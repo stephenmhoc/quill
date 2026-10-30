@@ -28,11 +28,12 @@ jobs:
       - name: Run GhostKit Tests
         run: swift test --package-path Packages/GhostKit
 
+      # Release, because the optimizer can fail where a Debug build passes.
       - name: Build iOS App
         run: |
           xcodebuild build \
             -project Quill.xcodeproj \
             -scheme Quill \
-            -configuration Debug \
+            -configuration Release \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO

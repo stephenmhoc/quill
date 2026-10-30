@@ -13,7 +13,7 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
     let margin: CGFloat
     @ViewBuilder let header: () -> Header
 
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeCoordinator() -> EditorCoordinator { EditorCoordinator(text: $text, selection: $selection, isFocused: $isFocused) }
 
     func makeUIView(context: Context) -> PageTextView {
         let view = PageTextView()
@@ -30,7 +30,9 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
 
     func updateUIView(_ view: PageTextView, context: Context) {
         let coordinator = context.coordinator
-        coordinator.parent = self
+        coordinator.text = $text
+        coordinator.selection = $selection
+        coordinator.isFocused = $isFocused
         coordinator.isUpdating = true
         defer { coordinator.isUpdating = false }
 
@@ -58,38 +60,46 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
         }
     }
 
-    final class Coordinator: NSObject, UITextViewDelegate {
-        var parent: EditorTextView
-        var isUpdating = false
-        var handledFocusRequest = 0
-        var lastSelection: NSRange?
+}
 
-        init(_ parent: EditorTextView) { self.parent = parent }
+/// Not nested in the generic view: Swift 6.3's optimizer crashes on this class's deinit there.
+final class EditorCoordinator: NSObject, UITextViewDelegate {
+    var text: Binding<String>
+    var selection: Binding<TextSelection?>
+    var isFocused: Binding<Bool>
+    var isUpdating = false
+    var handledFocusRequest = 0
+    var lastSelection: NSRange?
 
-        func textViewDidChange(_ view: UITextView) {
-            guard !isUpdating else { return }
-            parent.text = view.text
-            (view as? PageTextView)?.placeholder.isHidden = !view.text.isEmpty
-            if view.markedTextRange == nil { MarkdownStyler.style(view) }
+    init(text: Binding<String>, selection: Binding<TextSelection?>, isFocused: Binding<Bool>) {
+        self.text = text
+        self.selection = selection
+        self.isFocused = isFocused
+    }
+
+    func textViewDidChange(_ view: UITextView) {
+        guard !isUpdating else { return }
+        text.wrappedValue = view.text
+        (view as? PageTextView)?.placeholder.isHidden = !view.text.isEmpty
+        if view.markedTextRange == nil { MarkdownStyler.style(view) }
+    }
+
+    func textViewDidChangeSelection(_ view: UITextView) {
+        guard !isUpdating, let range = Range(view.selectedRange, in: view.text) else { return }
+        lastSelection = view.selectedRange
+        selection.wrappedValue = TextSelection(range: range)
+    }
+
+    func textViewDidBeginEditing(_ view: UITextView) { setFocused(true) }
+    func textViewDidEndEditing(_ view: UITextView) { setFocused(false) }
+
+    /// `updateUIView` can move the keyboard, and SwiftUI state can't change during an update.
+    private func setFocused(_ focused: Bool) {
+        guard isUpdating else {
+            isFocused.wrappedValue = focused
+            return
         }
-
-        func textViewDidChangeSelection(_ view: UITextView) {
-            guard !isUpdating, let range = Range(view.selectedRange, in: view.text) else { return }
-            lastSelection = view.selectedRange
-            parent.selection = TextSelection(range: range)
-        }
-
-        func textViewDidBeginEditing(_ view: UITextView) { setFocused(true) }
-        func textViewDidEndEditing(_ view: UITextView) { setFocused(false) }
-
-        /// `updateUIView` can move the keyboard, and SwiftUI state can't change during an update.
-        private func setFocused(_ focused: Bool) {
-            guard isUpdating else {
-                parent.isFocused = focused
-                return
-            }
-            DispatchQueue.main.async { self.parent.isFocused = focused }
-        }
+        DispatchQueue.main.async { self.isFocused.wrappedValue = focused }
     }
 }
 
