@@ -7,8 +7,8 @@ There are three parts:
 
 | Suite | Where it runs | What it proves |
 |---|---|---|
-| `QuillUITests` | Simulator | The whole app: simulated Face ID, add a site, write, publish, check the post in Ghost, relaunch |
-| `QuillTests` | Simulator | The real Publisher: publishing, the offline outbox, conflicts, double taps, lost responses |
+| `QuillUITests` | Simulator | The whole app: first-run setup, writing and publishing, then finding, editing and deleting past posts, appearance and app icon |
+| `QuillTests` | Simulator | The real Publisher: publishing, the offline outbox, conflicts, double taps, lost responses, importing and deleting posts, paging |
 | `GhostKitTests` | Mac | The API client on its own (`scripts/test-ghostkit.sh`) |
 
 ## Quick start

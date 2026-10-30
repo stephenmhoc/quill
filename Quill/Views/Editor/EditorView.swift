@@ -20,9 +20,8 @@ struct EditorView: View {
     @State private var uploading = false
     @State private var uploadError: String?
     @State private var pendingPublicPhoto: PhotosPickerItem?
-    @FocusState private var focus: Field?
-
-    enum Field { case title, body }
+    @State private var bodyFocused = false
+    @State private var focusRequest = 0
 
     private var site: Site? { sites.first { $0.id == entry.siteID } }
     private var isEditable: Bool { entry.state == .editing }
@@ -32,53 +31,20 @@ struct EditorView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                StatusBanner(entry: entry, site: site)
-                    .padding(.bottom, 16)
-
-                TextField("Title (optional)", text: $entry.title)
-                    .font(.system(.title, design: .serif).weight(.semibold))
-                    .focused($focus, equals: .title)
-                    .submitLabel(.next)
-                    .onSubmit { focus = .body }
-                    .padding(.bottom, 8)
-                    .disabled(!isEditable)
-
-                if !entry.tags.isEmpty {
-                    TagStrip(tags: entry.tags) { showingTags = true }
-                        .padding(.bottom, 8)
-                        .disabled(!isEditable)
-                }
-
-                ZStack(alignment: .topLeading) {
-                    if entry.body.isEmpty {
-                        Text("Write…")
-                            .font(.system(.body, design: .serif))
-                            .foregroundStyle(.tertiary)
-                            .padding(.top, 8)
-                            .padding(.leading, 5)
-                            .allowsHitTesting(false)
-                    }
-                    TextEditor(text: $entry.body, selection: $selection)
-                        .font(.system(.body, design: .serif))
-                        .lineSpacing(5)
-                        .scrollContentBackground(.hidden)
-                        .scrollDismissesKeyboard(.interactively)
-                        .focused($focus, equals: .body)
-                        .disabled(!isEditable)
-                }
-            }
-            .frame(maxWidth: 720, alignment: .leading)
-            .padding(.horizontal, sizeClass == .regular ? 48 : 20)
-            .padding(.top, 20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        EditorTextView(text: $entry.body, selection: $selection, isFocused: $bodyFocused,
+                       focusRequest: focusRequest, isEditable: isEditable, tint: tint,
+                       margin: sizeClass == .regular ? 48 : 20) {
+            // Hosted inside UIKit, so the environment has to be passed along.
+            EditorHeader(entry: entry, site: site, isEditable: isEditable,
+                         onTags: { showingTags = true }, onSubmit: { focusRequest += 1 })
+                .environment(navigation)
+                .environment(publisher)
         }
         .background(tint.opacity(0.035))
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
-                if focus != nil && isEditable { formatBar }
-                publishBar
+                if bodyFocused && isEditable { formatBar }
+                if isEditable { publishBar }
             }
         }
         .navigationTitle("")
@@ -110,7 +76,7 @@ struct EditorView: View {
             guard let item else { return }
             if site?.isPublic == true { pendingPublicPhoto = item } else { Task { await insertPhoto(item) } }
         }
-        .onAppear { if isEditable && entry.isBlank { focus = .body } }
+        .onAppear { if isEditable && entry.isBlank { focusRequest += 1 } }
     }
 
     private func touchIfStale() {
@@ -140,7 +106,7 @@ struct EditorView: View {
                 HStack(spacing: 22) { formatButtons }
             }
             .scrollIndicators(.hidden)
-            Button { focus = nil } label: { Image(systemName: "keyboard.chevron.compact.down") }
+            Button(action: hideKeyboard) { Image(systemName: "keyboard.chevron.compact.down") }
                 .accessibilityLabel("Hide Keyboard")
         }
         .padding(.horizontal, sizeClass == .regular ? 48 : 16)
@@ -221,7 +187,7 @@ struct EditorView: View {
     }
 
     private func send() {
-        focus = nil
+        hideKeyboard()
         let sent = entry
         Task {
             await publisher.publish(sent)
@@ -238,7 +204,11 @@ struct EditorView: View {
         let (text, newSelection) = format.apply(to: entry.body, selection: selection)
         entry.body = text
         selection = newSelection
-        focus = .body
+        focusRequest += 1
+    }
+
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private func insertPhoto(_ item: PhotosPickerItem) async {
@@ -297,6 +267,39 @@ struct SitePicker: View {
         }
         .disabled(locked)
         .accessibilityLabel("Site: \(site?.name ?? "none")")
+    }
+}
+
+/// Everything above the text. It scrolls away with the page.
+private struct EditorHeader: View {
+    @Bindable var entry: Entry
+    let site: Site?
+    let isEditable: Bool
+    let onTags: () -> Void
+    let onSubmit: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            StatusBanner(entry: entry, site: site)
+                .padding(.bottom, 16)
+            TextField("Title (optional)", text: $entry.title, axis: .vertical)
+                .font(.system(.title, design: .serif).weight(.semibold))
+                .lineLimit(1...4)
+                .disabled(!isEditable)
+                .padding(.bottom, 8)
+                // Multi-line so long titles wrap, but Return still moves on to the text.
+                .onChange(of: entry.title) { _, title in
+                    guard title.contains(where: \.isNewline) else { return }
+                    entry.title = title.filter { !$0.isNewline }
+                    onSubmit()
+                }
+            if !entry.tags.isEmpty {
+                TagStrip(tags: entry.tags, onTap: onTags)
+                    .padding(.bottom, 8)
+                    .disabled(!isEditable)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

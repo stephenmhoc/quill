@@ -30,6 +30,7 @@
 		CBA847A0D91FF6CF35722C21 /* MarkdownFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = E38D052F3FD1038D28BD2E47 /* MarkdownFormat.swift */; };
 		CCB62736FA629BAFBDE21593 /* TokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8DA851EEC6DDC791043D66F /* TokenStore.swift */; };
 		D4A4486ECDF96AE03E6D8076 /* QuillApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2BDDEC6FBD3F6622BF7272 /* QuillApp.swift */; };
+		D6A3327F5586CB8BFA2DA93D /* EditorTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECB4E88FFB544CBB3212EA2 /* EditorTextView.swift */; };
 		DA3769B4FADBCB4DBBCF6E29 /* TagEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E75D2A90726438075942B1 /* TagEditor.swift */; };
 		E113677E2C88F72B38258BFF /* Publisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F21B3D2ECEA6CDF2B70A82 /* Publisher.swift */; };
 		F5F0BBB891F093490DBFDF2C /* PublisherLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A65A91C0E406B03993C6B547 /* PublisherLiveTests.swift */; };
@@ -64,6 +65,7 @@
 		4CFFE080A6F3B5F2C89C9662 /* SitePostsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePostsView.swift; sourceTree = "<group>"; };
 		64CF96E4FEB2C5D36281BB0D /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		652A2E7C67C2F9335547BBB9 /* Site.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Site.swift; sourceTree = "<group>"; };
+		7ECB4E88FFB544CBB3212EA2 /* EditorTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTextView.swift; sourceTree = "<group>"; };
 		9234120738BBF6CBF48467A3 /* PublishFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishFlowUITests.swift; sourceTree = "<group>"; };
 		95E8C48ADF7597448F3FD904 /* Quill.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Quill.entitlements; sourceTree = "<group>"; };
 		9A601AE5954D328F6E161E61 /* Navigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Navigation.swift; sourceTree = "<group>"; };
@@ -130,6 +132,7 @@
 		1AAD7C12AAEA2E5DD99F26DB /* Editor */ = {
 			isa = PBXGroup;
 			children = (
+				7ECB4E88FFB544CBB3212EA2 /* EditorTextView.swift */,
 				1641461940ABADF3553A64FE /* EditorView.swift */,
 				E38D052F3FD1038D28BD2E47 /* MarkdownFormat.swift */,
 				37E75D2A90726438075942B1 /* TagEditor.swift */,
@@ -365,6 +368,7 @@
 				4D3B3EE692DDC20217F87624 /* AppIconChoice.swift in Sources */,
 				8BDD2968EEB5C5B8281245A0 /* AppLock.swift in Sources */,
 				AC6278DA04BDDA7F884010AF /* Appearance.swift in Sources */,
+				D6A3327F5586CB8BFA2DA93D /* EditorTextView.swift in Sources */,
 				AFB5235167ECFC2E9294CE68 /* EditorView.swift in Sources */,
 				2DECFDE235C863317DFF34BF /* Entry.swift in Sources */,
 				A45A30C56D3270D2493CEFFD /* EntryListView.swift in Sources */,

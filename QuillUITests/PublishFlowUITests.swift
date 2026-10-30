@@ -21,7 +21,7 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(urlField.waitForExistence(timeout: 30), "Face ID unlock / Add Site didn't appear")
         attach("add-site", app)
         XCTAssertFalse(app.buttons["Cancel"].exists, "first site must not be skippable")
-        XCTAssertFalse(app.textViews.firstMatch.exists, "no writing before a site exists")
+        XCTAssertFalse(app.textViews["editor"].exists, "no writing before a site exists")
         urlField.tap()
         urlField.typeText(url)
         let keyField = app.secureTextFields.firstMatch
@@ -32,7 +32,7 @@ final class PublishFlowUITests: XCTestCase {
         app.buttons["Save"].tap()
 
         // Then the blank page, on the new site.
-        let editor = app.textViews.firstMatch
+        let editor = app.textViews["editor"]
         XCTAssertTrue(editor.waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["Site: Quill Dev"].waitForExistence(timeout: 10), "site not selected")
         attach("blank-page", app)
@@ -57,7 +57,7 @@ final class PublishFlowUITests: XCTestCase {
         app.terminate()
         app.launch()
         allowFaceIDIfAsked()
-        XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout: 30), "didn't unlock on relaunch")
+        XCTAssertTrue(app.textViews["editor"].waitForExistence(timeout: 30), "didn't unlock on relaunch")
         attach("relaunched", app)
     }
 
@@ -77,7 +77,7 @@ final class PublishFlowUITests: XCTestCase {
         app.launch()
         allowFaceIDIfAsked()
         let urlField = app.textFields["https://journal.example.com"]
-        let editorView = app.textViews.firstMatch
+        let editorView = app.textViews["editor"]
         XCTAssertTrue(urlField.waitForExistence(timeout: 30) || editorView.exists, "didn't unlock")
         if urlField.exists {
             urlField.tap()
@@ -106,7 +106,7 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 15), "post not listed")
         attach("site-posts", app)
         row.tap()
-        let editor = app.textViews.firstMatch
+        let editor = app.textViews["editor"]
         XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 15), "post didn't open")
         XCTAssertEqual(editor.value as? String, "Written **elsewhere**")
 
@@ -136,7 +136,7 @@ final class PublishFlowUITests: XCTestCase {
         app.terminate()
         app.launch()
         allowFaceIDIfAsked()
-        XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout: 30))
+        XCTAssertTrue(app.textViews["editor"].waitForExistence(timeout: 30))
         showSidebar(app)
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.buttons["Dark"].waitForExistence(timeout: 5))
