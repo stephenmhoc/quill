@@ -11,6 +11,7 @@ require "time"
 require "uri"
 
 API_BASE = "https://api.appstoreconnect.apple.com"
+PROCESSING_TIMEOUT_MINUTES = 45
 
 def env_fetch(name)
   ENV.fetch(name) do
@@ -257,6 +258,46 @@ def prepare
   )
 end
 
+# Apple checks the signature while processing, so the certificate has to outlive this.
+def wait_for_processing
+  bundle_identifier = env_fetch("IOS_BUNDLE_ID")
+  build_number = env_fetch("BUILD_NUMBER")
+  app_query = URI.encode_www_form("filter[bundleId]" => bundle_identifier, "limit" => 200)
+  app = AppStoreConnectClient.new.get("/v1/apps?#{app_query}").fetch("data").find do |candidate|
+    candidate.fetch("attributes").fetch("bundleId") == bundle_identifier
+  end
+  unless app
+    warn "No App Store Connect app has the bundle ID #{bundle_identifier}"
+    exit 1
+  end
+
+  build_query = URI.encode_www_form(
+    "filter[app]" => app.fetch("id"),
+    "filter[version]" => build_number,
+    "limit" => 1
+  )
+  deadline = Time.now + (PROCESSING_TIMEOUT_MINUTES * 60)
+  while Time.now < deadline
+    # A new client each time, because its token only lasts ten minutes.
+    build = AppStoreConnectClient.new.get("/v1/builds?#{build_query}").fetch("data").first
+    state = build&.fetch("attributes")&.fetch("processingState") || "not visible yet"
+    puts "Build #{build_number}: #{state}"
+
+    case state
+    when "VALID"
+      return
+    when "FAILED", "INVALID"
+      warn "App Store Connect rejected build #{build_number}. Apple's email has the reason."
+      exit 1
+    end
+    sleep 30
+  end
+
+  warn "Build #{build_number} wasn't ready after #{PROCESSING_TIMEOUT_MINUTES} minutes. " \
+       "A rejected upload never appears, so check Apple's email."
+  exit 1
+end
+
 def cleanup
   client = AppStoreConnectClient.new
   profile_ids = ENV.fetch("ASC_CREATED_PROFILE_IDS", "").split(",").reject(&:empty?)
@@ -276,9 +317,11 @@ end
 case ARGV.fetch(0, "prepare")
 when "prepare"
   prepare
+when "wait"
+  wait_for_processing
 when "cleanup"
   cleanup
 else
-  warn "Usage: #{File.basename($PROGRAM_NAME)} [prepare|cleanup]"
+  warn "Usage: #{File.basename($PROGRAM_NAME)} [prepare|wait|cleanup]"
   exit 1
 end

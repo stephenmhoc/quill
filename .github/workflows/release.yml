@@ -205,6 +205,12 @@ jobs:
             exit 1
           fi
 
+      - name: Wait for App Store Connect Processing
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: ruby Tools/app_store_connect_signing.rb wait
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

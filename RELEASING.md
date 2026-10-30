@@ -1,7 +1,8 @@
 # Releasing to TestFlight
 
 `.github/workflows/release.yml` archives Quill, signs it with a temporary certificate and
-profile, uploads it to App Store Connect and revokes the temporary signing assets again.
+profile, uploads it to App Store Connect, waits for Apple to finish processing it, then revokes
+the temporary signing assets. Revoking any earlier fails processing with `ITMS-90721`.
 
 ## One-time setup
 
