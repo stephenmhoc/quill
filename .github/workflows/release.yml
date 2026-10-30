@@ -1,0 +1,264 @@
+name: Release to TestFlight
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (for example, 1.0.0)'
+        required: true
+      release_notes:
+        description: 'GitHub release notes'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SCHEME: Quill
+  CONFIGURATION: Release
+  ARCHIVE_PATH: build/Quill.xcarchive
+  EXPORT_PATH: build/export
+  KEYCHAIN_NAME: build.keychain-db
+  KEYCHAIN_PASSWORD: temporary-ci-password
+  APPLE_TEAM_ID: 8G4H6268W7
+  IOS_BUNDLE_ID: com.merimerimeri.Quill
+
+jobs:
+  release:
+    name: Archive, Upload, and Publish
+    runs-on: macos-26
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show Build Environment
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Ensure Device Platform
+        run: xcodebuild -downloadPlatform iOS -architectureVariant universal || true
+
+      - name: Compute Version
+        env:
+          VERSION_INPUT: ${{ github.event.inputs.version }}
+        run: |
+          if [ -n "$VERSION_INPUT" ]; then
+            VERSION="$VERSION_INPUT"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+
+          VERSION="${VERSION#v}"
+          TAG="v${VERSION}"
+          BUILD_NUMBER=${{ github.run_number }}
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "Building Quill $VERSION ($BUILD_NUMBER)"
+
+      - name: Run GhostKit Tests
+        run: swift test --package-path Packages/GhostKit
+
+      - name: Install App Store Connect API Key
+        env:
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo "$ASC_API_KEY_P8_BASE64" | base64 --decode -o ~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
+          echo "ASC_API_KEY_PATH=$HOME/.private_keys/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
+
+      - name: Create Temporary App Store Signing Assets
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: ruby Tools/app_store_connect_signing.rb prepare
+
+      - name: Install Apple Certificate and Provisioning Profile
+        run: |
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_NAME"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+
+          security import "$APPLE_CERTIFICATE_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_NAME"
+
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_NAME"
+
+          security list-keychains -d user -s "$KEYCHAIN_NAME" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$KEYCHAIN_NAME"
+
+          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES_DIR"
+
+          IOS_PROFILE_PLIST=$(security cms -D -i "$IOS_PROVISIONING_PROFILE_PATH")
+          IOS_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< "$IOS_PROFILE_PLIST")
+          IOS_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< "$IOS_PROFILE_PLIST")
+          cp "$IOS_PROVISIONING_PROFILE_PATH" "$PROFILES_DIR/$IOS_PROFILE_UUID.mobileprovision"
+
+          echo "IOS_PROFILE_UUID=$IOS_PROFILE_UUID" >> "$GITHUB_ENV"
+          echo "IOS_PROFILE_NAME=$IOS_PROFILE_NAME" >> "$GITHUB_ENV"
+
+          security find-identity -v -p codesigning "$KEYCHAIN_NAME"
+
+      # The project signs automatically for local builds; CI signs with the temporary assets above.
+      - name: Archive
+        run: |
+          rm -rf "$ARCHIVE_PATH" "$EXPORT_PATH"
+          xcodebuild archive \
+            -project Quill.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE_NAME" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+
+      - name: Generate ExportOptions.plist
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${IOS_BUNDLE_ID}</key>
+              <string>${IOS_PROFILE_NAME}</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Export IPA
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$EXPORT_PATH"
+
+          IPA_PATH=$(find "$EXPORT_PATH" -name "*.ipa" -type f | head -1)
+          if [ -z "$IPA_PATH" ]; then
+            echo "Error: no .ipa file found in $EXPORT_PATH"
+            find "$EXPORT_PATH" -maxdepth 3 -type f -print
+            exit 1
+          fi
+
+          IPA_ASSET_NAME="Quill-${VERSION}-${BUILD_NUMBER}.ipa"
+          IPA_ASSET_PATH="$EXPORT_PATH/$IPA_ASSET_NAME"
+          cp "$IPA_PATH" "$IPA_ASSET_PATH"
+
+          echo "IPA_PATH=$IPA_ASSET_PATH" >> "$GITHUB_ENV"
+
+      - name: Upload to App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set +e
+          xcrun altool --upload-app \
+            --file "$IPA_PATH" \
+            --type ios \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$RUNNER_TEMP/altool-upload.log"
+          ALTOOL_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$ALTOOL_STATUS" -ne 0 ]; then
+            exit "$ALTOOL_STATUS"
+          fi
+
+          if grep -Eq "ERROR:|UPLOAD FAILED|Validation failed|Failed to upload package" "$RUNNER_TEMP/altool-upload.log"; then
+            echo "App Store Connect upload failed validation."
+            exit 1
+          fi
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES_INPUT: ${{ github.event.inputs.release_notes }}
+        run: |
+          RELEASE_NOTES="$RELEASE_NOTES_INPUT"
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="Uploaded build ${BUILD_NUMBER} to TestFlight."
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$IPA_PATH" --clobber
+          else
+            gh release create "$TAG" "$IPA_PATH" \
+              --target "$GITHUB_SHA" \
+              --title "Quill $VERSION" \
+              --notes "$RELEASE_NOTES"
+          fi
+
+      - name: Upload Archive Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Quill-${{ env.BUILD_NUMBER }}.xcarchive
+          path: ${{ env.ARCHIVE_PATH }}
+          retention-days: 30
+
+      - name: Cleanup App Store Connect Signing Assets
+        if: always()
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          if [ -n "${ASC_API_KEY_PATH:-}" ] && [ -f "$ASC_API_KEY_PATH" ]; then
+            ruby Tools/app_store_connect_signing.rb cleanup
+          else
+            echo "No App Store Connect signing assets to clean up."
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          rm -f "$RUNNER_TEMP/apple_distribution.key"
+          rm -f "$RUNNER_TEMP/apple_distribution.csr"
+          rm -f "$RUNNER_TEMP/apple_distribution.cer"
+          rm -f "$RUNNER_TEMP/apple_distribution.pem"
+          rm -f "$RUNNER_TEMP/ios.mobileprovision"
+          rm -f "$RUNNER_TEMP/ExportOptions.plist"
+          rm -rf ~/.private_keys
+          if [ -n "${IOS_PROFILE_UUID:-}" ]; then
+            rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/$IOS_PROFILE_UUID.mobileprovision"
+          fi
