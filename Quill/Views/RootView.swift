@@ -8,6 +8,7 @@ struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \Site.createdAt) private var sites: [Site]
+    @State private var sidebarOverlays = false
 
     var body: some View {
         @Bindable var navigation = navigation
@@ -26,6 +27,11 @@ struct RootView: View {
                     DetailColumn()
                 }
                 .navigationSplitViewStyle(.balanced)
+                // Narrow iPad: the sidebar floats over the list, so get out of the way once it's used.
+                .onGeometryChange(for: Bool.self) { $0.size.width < 1100 } action: { sidebarOverlays = $0 }
+                .onChange(of: navigation.sidebar) {
+                    if sidebarOverlays { withAnimation { navigation.columnVisibility = .doubleColumn } }
+                }
                 .sheet(isPresented: $navigation.showingSettings) { SettingsView() }
                 .sheet(isPresented: $navigation.showingAddSite) { SiteFormView(site: nil) }
                 .overlay(alignment: .top) { ResultBanner() }
