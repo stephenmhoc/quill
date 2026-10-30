@@ -52,8 +52,14 @@ struct RootView: View {
                 .onReceive(NotificationCenter.default.publisher(for: .quillNewEntry)) { _ in
                     navigation.openBlankEntry(in: context)
                 }
+                .onChange(of: sites.count) {
+                    repairSidebar()
+                    if sizeClass == .regular, navigation.selectedEntry == nil {
+                        navigation.openBlankEntry(in: context, focus: false)
+                    }
+                }
                 .onAppear {
-                    if navigation.sidebar == nil { navigation.sidebar = sites.first.map { .site($0.id) } }
+                    repairSidebar()
                     // Also after setup, when the last site was removed and a new one added.
                     if !sites.contains(where: { $0.id == navigation.selectedEntry?.siteID }) {
                         navigation.openBlankEntry(in: context, focus: sizeClass != .regular)
@@ -74,6 +80,13 @@ struct RootView: View {
             // Only on background: an unfocused iPad Split View scene is merely inactive.
             PrivacyWindow.shared.setVisible(phase == .background)
         }
+    }
+
+    private func repairSidebar() {
+        if case .site(let id)? = navigation.sidebar, sites.contains(where: { $0.id == id }) { return }
+        if case .drafts? = navigation.sidebar { return }
+        if case .outbox? = navigation.sidebar { return }
+        navigation.sidebar = sites.first.map { .site($0.id) }
     }
 
     /// Retry queued entries every minute while unlocked and in the foreground.
@@ -113,7 +126,7 @@ private struct DetailColumn: View {
     @Environment(\.modelContext) private var context
 
     var body: some View {
-        if let entry = navigation.selectedEntry, entry.modelContext != nil {
+        if let entry = navigation.selectedEntry, entry.modelContext != nil, !entry.isDeleted {
             EditorView(entry: entry)
                 .id(entry.id)
         } else {

@@ -53,11 +53,11 @@ struct EntryListView: View {
             if visible.isEmpty { emptyState }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.paper)
+        .background(Color.paper.ignoresSafeArea())
         .navigationTitle(title)
         .toolbar {
             if section == .outbox, !visible.isEmpty {
-                Button("Retry All") { Task { await publisher.flushOutbox() } }
+                Button("Retry All") { Task { await publisher.retryAll() } }
             }
         }
     }

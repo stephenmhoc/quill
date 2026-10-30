@@ -27,6 +27,8 @@ protocol SiteBackend {
     func posts(limit: Int, page: Int) async throws -> [SitePost]
     /// The entry for a listed post, brought into Quill if needed. Nil if Quill can't edit it safely.
     func entry(forPost id: String) async throws -> Entry?
+    /// Updates an unedited copy of a post to match the site.
+    func refresh(_ entry: Entry) async throws
     func deletePost(id: String) async throws
     func send(_ entry: Entry) async throws -> SentPost
     /// Accept the site's current version, so `send` replaces it instead of conflicting.

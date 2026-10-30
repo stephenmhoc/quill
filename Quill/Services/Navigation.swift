@@ -74,6 +74,13 @@ final class Navigation {
         closeSidebarOverlay()
     }
 
+    /// Call before a site's data is deleted, while the selected entry can still be read.
+    func leaveSite(_ id: UUID) {
+        if selectedEntry?.siteID == id { selectedEntry = nil }
+        if sidebar == .site(id) { sidebar = nil }
+        path = []
+    }
+
     func show(_ entry: Entry) {
         selectedEntry = entry
         if path.last != .editor { path.append(.editor) }

@@ -65,6 +65,16 @@ final class Publisher {
         }
     }
 
+    /// The outbox's Retry All. Conflicts stay put: they need a decision, not another try.
+    func retryAll() async {
+        let failed = Entry.State.failed.rawValue
+        let descriptor = FetchDescriptor<Entry>(predicate: #Predicate { $0.stateRaw == failed })
+        for entry in (try? context.fetch(descriptor)) ?? [] where !entry.isConflict {
+            entry.state = .queued
+        }
+        await flushOutbox()
+    }
+
     /// Conflict resolution: replace whatever is on the site with this version.
     func overwrite(_ entry: Entry) async {
         guard entry.state == .failed, !sending.contains(entry.id), let site = site(for: entry) else { return }
@@ -72,7 +82,7 @@ final class Publisher {
         do {
             try await backend(for: site).adoptLatestVersion(of: entry)
             sending.remove(entry.id)
-            await publish(entry)
+            if entry.modelContext != nil, !entry.isDeleted { await publish(entry) }
         } catch {
             sending.remove(entry.id)
             fail(entry, error)
@@ -83,6 +93,12 @@ final class Publisher {
     /// Nil if the post has content Markdown can't hold: editing it here would lose that content.
     func importPost(id: String, site: Site) async throws -> Entry? {
         try await backend(for: site).entry(forPost: id)
+    }
+
+    /// Picks up changes made on the site. A failure is fine: the copy here still opens.
+    func refresh(_ entry: Entry, site: Site) async {
+        guard entry.state == .sent else { return }
+        try? await backend(for: site).refresh(entry)
     }
 
     func deletePost(id: String, site: Site) async throws {
@@ -117,6 +133,8 @@ final class Publisher {
         do {
             let isUpdate = entry.remotePostID != nil
             let post = try await backend(for: site).send(entry)
+            // Deleted while the request was out, along with its site or on its own.
+            guard entry.modelContext != nil, !entry.isDeleted else { return }
             entry.remotePostID = post.id
             entry.remoteUpdatedAt = post.updatedAt
             entry.remoteURLString = post.url?.absoluteString
@@ -126,9 +144,11 @@ final class Publisher {
             entry.createAttemptedAt = nil
             entry.clearPublishedCopy()
             entry.state = .sent
-            site.lastUsedAt = .now
+            if site.modelContext != nil, !site.isDeleted { site.lastUsedAt = .now }
             lastResult = Result(entryID: entry.id, siteName: site.name, kind: site.kind, url: post.url,
                                 status: post.status, wasUpdate: isUpdate)
+        } catch where entry.modelContext == nil || entry.isDeleted {
+            return
         } catch let error as GhostError where error.isTransient {
             // `.unreachable` never left the phone, so a fresh attempt can't have landed.
             if case .unreachable = error, !unresolvedAttempt { entry.createAttemptedAt = nil }

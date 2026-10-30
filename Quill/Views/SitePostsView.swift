@@ -62,7 +62,7 @@ struct SitePostsView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.paper)
+        .background(Color.paper.ignoresSafeArea())
         .navigationTitle(site?.name ?? "Site")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -124,9 +124,16 @@ struct SitePostsView: View {
         guard let site else { return }
         opening = post.id
         defer { opening = nil }
+        let (shownEntry, shownPath) = (navigation.selectedEntry, navigation.path)
         do {
             var entry = localEntry(for: post)
-            if entry == nil { entry = try await publisher.importPost(id: post.id, site: site) }
+            if let entry {
+                await publisher.refresh(entry, site: site)
+            } else {
+                entry = try await publisher.importPost(id: post.id, site: site)
+            }
+            // Someone who moved on while this loaded stays where they went.
+            guard navigation.selectedEntry == shownEntry, navigation.path == shownPath else { return }
             guard let entry else {
                 unsupported = post
                 return

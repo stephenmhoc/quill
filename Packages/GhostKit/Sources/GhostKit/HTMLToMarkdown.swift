@@ -65,7 +65,10 @@ public enum HTMLToMarkdown {
             let language = codeAttrs["class"]?.split(separator: " ")
                 .first { $0.hasPrefix("language-") }?.dropFirst("language-".count) ?? ""
             let text = plainText(code)
-            return "```\(language)\n\(text.hasSuffix("\n") ? text : text + "\n")```"
+            // The fence has to outrun any backticks in the code itself.
+            let longest = text.matches(of: /`+/).map(\.output.count).max() ?? 0
+            let fence = String(repeating: "`", count: max(3, longest + 1))
+            return "\(fence)\(language)\n\(text.hasSuffix("\n") ? text : text + "\n")\(fence)"
         case "hr":
             return "---"
         case "figure":
@@ -144,9 +147,11 @@ public enum HTMLToMarkdown {
     private static func escape(_ text: String) -> String {
         var out = ""
         for character in text {
-            if "\\`*_[]~".contains(character) { out.append("\\") }
+            if "\\`*_[]~<".contains(character) { out.append("\\") }
             out.append(character)
         }
+        // A literal "&lt;" in the text would otherwise publish as "<".
+        out.replace(/&(?=#?\w+;)/) { _ in "\\&" }
         // Would otherwise start a heading, quote or list.
         if let match = out.firstMatch(of: /^(\s*)(#{1,6} |> |[-+] |\d+[.)] )/) {
             let marker = String(match.output.2)

@@ -20,22 +20,44 @@ struct GhostBackend: SiteBackend {
         let post = try await client.post(id: id)
         guard post.status == .published || post.status == .draft,
               let body = HTMLToMarkdown.convert(post.html ?? "") else { return nil }
-        let tags = (post.tags ?? []).map(\.name)
+        // A second tap can have finished importing while this one waited.
+        if let existing = try localCopy(of: id) { return existing }
         let entry = Entry(siteID: site.id)
+        apply(post, body: body, to: entry)
+        entry.createdAt = post.publishedAt ?? post.createdAt ?? .now
+        entry.state = .sent
+        entry.sentAt = entry.createdAt
+        context.insert(entry)
+        try context.save()
+        return entry
+    }
+
+    func refresh(_ entry: Entry) async throws {
+        guard let id = entry.remotePostID else { return }
+        let post = try await client.post(id: id)
+        guard post.updatedAt != entry.remoteUpdatedAt, entry.state == .sent, !entry.isDeleted,
+              post.status == .published || post.status == .draft,
+              let body = HTMLToMarkdown.convert(post.html ?? "") else { return }
+        apply(post, body: body, to: entry)
+        try context.save()
+    }
+
+    private func apply(_ post: GhostPost, body: String, to entry: Entry) {
+        let tags = (post.tags ?? []).map(\.name)
         entry.title = tags.contains(EntryBuilder.untitledTag) || post.title == "(Untitled)" ? "" : post.title
         entry.body = body
         entry.tags = tags.filter { $0 != EntryBuilder.untitledTag }
         entry.publishStatus = post.status
-        entry.createdAt = post.publishedAt ?? post.createdAt ?? .now
-        entry.state = .sent
-        entry.sentAt = entry.createdAt
         entry.remotePostID = post.id
         entry.remoteUpdatedAt = post.updatedAt
         entry.remoteURLString = post.url?.absoluteString
         entry.remoteStatusRaw = post.status.rawValue
-        context.insert(entry)
-        try context.save()
-        return entry
+    }
+
+    private func localCopy(of id: String) throws -> Entry? {
+        let siteID = site.id
+        return try context.fetch(FetchDescriptor<Entry>(
+            predicate: #Predicate { $0.remotePostID == id && $0.siteID == siteID })).first
     }
 
     /// Permanently deletes a post from Ghost, and Quill's copy of it.
@@ -73,7 +95,9 @@ struct GhostBackend: SiteBackend {
 
     func adoptLatestVersion(of entry: Entry) async throws {
         guard let id = entry.remotePostID else { return }
-        entry.remoteUpdatedAt = try await client.post(id: id).updatedAt
+        let latest = try await client.post(id: id).updatedAt
+        // Edit can be tapped during the fetch; that entry is no longer overwriting anything.
+        if entry.isConflict { entry.remoteUpdatedAt = latest }
     }
 
     func tags() async throws -> [String] {
@@ -84,8 +108,17 @@ struct GhostBackend: SiteBackend {
         try await client.uploadImage(jpeg, filename: filename, mimeType: "image/jpeg")
     }
 
-    /// Posts stay in Ghost; there's nothing else here to clean up.
-    func removeSiteData() throws {}
+    /// Posts stay in Ghost, so only Quill's copies of them go. Unsent writing stays in Drafts.
+    func removeSiteData() throws {
+        let siteID = site.id
+        let sent = Entry.State.sent.rawValue
+        let copies = try context.fetch(FetchDescriptor<Entry>(
+            predicate: #Predicate { $0.siteID == siteID && $0.stateRaw == sent }))
+        for entry in copies { context.delete(entry) }
+        let uploaded = try context.fetch(FetchDescriptor<Entry>(
+            predicate: #Predicate { $0.uploadedToSiteID == siteID }))
+        for entry in uploaded { entry.uploadedToSiteID = nil }
+    }
 
     private func resolvedUpdatedAt(_ entry: Entry, id: String) async throws -> String {
         if let known = entry.remoteUpdatedAt { return known }
@@ -96,7 +129,7 @@ struct GhostBackend: SiteBackend {
     /// identifies it; more than one match needs a human.
     private func findCreated(_ outgoing: OutgoingPost, since: Date) async throws -> GhostPost? {
         let cutoff = since.addingTimeInterval(-120) // allow for clock differences
-        let matches = try await client.recentPosts(limit: 30).filter {
+        let matches = try await client.recentPosts(limit: 100).filter {
             $0.title == outgoing.title && ($0.createdAt ?? .distantPast) >= cutoff
         }
         if matches.count > 1 {

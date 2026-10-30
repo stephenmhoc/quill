@@ -7,6 +7,7 @@ struct LocalSiteForm: View {
     let isCentered: Bool
     let onDone: () -> Void
 
+    @Environment(Navigation.self) private var navigation
     @Environment(Publisher.self) private var publisher
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.modelContext) private var context
@@ -74,6 +75,7 @@ struct LocalSiteForm: View {
 
     private func remove() {
         guard let site else { return }
+        navigation.leaveSite(site.id)
         do {
             try publisher.backend(for: site).removeSiteData()
             context.delete(site)

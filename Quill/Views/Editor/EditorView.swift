@@ -156,8 +156,9 @@ struct EditorView: View {
             .accessibilityLabel("Quote")
         Button { apply(.link) } label: { Image(systemName: "link") }
             .keyboardShortcut("k")
+        let isUploading = uploading
         PhotosPicker(selection: $photoItem, matching: .images) {
-            if uploading { ProgressView() } else { Image(systemName: "photo") }
+            if isUploading { ProgressView() } else { Image(systemName: "photo") }
         }
         .disabled(site == nil || uploading)
     }
@@ -264,7 +265,9 @@ struct EditorView: View {
                 return
             }
             let url = try await publisher.backend(for: site)
-                .uploadImage(jpeg, filename: "quill-\(Int(Date.now.timeIntervalSince1970)).jpg")
+                .uploadImage(jpeg, filename: "quill-\(UUID().uuidString).jpg")
+            // Going back cancels an edit, and the picture goes with it.
+            guard entry.modelContext != nil, !entry.isDeleted, entry.state == .editing else { return }
             entry.uploadedToSiteID = site.id
             let (text, newSelection) = MarkdownFormat.insert("\n![](\(url.absoluteString))\n", into: entry.body, at: selection)
             entry.body = text
@@ -393,7 +396,10 @@ struct StatusBanner: View {
                 note(entry.lastError ?? "Waiting to send to \(site?.name ?? "the site").", "clock", .orange)
                 HStack {
                     Button("Retry now") { Task { await publisher.publish(entry) } }
-                    Button("Back to drafts") { entry.state = .editing }
+                    // A post that may already be on the site has to be found again before it can change.
+                    if entry.createAttemptedAt == nil {
+                        Button(entry.remotePostID == nil ? "Back to drafts" : "Keep editing") { entry.state = .editing }
+                    }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -407,7 +413,10 @@ struct StatusBanner: View {
                     } else {
                         Button("Retry") { Task { await publisher.publish(entry) } }
                     }
-                    Button("Edit") { entry.state = .editing; entry.failureReason = nil }
+                    if entry.createAttemptedAt == nil {
+                        Button("Edit") { entry.state = .editing; entry.failureReason = nil }
+                            .disabled(publisher.sending.contains(entry.id))
+                    }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)

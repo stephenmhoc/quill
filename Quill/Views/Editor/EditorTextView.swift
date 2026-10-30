@@ -79,8 +79,17 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
             parent.selection = TextSelection(range: range)
         }
 
-        func textViewDidBeginEditing(_ view: UITextView) { parent.isFocused = true }
-        func textViewDidEndEditing(_ view: UITextView) { parent.isFocused = false }
+        func textViewDidBeginEditing(_ view: UITextView) { setFocused(true) }
+        func textViewDidEndEditing(_ view: UITextView) { setFocused(false) }
+
+        /// `updateUIView` can move the keyboard, and SwiftUI state can't change during an update.
+        private func setFocused(_ focused: Bool) {
+            guard isUpdating else {
+                parent.isFocused = focused
+                return
+            }
+            DispatchQueue.main.async { self.parent.isFocused = focused }
+        }
     }
 }
 

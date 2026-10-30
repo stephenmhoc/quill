@@ -22,6 +22,9 @@ struct LocalBackend: SiteBackend {
         try saved().first { $0.remotePostID == id }
     }
 
+    /// The copy here is the only one.
+    func refresh(_ entry: Entry) async throws {}
+
     func deletePost(id: String) async throws {
         for entry in try saved() where entry.remotePostID == id { delete(entry) }
         try context.save()

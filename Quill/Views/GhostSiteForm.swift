@@ -9,6 +9,8 @@ struct GhostSiteForm: View {
     let onDone: () -> Void
 
     @Environment(AppLock.self) private var lock
+    @Environment(Navigation.self) private var navigation
+    @Environment(Publisher.self) private var publisher
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.modelContext) private var context
 
@@ -127,6 +129,8 @@ struct GhostSiteForm: View {
 
     private func remove() {
         guard let site else { return }
+        navigation.leaveSite(site.id)
+        try? publisher.backend(for: site).removeSiteData()
         lock.deleteKey(for: site.id)
         context.delete(site)
         try? context.save()
