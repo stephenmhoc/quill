@@ -8,6 +8,8 @@ struct SettingsView: View {
     @AppStorage(AppLock.graceKey) private var grace: Double = 30
     @AppStorage(Navigation.defaultSiteKey) private var defaultSite = ""
     @AppStorage(Appearance.key) private var appearance = Appearance.auto
+    @State private var icon = AppIconChoice.current
+    @State private var iconError: String?
 
     var body: some View {
         NavigationStack {
@@ -18,6 +20,21 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
+                }
+                Section {
+                    HStack(spacing: 20) {
+                        ForEach(AppIconChoice.allCases) { option in
+                            Button { choose(option) } label: { IconOption(option: option, isSelected: option == icon) }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("\(option.label) icon")
+                                .accessibilityAddTraits(option == icon ? .isSelected : [])
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                } header: {
+                    Text("Icon")
+                } footer: {
+                    if let iconError { Text(iconError).foregroundStyle(.red) }
                 }
                 Section("Writing") {
                     Picker("Default site", selection: $defaultSite) {
@@ -46,6 +63,51 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+        }
+    }
+
+    private func choose(_ option: AppIconChoice) {
+        Task {
+            do {
+                try await UIApplication.shared.setAlternateIconName(option.iconName)
+                icon = option
+                iconError = nil
+            } catch {
+                iconError = error.localizedDescription
+            }
+        }
+    }
+}
+
+private struct IconOption: View {
+    let option: AppIconChoice
+    let isSelected: Bool
+
+    private let size: CGFloat = 68
+    private var shape: some Shape { RoundedRectangle(cornerRadius: 15, style: .continuous) }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            preview
+                .frame(width: size, height: size)
+                .clipShape(shape)
+                .overlay { shape.stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.25), lineWidth: isSelected ? 2.5 : 1) }
+            Text(option.label)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(isSelected ? .primary : .secondary)
+        }
+    }
+
+    @ViewBuilder private var preview: some View {
+        switch option {
+        case .paper: Image("IconPaper").resizable()
+        case .ink: Image("IconInk").resizable()
+        case .auto:
+            // Half and half: this one follows the system's light or dark mode.
+            Image("IconPaper").resizable().overlay(alignment: .trailing) {
+                Image("IconInk").resizable()
+                    .mask(alignment: .trailing) { Rectangle().frame(width: size / 2) }
             }
         }
     }

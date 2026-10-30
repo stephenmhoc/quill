@@ -1,0 +1,12 @@
+{
+  "images": [
+    {
+      "filename": "nib.png",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

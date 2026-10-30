@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Quill: fountain-pen nib, light -->
+  <rect width="1024" height="1024" fill="#F3EDE2"/>
+  <!-- nib body: rounded shoulders, tapering to the tip -->
+  <path d="M 512 790 C 440 700 292 540 292 360 A 220 220 0 0 1 732 360 C 732 540 584 700 512 790 Z" fill="#1E1B18"/>
+  <!-- breather hole -->
+  <circle cx="512" cy="430" r="38" fill="#F3EDE2"/>
+  <!-- slit from hole to tip -->
+  <path d="M 500 430 L 524 430 L 524 740 L 512 756 L 500 740 Z" fill="#F3EDE2"/>
+  <!-- ink drop, rust -->
+  <path d="M 512 804 C 512 804 472 854 472 880 A 40 40 0 0 0 552 880 C 552 854 512 804 512 804 Z" fill="#B2452A"/>
+</svg>

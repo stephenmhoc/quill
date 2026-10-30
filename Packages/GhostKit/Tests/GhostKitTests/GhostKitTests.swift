@@ -93,7 +93,7 @@ private let sampleKey = "6ae4057d55c8400001a47b58:" + String(repeating: "ab", co
     @Test func gfmExtrasAndRawHTML() {
         let html = EntryBuilder.html(fromMarkdown: "| a | b |\n|---|---|\n| 1 | 2 |\n\n~~gone~~ https://example.com\n\n<aside>kept</aside>")
         #expect(html.contains("<table>"))
-        #expect(html.contains("<del>gone</del>"))
+        #expect(html.contains("<s>gone</s>"))
         #expect(html.contains("<a href=\"https://example.com\">"))
         #expect(html.contains("<aside>kept</aside>"))
     }
