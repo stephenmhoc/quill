@@ -60,6 +60,7 @@ targets:
     scheme:
       testTargets:
         - QuillTests
+        - QuillUITests
 
   QuillTests:
     type: bundle.unit-test
@@ -75,3 +76,17 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.merimerimeri.QuillTests
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+
+  QuillUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - QuillUITests
+    dependencies:
+      - target: Quill
+      - package: GhostKit
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.merimerimeri.QuillUITests
+        TARGETED_DEVICE_FAMILY: "1,2"

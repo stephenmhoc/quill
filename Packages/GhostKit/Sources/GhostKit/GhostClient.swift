@@ -178,6 +178,7 @@ public struct GhostClient: Sendable {
         case 401, 403: return .unauthorized(message)
         case 404: return .notFound
         case 409: return .conflict(message)
+        case 429: return .server(status: status, message: message)
         case 400..<500: return .rejected(message)
         default: return .server(status: status, message: message)
         }

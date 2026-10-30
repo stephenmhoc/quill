@@ -12,7 +12,11 @@ struct RootView: View {
     var body: some View {
         @Bindable var navigation = navigation
         ZStack {
-            if lock.isUnlocked {
+            if !lock.isUnlocked {
+                LockView()
+            } else if sites.isEmpty {
+                SiteFormView(site: nil, isRequired: true)
+            } else {
                 NavigationSplitView(columnVisibility: $navigation.columnVisibility,
                                     preferredCompactColumn: $navigation.preferredCompactColumn) {
                     SidebarView()
@@ -30,13 +34,12 @@ struct RootView: View {
                     navigation.openBlankEntry(in: context)
                 }
                 .onAppear {
-                    if navigation.selectedEntry == nil { navigation.openBlankEntry(in: context) }
-                    if sites.isEmpty { navigation.showingAddSite = true }
+                    // Also after setup, when the last site was removed and a new one added.
+                    if !sites.contains(where: { $0.id == navigation.selectedEntry?.siteID }) {
+                        navigation.openBlankEntry(in: context)
+                    }
                 }
-            } else {
-                LockView()
             }
-
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -48,7 +51,8 @@ struct RootView: View {
             default:
                 break
             }
-            PrivacyWindow.shared.setVisible(phase != .active)
+            // Only on background: an unfocused iPad Split View scene is merely inactive.
+            PrivacyWindow.shared.setVisible(phase == .background)
         }
     }
 
@@ -92,7 +96,7 @@ private struct DetailColumn: View {
     }
 }
 
-/// Covers everything, sheets included, in the app switcher snapshot and while Face ID is up.
+/// Covers everything, sheets included, in the app switcher snapshot.
 /// It needs its own window because sheets sit above the root view.
 final class PrivacyWindow {
     static let shared = PrivacyWindow()

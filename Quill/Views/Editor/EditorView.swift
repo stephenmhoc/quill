@@ -32,12 +32,12 @@ struct EditorView: View {
     }
 
     var body: some View {
-        ScrollView {
+        VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
                 StatusBanner(entry: entry, site: site)
                     .padding(.bottom, 16)
 
-                TextField("Title (optional)", text: $entry.title, axis: .vertical)
+                TextField("Title (optional)", text: $entry.title)
                     .font(.system(.title, design: .serif).weight(.semibold))
                     .focused($focus, equals: .title)
                     .submitLabel(.next)
@@ -63,21 +63,24 @@ struct EditorView: View {
                     TextEditor(text: $entry.body, selection: $selection)
                         .font(.system(.body, design: .serif))
                         .lineSpacing(5)
-                        .scrollDisabled(true)
                         .scrollContentBackground(.hidden)
+                        .scrollDismissesKeyboard(.interactively)
                         .focused($focus, equals: .body)
-                        .frame(minHeight: 320)
                         .disabled(!isEditable)
                 }
             }
             .frame(maxWidth: 720, alignment: .leading)
             .padding(.horizontal, sizeClass == .regular ? 48 : 20)
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity)
+            .padding(.top, 20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .scrollDismissesKeyboard(.interactively)
         .background(tint.opacity(0.035))
-        .safeAreaInset(edge: .bottom) { publishBar }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 0) {
+                if focus != nil && isEditable { formatBar }
+                publishBar
+            }
+        }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
@@ -100,13 +103,18 @@ struct EditorView: View {
         .alert("Image upload failed", isPresented: Binding(get: { uploadError != nil }, set: { if !$0 { uploadError = nil } })) {
             Button("OK") { uploadError = nil }
         } message: { Text(uploadError ?? "") }
-        .onChange(of: entry.title) { entry.touch() }
-        .onChange(of: entry.body) { entry.touch() }
+        // Throttled: updatedAt re-sorts every list on screen.
+        .onChange(of: entry.title) { touchIfStale() }
+        .onChange(of: entry.body) { touchIfStale() }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             if site?.isPublic == true { pendingPublicPhoto = item } else { Task { await insertPhoto(item) } }
         }
         .onAppear { if isEditable && entry.isBlank { focus = .body } }
+    }
+
+    private func touchIfStale() {
+        if Date.now.timeIntervalSince(entry.updatedAt) > 30 { entry.touch() }
     }
 
     // MARK: Toolbar
@@ -123,11 +131,21 @@ struct EditorView: View {
                 }
             }
         }
-        ToolbarItemGroup(placement: .keyboard) {
-            formatButtons
-            Spacer()
+    }
+
+    /// In the layout, not a keyboard toolbar: that one floats over the publish bar and takes its taps.
+    private var formatBar: some View {
+        HStack(spacing: 12) {
+            ScrollView(.horizontal) {
+                HStack(spacing: 22) { formatButtons }
+            }
+            .scrollIndicators(.hidden)
             Button { focus = nil } label: { Image(systemName: "keyboard.chevron.compact.down") }
+                .accessibilityLabel("Hide Keyboard")
         }
+        .padding(.horizontal, sizeClass == .regular ? 48 : 16)
+        .padding(.vertical, 8)
+        .background(.bar)
     }
 
     @ViewBuilder private var formatButtons: some View {
@@ -165,6 +183,12 @@ struct EditorView: View {
 
             Spacer()
 
+            if site?.isPublic == true {
+                Label("PUBLIC", systemImage: "globe")
+                    .font(.system(.caption2, design: .monospaced).weight(.bold))
+                    .foregroundStyle(tint)
+            }
+
             Button(action: requestSend) {
                 if publisher.sending.contains(entry.id) {
                     ProgressView().tint(.white)
@@ -176,6 +200,7 @@ struct EditorView: View {
             .tint(tint)
             .disabled(!canSend)
             .keyboardShortcut(.return, modifiers: .command)
+            .accessibilityIdentifier("sendButton")
         }
         .padding(.horizontal, sizeClass == .regular ? 48 : 16)
         .padding(.vertical, 10)
@@ -184,7 +209,8 @@ struct EditorView: View {
 
     private var sendLabel: String {
         if entry.remotePostID != nil { return "Update" }
-        return entry.publishStatus == .published ? "Publish" : "Send Draft"
+        if entry.publishStatus == .draft { return "Send Draft" }
+        return site?.isPublic == true ? "Publish publicly" : "Publish"
     }
 
     private func requestSend() {
@@ -291,6 +317,7 @@ struct StatusBanner: View {
     @Bindable var entry: Entry
     let site: Site?
     @Environment(Publisher.self) private var publisher
+    @Environment(Navigation.self) private var navigation
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -333,7 +360,10 @@ struct StatusBanner: View {
                 if let url = entry.remoteURL, entry.remoteStatus != .draft {
                     Button("View") { openURL(url) }
                 }
-                Button("Edit") { entry.state = .editing }
+                Button("Edit") {
+                    entry.state = .editing
+                    navigation.sidebar = .drafts
+                }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)

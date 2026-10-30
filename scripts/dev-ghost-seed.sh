@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup of the throwaway dev Ghost (docker-server:/opt/ghost-dev, loopback only).
-# Needs the tunnel:  ssh -N -L 2369:127.0.0.1:2369 docker-server
+# Creates the test owner and Admin API key on the test Ghost. Run by scripts/testenv.sh.
 # Writes generated TEST credentials + an Admin API key to .dev/ghost-dev.env (gitignored).
 set -euo pipefail
 cd "$(dirname "$0")/.."

@@ -5,6 +5,8 @@ import SwiftUI
 /// Add or edit a site. The key is checked against the site before saving.
 struct SiteFormView: View {
     let site: Site?
+    /// First run: there's nothing behind this form, so it can't be cancelled.
+    var isRequired = false
 
     @Environment(AppLock.self) private var lock
     @Environment(\.dismiss) private var dismiss
@@ -84,10 +86,12 @@ struct SiteFormView: View {
                     }
                 }
             }
-            .navigationTitle(isNew ? "Add Site" : "Edit Site")
+            .navigationTitle(isRequired ? "Add Your First Site" : isNew ? "Add Site" : "Edit Site")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                if !isRequired {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     if checking { ProgressView() } else {
                         Button("Save") { Task { await save() } }.disabled(!canSave)
@@ -124,17 +128,17 @@ struct SiteFormView: View {
                 _ = try await client.recentPosts(limit: 1)
                 if title.isEmpty { title = try await client.site().title }
             }
-            let target: Site
             if let site {
-                target = site
-                target.name = title.isEmpty ? site.name : title
-                target.isPublic = isPublic
-                target.color = color
+                if let credentials { try lock.saveKey(credentials.apiKey, for: site.id) }
+                site.name = title.isEmpty ? site.name : title
+                site.isPublic = isPublic
+                site.color = color
             } else {
-                target = Site(name: title.isEmpty ? (url.host() ?? "Site") : title, url: url, isPublic: isPublic, color: color)
-                context.insert(target)
+                // Key first, so a failed Keychain write leaves no site without one.
+                let new = Site(name: title.isEmpty ? (url.host() ?? "Site") : title, url: url, isPublic: isPublic, color: color)
+                if let credentials { try lock.saveKey(credentials.apiKey, for: new.id) }
+                context.insert(new)
             }
-            if let credentials { try lock.saveKey(credentials.apiKey, for: target.id) }
             try context.save()
             dismiss()
         } catch {

@@ -50,6 +50,17 @@
                ReferencedContainer = "container:Quill.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "4DF2980F09ABA0A7EE80DEFB"
+               BuildableName = "QuillUITests.xctest"
+               BlueprintName = "QuillUITests"
+               ReferencedContainer = "container:Quill.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

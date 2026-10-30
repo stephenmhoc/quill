@@ -24,7 +24,7 @@ public enum GhostError: Error, Equatable, Sendable {
     public var isTransient: Bool {
         switch self {
         case .unreachable, .outcomeUnknown: true
-        case .server(let status, _): status >= 500
+        case .server(let status, _): status >= 500 || status == 429
         default: false
         }
     }

@@ -3,6 +3,8 @@ import SwiftUI
 struct LockView: View {
     @Environment(AppLock.self) private var lock
     @Environment(\.scenePhase) private var scenePhase
+    /// One automatic prompt per return to the app, so cancelling doesn't re-prompt forever.
+    @State private var didAutoPrompt = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -35,7 +37,11 @@ struct LockView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
         .task(id: scenePhase) {
-            if scenePhase == .active { await lock.unlock() }
+            if scenePhase == .background { didAutoPrompt = false }
+            if scenePhase == .active, !didAutoPrompt {
+                didAutoPrompt = true
+                await lock.unlock()
+            }
         }
     }
 }

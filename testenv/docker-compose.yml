@@ -1,0 +1,27 @@
+# Throwaway Ghost for Quill's end-to-end tests. Runs the same image as production Ghost,
+# but in development mode with SQLite so it needs a single container.
+# Published on loopback only; test machines reach it through an SSH tunnel.
+# Managed by scripts/testenv.sh. See TESTING.md.
+name: ghost-dev
+services:
+  ghost:
+    image: ghost:6-alpine
+    container_name: ghost-dev
+    restart: unless-stopped
+    user: "1000:1000"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - "127.0.0.1:2369:2368"
+    environment:
+      NODE_ENV: development
+      url: http://localhost:2369
+      database__client: sqlite3
+      database__connection__filename: /var/lib/ghost/content/data/ghost-dev.db
+      security__staffDeviceVerification: "false"
+      privacy__useTinfoil: "true"
+    volumes:
+      - ./content:/var/lib/ghost/content
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 768M }

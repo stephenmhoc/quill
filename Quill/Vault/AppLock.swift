@@ -22,7 +22,7 @@ final class AppLock {
     /// New sends only start while unlocked and on screen.
     var canWork: Bool { isUnlocked && isForeground }
 
-    var biometryName: String {
+    let biometryName: String = {
         let ctx = LAContext()
         _ = ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
         switch ctx.biometryType {
@@ -31,7 +31,7 @@ final class AppLock {
         case .opticID: return "Optic ID"
         default: return "Passcode"
         }
-    }
+    }()
 
     func unlock() async {
         guard !isUnlocked, !isAuthenticating else { return }

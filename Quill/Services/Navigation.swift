@@ -41,7 +41,7 @@ final class Navigation {
         if let blank = drafts.first(where: \.isBlank) {
             entry = blank
             entry.createdAt = .now
-            if entry.siteID == nil { entry.siteID = defaultSiteID(in: context) }
+            entry.siteID = defaultSiteID(in: context)
         } else {
             entry = Entry(siteID: defaultSiteID(in: context))
             context.insert(entry)

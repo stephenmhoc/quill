@@ -8,11 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		01DADE2485C35FD8283B6F7D /* GhostKit in Frameworks */ = {isa = PBXBuildFile; productRef = 50AA175CB5E00ABE45A6F873 /* GhostKit */; };
+		09E8817F2D1600265476DAC6 /* GhostKit in Frameworks */ = {isa = PBXBuildFile; productRef = 65D9C7189A68C5BF5AC6F620 /* GhostKit */; };
 		2BFD621207C24D0D45BF7932 /* LockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4829D02BAD5836F8776B8F8F /* LockView.swift */; };
 		2CC3D1968680F73908563F74 /* ResultBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D77473C7C72BECB34E408C /* ResultBanner.swift */; };
 		2DECFDE235C863317DFF34BF /* Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD30CED7B199FBAC661EA02 /* Entry.swift */; };
 		42387E640DDEC9B914B85410 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF31C8EE91FDE72C86EE086E /* SettingsView.swift */; };
 		6DA99894461AF26112196137 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB8425B76428A097BB6A89 /* SidebarView.swift */; };
+		7E146DC24D130D44E61F2CB0 /* PublishFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9234120738BBF6CBF48467A3 /* PublishFlowUITests.swift */; };
 		8A051949489ABF2A4737978D /* SiteFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB02CE3A2A9AB41D90CEC3C /* SiteFormView.swift */; };
 		8BDD2968EEB5C5B8281245A0 /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6295CF0492AC51BC221F16 /* AppLock.swift */; };
 		9A17C942B6A0E268D6AAC3C6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AF8430782BE47927308B3295 /* Assets.xcassets */; };
@@ -32,6 +34,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		7EA2FC33FD61336731186681 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1D419A2DB66B4CDAD3E67ECA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7DEF7B1DAF0532C32746D151;
+			remoteInfo = Quill;
+		};
 		A97A7926DCA1A4E8A0DE46C4 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 1D419A2DB66B4CDAD3E67ECA /* Project object */;
@@ -46,11 +55,13 @@
 		0DBE22D21ADC2F0225DF0411 /* Quill.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Quill.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		10405B78291BAC2C4A11149D /* GhostKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = GhostKit; path = Packages/GhostKit; sourceTree = SOURCE_ROOT; };
 		1641461940ABADF3553A64FE /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		16B4BED4FCFB678EB2FD47B5 /* QuillUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = QuillUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		37E75D2A90726438075942B1 /* TagEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagEditor.swift; sourceTree = "<group>"; };
 		4433B57A9D396E73486DFF7A /* EntryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryListView.swift; sourceTree = "<group>"; };
 		4829D02BAD5836F8776B8F8F /* LockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockView.swift; sourceTree = "<group>"; };
 		4CFFE080A6F3B5F2C89C9662 /* SitePostsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePostsView.swift; sourceTree = "<group>"; };
 		652A2E7C67C2F9335547BBB9 /* Site.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Site.swift; sourceTree = "<group>"; };
+		9234120738BBF6CBF48467A3 /* PublishFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishFlowUITests.swift; sourceTree = "<group>"; };
 		95E8C48ADF7597448F3FD904 /* Quill.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Quill.entitlements; sourceTree = "<group>"; };
 		9A601AE5954D328F6E161E61 /* Navigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Navigation.swift; sourceTree = "<group>"; };
 		9DD30CED7B199FBAC661EA02 /* Entry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entry.swift; sourceTree = "<group>"; };
@@ -75,6 +86,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				01DADE2485C35FD8283B6F7D /* GhostKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E5A14E6850F01A920A77D208 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				09E8817F2D1600265476DAC6 /* GhostKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +146,7 @@
 			children = (
 				0DBE22D21ADC2F0225DF0411 /* Quill.app */,
 				9DD607DFB83009FE4EF6CB19 /* QuillTests.xctest */,
+				16B4BED4FCFB678EB2FD47B5 /* QuillUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -137,6 +157,7 @@
 				A575C325117E7F87D3EAAD73 /* Packages */,
 				039D8D60F3BF8AB7113265C0 /* Quill */,
 				4FA2B8A80CCB68BE57F36012 /* QuillTests */,
+				FA18AEAEC123DD1473BE9D97 /* QuillUITests */,
 				574FA7F4F56686AF305E9580 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -183,6 +204,14 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		FA18AEAEC123DD1473BE9D97 /* QuillUITests */ = {
+			isa = PBXGroup;
+			children = (
+				9234120738BBF6CBF48467A3 /* PublishFlowUITests.swift */,
+			);
+			path = QuillUITests;
+			sourceTree = "<group>";
+		};
 		FFB0337E01F4569647FA61A7 /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -214,6 +243,26 @@
 			productName = QuillTests;
 			productReference = 9DD607DFB83009FE4EF6CB19 /* QuillTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		4DF2980F09ABA0A7EE80DEFB /* QuillUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4804538F386C3372C5FF1CAC /* Build configuration list for PBXNativeTarget "QuillUITests" */;
+			buildPhases = (
+				5F057270B984404DE9410B94 /* Sources */,
+				E5A14E6850F01A920A77D208 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2886D9AC9390B3B0259AD616 /* PBXTargetDependency */,
+			);
+			name = QuillUITests;
+			packageProductDependencies = (
+				65D9C7189A68C5BF5AC6F620 /* GhostKit */,
+			);
+			productName = QuillUITests;
+			productReference = 16B4BED4FCFB678EB2FD47B5 /* QuillUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		7DEF7B1DAF0532C32746D151 /* Quill */ = {
 			isa = PBXNativeTarget;
@@ -248,6 +297,11 @@
 						DevelopmentTeam = 8G4H6268W7;
 						ProvisioningStyle = Automatic;
 					};
+					4DF2980F09ABA0A7EE80DEFB = {
+						DevelopmentTeam = 8G4H6268W7;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 7DEF7B1DAF0532C32746D151;
+					};
 					7DEF7B1DAF0532C32746D151 = {
 						DevelopmentTeam = 8G4H6268W7;
 						ProvisioningStyle = Automatic;
@@ -273,6 +327,7 @@
 			targets = (
 				7DEF7B1DAF0532C32746D151 /* Quill */,
 				0A71ACF71F943735240F5178 /* QuillTests */,
+				4DF2980F09ABA0A7EE80DEFB /* QuillUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -289,6 +344,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		5F057270B984404DE9410B94 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7E146DC24D130D44E61F2CB0 /* PublishFlowUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		7A1334224C98F7465D65136E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -330,6 +393,11 @@
 			target = 7DEF7B1DAF0532C32746D151 /* Quill */;
 			targetProxy = A97A7926DCA1A4E8A0DE46C4 /* PBXContainerItemProxy */;
 		};
+		2886D9AC9390B3B0259AD616 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7DEF7B1DAF0532C32746D151 /* Quill */;
+			targetProxy = 7EA2FC33FD61336731186681 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -353,6 +421,40 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
+		};
+		5699ECCC61E3A0D335B852AF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.merimerimeri.QuillUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Quill;
+			};
+			name = Release;
+		};
+		5D3397FC171B6EF9A5E1D75A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.merimerimeri.QuillUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Quill;
+			};
+			name = Debug;
 		};
 		76D9E6709DC61788E7520A2A /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -541,6 +643,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		4804538F386C3372C5FF1CAC /* Build configuration list for PBXNativeTarget "QuillUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5D3397FC171B6EF9A5E1D75A /* Debug */,
+				5699ECCC61E3A0D335B852AF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		626C6C6011A78070956F318B /* Build configuration list for PBXNativeTarget "Quill" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -583,6 +694,10 @@
 			productName = GhostKit;
 		};
 		50AA175CB5E00ABE45A6F873 /* GhostKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = GhostKit;
+		};
+		65D9C7189A68C5BF5AC6F620 /* GhostKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GhostKit;
 		};

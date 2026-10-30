@@ -90,13 +90,15 @@ final class Publisher {
 
     private func send(_ entry: Entry) async {
         // Re-checked here because a flush can hold a list fetched before an earlier await.
-        guard lock.canWork, entry.state == .queued, !sending.contains(entry.id) else { return }
+        guard lock.canWork, entry.modelContext != nil, entry.state == .queued, !sending.contains(entry.id) else { return }
         guard let site = site(for: entry) else {
             entry.state = .failed
             entry.lastError = "Choose a site for this entry."
             try? context.save()
             return
         }
+        // An earlier attempt whose outcome is unknown must survive later network failures.
+        let unresolvedAttempt = entry.createAttemptedAt != nil
         sending.insert(entry.id)
         entry.state = .sending
         defer {
@@ -117,7 +119,10 @@ final class Publisher {
             } else {
                 if entry.createAttemptedAt == nil { entry.createAttemptedAt = .now }
                 try context.save()
-                post = try await client.createPost(outgoing)
+                // An entry that waited in the outbox is dated when it was written.
+                var dated = outgoing
+                if dated.status == .published { dated.publishedAt = entry.createdAt }
+                post = try await client.createPost(dated)
             }
             entry.remotePostID = post.id
             entry.remoteUpdatedAt = post.updatedAt
@@ -130,13 +135,9 @@ final class Publisher {
             site.lastUsedAt = .now
             lastResult = Result(entryID: entry.id, siteName: site.name, url: post.url,
                                 status: post.status, wasUpdate: isUpdate)
-        } catch GhostError.unreachable(let detail) where entry.remotePostID == nil && entry.createAttemptedAt != nil
-            && (entry.lastError == nil) {
-            // Never left the phone, and no earlier attempt is unresolved: safe to create later.
-            entry.createAttemptedAt = nil
-            entry.state = .queued
-            entry.lastError = GhostError.unreachable(detail).localizedDescription
         } catch let error as GhostError where error.isTransient {
+            // `.unreachable` never left the phone, so a fresh attempt can't have landed.
+            if case .unreachable = error, !unresolvedAttempt { entry.createAttemptedAt = nil }
             entry.state = .queued
             entry.lastError = error.localizedDescription
         } catch {
