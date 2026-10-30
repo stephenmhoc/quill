@@ -1,12 +1,14 @@
 import SwiftUI
 
 extension Color {
-    /// The writing surface: easy on the eyes whatever the site's colour.
+    /// The writing surface: barely off white or black, so the text does the work.
     static let paper = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.10, green: 0.094, blue: 0.086, alpha: 1)
-            : UIColor(red: 0.98, green: 0.965, blue: 0.937, alpha: 1)
+            ? UIColor(red: 0.102, green: 0.102, blue: 0.102, alpha: 1)
+            : UIColor(red: 0.98, green: 0.98, blue: 0.973, alpha: 1)
     })
+    /// The only colour on the page while writing, whatever the site's colour.
+    static let cursor = Color(red: 0.0, green: 0.56, blue: 0.94)
 }
 
 /// Light, dark, or follow the system.

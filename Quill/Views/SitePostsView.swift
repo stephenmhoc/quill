@@ -61,6 +61,8 @@ struct SitePostsView: View {
                 ContentUnavailableView("No posts yet", systemImage: "doc.richtext")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.paper)
         .navigationTitle(site?.name ?? "Site")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -70,8 +72,7 @@ struct SitePostsView: View {
         .sheet(isPresented: $editing) {
             if let site { EditSiteView(site: site) }
         }
-        .confirmationDialog("Delete “\(pendingDelete?.title ?? "")”?",
-                            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+        .confirmationDialog(deleteQuestion, isPresented: isConfirmingDelete,
                             titleVisibility: .visible, presenting: pendingDelete) { post in
             Button("Delete from \(site?.name ?? "site")", role: .destructive) { Task { await delete(post) } }
         } message: { _ in
@@ -88,6 +89,11 @@ struct SitePostsView: View {
         .refreshable { await Task { await load() }.value }
         .task { await Task { await load() }.value }
         .onChange(of: publisher.lastResult?.id) { Task { await load() } }
+    }
+
+    private var deleteQuestion: String { "Delete “\(pendingDelete?.title ?? "")”?" }
+    private var isConfirmingDelete: Binding<Bool> {
+        Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
     }
 
     private func row(_ post: SitePost) -> some View {

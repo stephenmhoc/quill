@@ -26,17 +26,18 @@ struct EditorView: View {
     @State private var focusTitle = false
     /// Unticking removes the title from the entry. This brings it back if it's ticked again.
     @State private var hiddenTitle = ""
+    /// The controls fade while words are arriving and come back in a pause.
+    @State private var isTyping = false
 
     private var site: Site? { sites.first { $0.id == entry.siteID } }
     private var isEditable: Bool { entry.state == .editing }
-    private var tint: Color { site?.color.color ?? .accentColor }
     private var canSend: Bool {
         isEditable && !entry.isBlank && site != nil && !uploading && !publisher.sending.contains(entry.id)
     }
 
     var body: some View {
         EditorTextView(text: $entry.body, selection: $selection, isFocused: $bodyFocused,
-                       focusRequest: focusRequest, isEditable: isEditable, tint: tint,
+                       focusRequest: focusRequest, isEditable: isEditable,
                        margin: usesColumns ? 48 : 20) {
             // Hosted inside UIKit, so the environment has to be passed along.
             EditorHeader(entry: entry, site: site, isEditable: isEditable, showsTitle: showsTitle,
@@ -54,6 +55,9 @@ struct EditorView: View {
                 if bodyFocused && isEditable { formatBar }
                 if isEditable { publishBar }
             }
+            .tint(.secondary)
+            .opacity(isTyping ? 0.25 : 1)
+            .animation(.easeInOut(duration: 0.4), value: isTyping)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -79,11 +83,16 @@ struct EditorView: View {
         } message: { Text(uploadError ?? "") }
         // Throttled: updatedAt re-sorts every list on screen.
         .onChange(of: entry.title) { touchIfStale() }
-        .onChange(of: entry.body) { touchIfStale() }
+        .onChange(of: entry.body) {
+            touchIfStale()
+            if bodyFocused { isTyping = true }
+        }
         // Saved as you type, so there's nothing to do to keep a draft.
         .task(id: "\(entry.title)\(entry.body)") {
             try? await Task.sleep(for: .seconds(1))
             if !Task.isCancelled { try? context.save() }
+            try? await Task.sleep(for: .seconds(1))
+            if !Task.isCancelled { isTyping = false }
         }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
@@ -132,7 +141,7 @@ struct EditorView: View {
         }
         .padding(.horizontal, usesColumns ? 48 : 16)
         .padding(.vertical, 8)
-        .background(.bar)
+        .background(Color.paper)
     }
 
     @ViewBuilder private var formatButtons: some View {
@@ -172,25 +181,26 @@ struct EditorView: View {
             if site?.isPublic == true {
                 Label("PUBLIC", systemImage: "globe")
                     .font(.system(.caption2, design: .monospaced).weight(.bold))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(.secondary)
             }
 
             Button(action: requestSend) {
                 if publisher.sending.contains(entry.id) {
-                    ProgressView().tint(.white)
+                    ProgressView().tint(Color.paper)
                 } else {
                     Text(sendLabel).fontWeight(.semibold)
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(tint)
+            .tint(.primary)
+            .foregroundStyle(Color.paper)
             .disabled(!canSend)
             .keyboardShortcut(.return, modifiers: .command)
             .accessibilityIdentifier("sendButton")
         }
         .padding(.horizontal, usesColumns ? 48 : 16)
         .padding(.vertical, 10)
-        .background(.bar)
+        .background(Color.paper)
     }
 
     private var sendLabel: String {
@@ -324,7 +334,7 @@ private struct EditorHeader: View {
                 .padding(.bottom, 16)
             if showsTitle {
                 TextField("Title", text: $entry.title, axis: .vertical)
-                    .font(.system(.title, design: .serif).weight(.semibold))
+                    .font(.system(.title2, design: .monospaced).weight(.semibold))
                     .lineLimit(1...4)
                     .disabled(!isEditable)
                     .focused($titleFocused)

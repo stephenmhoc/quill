@@ -10,7 +10,6 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
     /// Bump to move the keyboard to the text.
     let focusRequest: Int
     let isEditable: Bool
-    let tint: Color
     let margin: CGFloat
     @ViewBuilder let header: () -> Header
 
@@ -37,7 +36,7 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
 
         view.margin = margin
         view.isEditable = isEditable
-        view.tintColor = UIColor(tint)
+        view.tintColor = UIColor(.cursor)
         view.setHeader(UIHostingConfiguration { header() }.margins(.all, 0))
         if view.text != text {
             view.text = text
@@ -86,7 +85,8 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
 }
 
 final class PageTextView: UITextView {
-    static let maxWidth: CGFloat = 720
+    /// About 72 characters, the longest line that's still comfortable to write in.
+    static let maxWidth = ceil(("0" as NSString).size(withAttributes: [.font: MarkdownStyler.bodyFont]).width * 72)
 
     var margin: CGFloat = 20 { didSet { if margin != oldValue { setNeedsLayout() } } }
     let placeholder = UILabel()
@@ -149,15 +149,16 @@ final class PageTextView: UITextView {
 
 /// Quiet live styling. It only sets attributes: the text is always plain Markdown.
 enum MarkdownStyler {
+    /// Monospaced, because it reads as a draft in progress rather than finished type.
     static let bodyFont: UIFont = {
-        let body = UIFont.preferredFont(forTextStyle: .body)
-        let serif = body.fontDescriptor.withDesign(.serif) ?? body.fontDescriptor
-        return UIFont(descriptor: serif, size: 0)
+        let size: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 18 : 16
+        return UIFontMetrics(forTextStyle: .body).scaledFont(for: .monospacedSystemFont(ofSize: size, weight: .regular))
     }()
 
     static var base: [NSAttributedString.Key: Any] {
         let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 5
+        // Line height of about 1.5: screens are read from further away than paper.
+        paragraph.lineSpacing = max(0, bodyFont.pointSize * 1.5 - bodyFont.lineHeight)
         return [.font: bodyFont, .foregroundColor: UIColor.label, .paragraphStyle: paragraph]
     }
 

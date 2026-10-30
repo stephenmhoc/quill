@@ -52,6 +52,8 @@ struct EntryListView: View {
         .overlay {
             if visible.isEmpty { emptyState }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.paper)
         .navigationTitle(title)
         .toolbar {
             if section == .outbox, !visible.isEmpty {
