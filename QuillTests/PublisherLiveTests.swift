@@ -114,4 +114,71 @@ struct PublisherLiveTests {
         #expect(e.remotePostID == id)
         #expect(try await count(client, title: title) == 1)
     }
+
+    @Test func editsThenDeletesAPostWrittenElsewhere() async throws {
+        let (publisher, site, client) = harness()
+        let markdown = """
+            # Heading
+
+            Some **bold**, *italic*, `code`, ~~gone~~ and a [link](https://example.com/a?b=1) with 2 \\* stars.
+
+            - one
+            - two
+              - nested
+
+            1. first
+            2. second
+
+            > quoted line
+            >
+            > second paragraph
+
+            ```swift
+            let x = 1 < 2
+            ```
+
+            ---
+
+            ![alt text](https://example.com/photo.jpg)
+            """
+        let title = "Elsewhere \(UUID())"
+        let created = try await client.createPost(OutgoingPost(title: title, html: EntryBuilder.html(fromMarkdown: markdown),
+                                                               status: .published, tags: ["elsewhere"]))
+
+        let e = try #require(try await publisher.importPost(id: created.id, site: site))
+        #expect(e.title == title)
+        #expect(e.body == markdown)
+        #expect(e.tags == ["elsewhere"])
+
+        e.state = .editing
+        e.body += "\n\nAdded in Quill"
+        await publisher.publish(e)
+        #expect(e.state == .sent)
+        let updated = try await client.post(id: created.id)
+        #expect(updated.html?.contains("Added in Quill") == true)
+        #expect(updated.html?.contains("<strong>bold</strong>") == true)
+        #expect(updated.tags?.map(\.name) == ["elsewhere"])
+
+        try await publisher.deletePost(id: created.id, site: site)
+        await #expect(throws: GhostError.notFound) { try await client.post(id: created.id) }
+        #expect(try context.fetch(FetchDescriptor<Entry>()).allSatisfy { $0.remotePostID != created.id })
+    }
+
+    @Test func refusesToEditWhatMarkdownCantHold() async throws {
+        let (publisher, site, client) = harness()
+        let html = "<!--kg-card-begin: html--><div style=\"color:red\">Custom</div><!--kg-card-end: html-->"
+        let created = try await client.createPost(OutgoingPost(title: "Card \(UUID())", html: html, status: .draft, tags: []))
+        #expect(try await publisher.importPost(id: created.id, site: site) == nil)
+        try await publisher.deletePost(id: created.id, site: site)
+    }
+
+    @Test func pagesThroughHistory() async throws {
+        let (_, _, client) = harness()
+        for _ in 0..<3 { _ = try await client.createPost(OutgoingPost(title: "Page \(UUID())", html: "<p>x</p>", status: .draft, tags: [])) }
+        let first = try await client.recentPosts(limit: 2)
+        let second = try await client.recentPosts(limit: 2, page: 2)
+        #expect(first.count == 2)
+        #expect(!second.isEmpty)
+        #expect(Set(first.map(\.id)).isDisjoint(with: second.map(\.id)))
+    }
 }

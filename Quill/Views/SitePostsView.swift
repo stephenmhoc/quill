@@ -8,13 +8,20 @@ struct SitePostsView: View {
 
     @Environment(AppLock.self) private var lock
     @Environment(Navigation.self) private var navigation
+    @Environment(Publisher.self) private var publisher
     @Environment(\.openURL) private var openURL
+    @Environment(\.modelContext) private var context
     @Query private var sites: [Site]
     @Query private var entries: [Entry]
     @State private var posts: [GhostPost] = []
     @State private var error: String?
     @State private var loading = false
     @State private var editing = false
+    @State private var page = 1
+    @State private var hasMore = false
+    @State private var opening: String?
+    @State private var pendingDelete: GhostPost?
+    @State private var unsupported: GhostPost?
 
     private var site: Site? { sites.first { $0.id == siteID } }
 
@@ -26,8 +33,20 @@ struct SitePostsView: View {
                     .foregroundStyle(.red)
             }
             ForEach(posts) { post in
-                Button { open(post) } label: { row(post) }
+                Button { Task { await open(post) } } label: { row(post) }
                     .buttonStyle(.plain)
+                    .disabled(opening != nil)
+                    .swipeActions(edge: .trailing) {
+                        Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
+                    }
+                    .contextMenu {
+                        Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
+                    }
+            }
+            if hasMore {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .task(id: page) { await loadMore() }
             }
         }
         .overlay {
@@ -45,6 +64,20 @@ struct SitePostsView: View {
         .sheet(isPresented: $editing) {
             if let site { SiteFormView(site: site) }
         }
+        .confirmationDialog("Delete “\(pendingDelete.map(displayTitle) ?? "")”?",
+                            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+                            titleVisibility: .visible, presenting: pendingDelete) { post in
+            Button("Delete from \(site?.name ?? "Ghost")", role: .destructive) { Task { await delete(post) } }
+        } message: { _ in
+            Text("This permanently deletes the post from Ghost. It can't be undone.")
+        }
+        .alert("Quill can't edit this post", isPresented: Binding(get: { unsupported != nil }, set: { if !$0 { unsupported = nil } }),
+               presenting: unsupported) { post in
+            if let url = post.url { Button("Open in Browser") { openURL(url) } }
+            Button("OK", role: .cancel) {}
+        } message: { _ in
+            Text("It has layouts Markdown can't hold, like galleries or embeds, and saving it here would remove them.")
+        }
         .refreshable { await load() }
         .task(id: siteID) { await load() }
     }
@@ -56,11 +89,12 @@ struct SitePostsView: View {
                 Text((post.publishedAt ?? .now).formatted(date: .abbreviated, time: .omitted).uppercased())
                 Spacer()
                 if post.status != .published { Text(post.status.rawValue.uppercased()) }
-                if localEntry(for: post) != nil { Image(systemName: "pencil.circle") }
+                if opening == post.id { ProgressView().controlSize(.mini) }
+                else if localEntry(for: post) != nil { Image(systemName: "pencil.circle") }
             }
             .font(.system(.caption2, design: .monospaced))
             .foregroundStyle(.secondary)
-            Text(untitled ? (post.excerpt ?? post.title) : post.title)
+            Text(displayTitle(post))
                 .font(.system(.headline, design: .serif))
                 .italic(untitled)
                 .lineLimit(2)
@@ -69,18 +103,42 @@ struct SitePostsView: View {
         .contentShape(Rectangle())
     }
 
+    private func displayTitle(_ post: GhostPost) -> String {
+        let untitled = post.tags?.contains { $0.name == EntryBuilder.untitledTag } ?? false
+        return untitled ? (post.excerpt ?? post.title) : post.title
+    }
+
     private func localEntry(for post: GhostPost) -> Entry? {
         entries.first { $0.remotePostID == post.id && $0.siteID == siteID }
     }
 
-    /// Entries written in Quill reopen in the editor; anything else opens in the browser.
-    private func open(_ post: GhostPost) {
-        if let entry = localEntry(for: post) {
-            navigation.sidebar = .sent
+    private func open(_ post: GhostPost) async {
+        guard let site else { return }
+        opening = post.id
+        defer { opening = nil }
+        do {
+            var entry = localEntry(for: post)
+            if entry == nil { entry = try await publisher.importPost(id: post.id, site: site) }
+            guard let entry else {
+                unsupported = post
+                return
+            }
             navigation.selectedEntry = entry
             navigation.preferredCompactColumn = .detail
-        } else if let url = post.url {
-            openURL(url)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func delete(_ post: GhostPost) async {
+        guard let site else { return }
+        if let entry = localEntry(for: post), navigation.selectedEntry == entry { navigation.selectedEntry = nil }
+        do {
+            try await publisher.deletePost(id: post.id, site: site)
+            posts.removeAll { $0.id == post.id }
+            error = nil
+        } catch {
+            self.error = error.localizedDescription
         }
     }
 
@@ -89,10 +147,29 @@ struct SitePostsView: View {
         loading = true
         defer { loading = false }
         do {
-            posts = try await lock.client(for: site).recentPosts(limit: 30)
+            let first = try await lock.client(for: site).recentPosts(limit: Self.pageSize)
+            posts = first
+            page = 1
+            hasMore = first.count == Self.pageSize
             error = nil
         } catch {
             self.error = error.localizedDescription
         }
     }
+
+    private func loadMore() async {
+        guard let site else { return }
+        do {
+            let next = try await lock.client(for: site).recentPosts(limit: Self.pageSize, page: page + 1)
+            let known = Set(posts.map(\.id))
+            posts += next.filter { !known.contains($0.id) }
+            hasMore = next.count == Self.pageSize
+            page += 1
+        } catch {
+            hasMore = false
+            self.error = error.localizedDescription
+        }
+    }
+
+    private static let pageSize = 30
 }

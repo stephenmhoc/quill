@@ -80,6 +80,43 @@ final class Publisher {
         }
     }
 
+    /// Brings a post from Ghost into Quill so it can be edited.
+    /// Nil if the post has content Markdown can't hold: editing it here would lose that content.
+    func importPost(id: String, site: Site) async throws -> Entry? {
+        let post = try await lock.client(for: site).post(id: id)
+        guard post.status == .published || post.status == .draft,
+              let body = HTMLToMarkdown.convert(post.html ?? "") else { return nil }
+        let tags = (post.tags ?? []).map(\.name)
+        let entry = Entry(siteID: site.id)
+        entry.title = tags.contains(EntryBuilder.untitledTag) ? "" : post.title
+        entry.body = body
+        entry.tags = tags.filter { $0 != EntryBuilder.untitledTag }
+        entry.publishStatus = post.status
+        entry.createdAt = post.publishedAt ?? post.createdAt ?? .now
+        entry.state = .sent
+        entry.sentAt = entry.createdAt
+        entry.remotePostID = post.id
+        entry.remoteUpdatedAt = post.updatedAt
+        entry.remoteURLString = post.url?.absoluteString
+        entry.remoteStatusRaw = post.status.rawValue
+        context.insert(entry)
+        try context.save()
+        return entry
+    }
+
+    /// Permanently deletes a post from Ghost, and Quill's copy of it.
+    func deletePost(id: String, site: Site) async throws {
+        do {
+            try await lock.client(for: site).deletePost(id: id)
+        } catch GhostError.notFound {
+            // Already gone from Ghost; still clear the local copy.
+        }
+        let siteID = site.id
+        let local = FetchDescriptor<Entry>(predicate: #Predicate { $0.remotePostID == id && $0.siteID == siteID })
+        for entry in try context.fetch(local) { context.delete(entry) }
+        try context.save()
+    }
+
     /// A crash or kill mid-send leaves `.sending` behind; put those back in the outbox.
     private func recoverInterrupted() {
         let stuck = Entry.State.sending.rawValue

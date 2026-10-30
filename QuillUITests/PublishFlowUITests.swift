@@ -61,6 +61,96 @@ final class PublishFlowUITests: XCTestCase {
         attach("relaunched", app)
     }
 
+    /// Everything past the first run: a post written elsewhere can be found, edited and deleted,
+    /// and settings stick. Stands alone, so it adds the site if this is a fresh install.
+    @MainActor
+    func testManagePastPostsAndSettings() async throws {
+        let url = try XCTUnwrap(env["GHOST_DEV_URL"], "dev Ghost not configured")
+        let key = try XCTUnwrap(env["GHOST_DEV_ADMIN_KEY"])
+        continueAfterFailure = false
+        let client = GhostClient(baseURL: URL(string: url)!, credentials: try GhostCredentials(apiKey: key))
+        let title = "Past \(UUID().uuidString.prefix(8))"
+        let created = try await client.createPost(OutgoingPost(title: title, html: "<p>Written <strong>elsewhere</strong></p>",
+                                                               status: .published, tags: []))
+
+        let app = XCUIApplication()
+        app.launch()
+        allowFaceIDIfAsked()
+        let urlField = app.textFields["https://journal.example.com"]
+        let editorView = app.textViews.firstMatch
+        XCTAssertTrue(urlField.waitForExistence(timeout: 30) || editorView.exists, "didn't unlock")
+        if urlField.exists {
+            urlField.tap()
+            urlField.typeText(url)
+            let keyField = app.secureTextFields.firstMatch
+            keyField.tap()
+            keyField.typeText(key)
+            app.buttons["Private"].tap()
+            app.buttons["Save"].tap()
+            XCTAssertTrue(editorView.waitForExistence(timeout: 15))
+        }
+
+        // Settings, from the home sidebar.
+        showSidebar(app)
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.buttons["Dark"].waitForExistence(timeout: 5))
+        app.buttons["Dark"].tap()
+        attach("settings-dark", app)
+        app.buttons["Done"].tap()
+
+        // The post is listed under its site and opens with its formatting as Markdown.
+        app.staticTexts["Quill Dev"].firstMatch.tap()
+        let row = app.staticTexts[title]
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "post not listed")
+        attach("site-posts", app)
+        row.tap()
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 15), "post didn't open")
+        XCTAssertEqual(editor.value as? String, "Written **elsewhere**")
+
+        app.buttons["Edit"].tap()
+        editor.tap()
+        editor.typeText(" and edited")
+        attach("editing-past-post", app)
+        app.buttons["sendButton"].tap()
+        XCTAssertTrue(app.staticTexts["Updated on Quill Dev"].waitForExistence(timeout: 20), "no update banner")
+        let edited = try await client.post(id: created.id)
+        XCTAssertTrue(edited.html?.contains("edited") == true, "edit didn't reach Ghost")
+
+        // Delete asks first, then it's gone from Ghost.
+        if app.buttons["BackButton"].exists { app.buttons["BackButton"].tap() }
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.swipeLeft()
+        app.buttons["Delete"].firstMatch.tap()
+        let confirm = app.buttons["Delete from Quill Dev"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "delete must confirm")
+        attach("delete-confirm", app)
+        confirm.tap()
+        XCTAssertTrue(row.waitForNonExistence(timeout: 10))
+        let remaining = try await client.recentPosts(limit: 50)
+        XCTAssertFalse(remaining.contains { $0.id == created.id }, "still in Ghost")
+
+        // Appearance survives a relaunch.
+        app.terminate()
+        app.launch()
+        allowFaceIDIfAsked()
+        XCTAssertTrue(app.textViews.firstMatch.waitForExistence(timeout: 30))
+        showSidebar(app)
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.buttons["Dark"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Dark"].isSelected, "appearance wasn't saved")
+        app.buttons["Auto"].tap()
+        app.buttons["Done"].tap()
+    }
+
+    private func showSidebar(_ app: XCUIApplication) {
+        for _ in 0..<3 where !app.buttons["Settings"].isHittable {
+            let back = app.buttons["BackButton"]
+            (back.exists ? back : app.buttons["ToggleSidebar"]).tap()
+            _ = app.buttons["Settings"].waitForExistence(timeout: 2)
+        }
+    }
+
     private func allowFaceIDIfAsked() {
         let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow"]
         if allow.waitForExistence(timeout: 4) { allow.tap() }

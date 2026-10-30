@@ -7,6 +7,7 @@ struct QuillApp: App {
     @State private var lock = AppLock()
     @State private var navigation = Navigation()
     @State private var publisher: Publisher
+    @AppStorage(Appearance.key) private var appearance = Appearance.auto
 
     init() {
         let container = Self.makeContainer()
@@ -22,6 +23,7 @@ struct QuillApp: App {
                 .environment(lock)
                 .environment(navigation)
                 .environment(publisher)
+                .preferredColorScheme(appearance.colorScheme)
         }
         .modelContainer(container)
         .commands { QuillCommands(navigation: navigation) }

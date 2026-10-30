@@ -76,12 +76,20 @@ public struct GhostClient: Sendable {
     }
 
     public func post(id: String) async throws -> GhostPost {
-        try firstPost(try await send("GET", "posts/\(id)/", query: [URLQueryItem(name: "include", value: "tags")]))
+        try firstPost(try await send("GET", "posts/\(id)/", query: [
+            URLQueryItem(name: "include", value: "tags"),
+            URLQueryItem(name: "formats", value: "html"),
+        ]))
     }
 
-    public func recentPosts(limit: Int = 20) async throws -> [GhostPost] {
+    public func deletePost(id: String) async throws {
+        _ = try await send("DELETE", "posts/\(id)/")
+    }
+
+    public func recentPosts(limit: Int = 20, page: Int = 1) async throws -> [GhostPost] {
         let data = try await send("GET", "posts/", query: [
             URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "page", value: String(page)),
             URLQueryItem(name: "order", value: "updated_at desc"),
             URLQueryItem(name: "include", value: "tags"),
             URLQueryItem(name: "fields", value: "id,title,slug,status,url,created_at,updated_at,published_at,excerpt"),

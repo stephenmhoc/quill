@@ -7,10 +7,18 @@ struct SettingsView: View {
     @Query(sort: \Site.createdAt) private var sites: [Site]
     @AppStorage(AppLock.graceKey) private var grace: Double = 30
     @AppStorage(Navigation.defaultSiteKey) private var defaultSite = ""
+    @AppStorage(Appearance.key) private var appearance = Appearance.auto
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Appearance") {
+                    Picker("Appearance", selection: $appearance) {
+                        ForEach(Appearance.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
                 Section("Writing") {
                     Picker("Default site", selection: $defaultSite) {
                         Text("Last used").tag("")

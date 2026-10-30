@@ -42,7 +42,10 @@ public enum EntryBuilder {
     }
 
     public static func html(fromMarkdown markdown: String) -> String {
+        // Ghost drops <del> on import but keeps <s>.
         MarkdownRenderer.html(from: markdown)
+            .replacingOccurrences(of: "<del>", with: "<s>")
+            .replacingOccurrences(of: "</del>", with: "</s>")
     }
 
     /// Trims, drops empties and case-insensitive duplicates, keeps order.

@@ -44,9 +44,11 @@ public struct GhostPost: Decodable, Sendable, Equatable, Identifiable {
     public let publishedAt: Date?
     public let excerpt: String?
     public let tags: [GhostTag]?
+    /// Only present when asked for: `post(id:)` includes it, lists don't.
+    public let html: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, slug, status, url, excerpt, tags
+        case id, title, slug, status, url, excerpt, tags, html
         case updatedAt = "updated_at"
         case createdAt = "created_at"
         case publishedAt = "published_at"
