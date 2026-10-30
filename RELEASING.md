@@ -40,5 +40,7 @@ git tag v0.2.0 && git push origin v0.2.0
 gh workflow run release.yml -R stephenmhoc/quill -f version=0.2.0
 ```
 
-The tag sets the version and the run number sets the build number. Run the e2e suites first
-(see `TESTING.md`): they need the homelab test Ghost, so CI only runs the GhostKit tests.
+The tag sets the version and the run number sets the build number.
+
+GitHub only builds and publishes. All testing is local, so run the suites from `TESTING.md` on
+iPhone and iPad before tagging.

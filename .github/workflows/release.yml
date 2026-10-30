@@ -69,9 +69,6 @@ jobs:
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
           echo "Building Quill $VERSION ($BUILD_NUMBER)"
 
-      - name: Run GhostKit Tests
-        run: swift test --package-path Packages/GhostKit
-
       - name: Install App Store Connect API Key
         env:
           ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}

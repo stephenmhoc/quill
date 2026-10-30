@@ -18,6 +18,7 @@ The test scripts create a fresh Ghost on `docker-server` and delete it afterward
 
 ## Testing
 
+- Tests run locally only. GitHub Actions just builds and publishes, so don't add CI there.
 - End-to-end only, against a real Ghost. Don't add unit tests or mocks.
 - Run both iPhone and iPad before committing UI changes; layout code differs between them.
 - Check the screenshots too, because a passing test can't see a visual regression:
