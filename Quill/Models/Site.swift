@@ -46,12 +46,6 @@ enum SiteKind: String, CaseIterable, Identifiable {
         case .local: "Saved"
         }
     }
-    func doneMessage(siteName: String, wasUpdate: Bool) -> String {
-        switch self {
-        case .ghost: wasUpdate ? "Updated on \(siteName)" : "Published to \(siteName)"
-        case .local: "Saved to \(siteName)"
-        }
-    }
 }
 
 /// A site Quill can write to. A Ghost site's key lives in the Keychain (see `Vault`), never here.

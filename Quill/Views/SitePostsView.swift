@@ -88,7 +88,7 @@ struct SitePostsView: View {
         // Unstructured: SwiftUI cancels view tasks during column transitions and list refreshes.
         .refreshable { await Task { await load() }.value }
         .task { await Task { await load() }.value }
-        .onChange(of: publisher.lastResult?.id) { Task { await load() } }
+        .onChange(of: publisher.sentCount) { Task { await load() } }
     }
 
     private var deleteQuestion: String { "Delete “\(pendingDelete?.title ?? "")”?" }

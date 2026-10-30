@@ -51,7 +51,7 @@ final class PublishFlowUITests: XCTestCase {
         attach("written", app)
         app.buttons["sendButton"].tap()
 
-        XCTAssertTrue(app.staticTexts["Published to Quill Dev"].waitForExistence(timeout: 20), "no success banner")
+        waitForBlankPage(editor)
         attach("published", app)
 
         // The title is a tick box: on shows it, focused to type in; off removes it; on restores it.
@@ -168,8 +168,7 @@ final class PublishFlowUITests: XCTestCase {
         editor.typeText(" and edited")
         attach("editing-past-post", app)
         app.buttons["sendButton"].tap()
-        XCTAssertTrue(app.staticTexts["Updated on Quill Dev"].waitForExistence(timeout: 20), "no update banner")
-        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 5), "an update returns to the entry")
+        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 20), "an update returns to the entry")
         let edited = try await client.post(id: created.id)
         XCTAssertTrue(edited.html?.contains("edited") == true, "edit didn't reach Ghost")
 
@@ -260,7 +259,7 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertEqual(saved.label, "Saved")
         attach("local-writing", app)
         saved.tap()
-        XCTAssertTrue(app.staticTexts["Saved to \(name)"].waitForExistence(timeout: 10), "no saved banner")
+        waitForBlankPage(editor)
 
         showSidebar(app)
         app.cells.containing(.staticText, identifier: name).firstMatch.tap()
@@ -287,6 +286,12 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "delete must confirm")
         confirm.tap()
         XCTAssertTrue(row.waitForNonExistence(timeout: 10))
+    }
+
+    /// Sending a new entry gives no message, it just moves on to a fresh page.
+    private func waitForBlankPage(_ editor: XCUIElement) {
+        let blank = expectation(for: NSPredicate(format: "value == ''"), evaluatedWith: editor)
+        XCTAssertEqual(XCTWaiter.wait(for: [blank], timeout: 20), .completed, "no blank page after sending")
     }
 
     private func showSidebar(_ app: XCUIApplication) {

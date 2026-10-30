@@ -60,7 +60,7 @@ struct PublisherLiveTests {
         #expect(e.remoteStatus == .published)
         let post = try await client.post(id: try #require(e.remotePostID))
         #expect(post.tags?.contains { $0.name == "#untitled" } == true)
-        #expect(publisher.lastResult?.siteName == "Dev")
+        #expect(publisher.sentCount == 1)
     }
 
     @Test func unreachableStaysQueuedThenFlushesExactlyOnce() async throws {

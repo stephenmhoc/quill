@@ -47,7 +47,6 @@ struct RootView: View {
                 .environment(\.usesColumns, sizeClass == .regular)
                 .sheet(isPresented: $navigation.showingSettings) { SettingsView() }
                 .sheet(isPresented: $navigation.showingAddSite) { AddSiteView() }
-                .overlay(alignment: .top) { ResultBanner() }
                 .task(id: lock.isUnlocked) { await runOutbox() }
                 .onReceive(NotificationCenter.default.publisher(for: .quillNewEntry)) { _ in
                     navigation.openBlankEntry(in: context)

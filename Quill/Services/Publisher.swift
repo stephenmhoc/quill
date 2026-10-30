@@ -8,18 +8,9 @@ import SwiftData
 /// 5xx) leave the entry queued for a later retry; anything that needs the user marks it failed.
 @Observable
 final class Publisher {
-    struct Result: Identifiable, Equatable {
-        let id = UUID()
-        let entryID: UUID
-        let siteName: String
-        let kind: SiteKind
-        let url: URL?
-        let status: GhostPost.Status
-        let wasUpdate: Bool
-    }
-
     private(set) var sending: Set<UUID> = []
-    var lastResult: Result?
+    /// Goes up with every post a site accepts, so lists know to reload.
+    private(set) var sentCount = 0
 
     let lock: AppLock
     let context: ModelContext
@@ -131,7 +122,6 @@ final class Publisher {
             try? context.save()
         }
         do {
-            let isUpdate = entry.remotePostID != nil
             let post = try await backend(for: site).send(entry)
             // Deleted while the request was out, along with its site or on its own.
             guard entry.modelContext != nil, !entry.isDeleted else { return }
@@ -145,8 +135,7 @@ final class Publisher {
             entry.clearPublishedCopy()
             entry.state = .sent
             if site.modelContext != nil, !site.isDeleted { site.lastUsedAt = .now }
-            lastResult = Result(entryID: entry.id, siteName: site.name, kind: site.kind, url: post.url,
-                                status: post.status, wasUpdate: isUpdate)
+            sentCount += 1
         } catch where entry.modelContext == nil || entry.isDeleted {
             return
         } catch let error as GhostError where error.isTransient {
