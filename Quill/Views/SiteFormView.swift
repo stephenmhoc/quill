@@ -10,6 +10,7 @@ struct SiteFormView: View {
 
     @Environment(AppLock.self) private var lock
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.modelContext) private var context
 
     @State private var name = ""
@@ -86,6 +87,7 @@ struct SiteFormView: View {
                     }
                 }
             }
+            .safeAreaPadding(.horizontal, isRequired && sizeClass == .regular ? 180 : 0)
             .navigationTitle(isRequired ? "Add Your First Site" : isNew ? "Add Site" : "Edit Site")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

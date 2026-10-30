@@ -20,7 +20,7 @@ struct ResultBanner: View {
                 .padding(.vertical, 10)
                 .background(.regularMaterial, in: Capsule())
                 .shadow(radius: 6, y: 2)
-                .padding(.top, 8)
+                .padding(.top, 56) // clears the site picker
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .task(id: result.id) {
                     try? await Task.sleep(for: .seconds(4))
