@@ -434,8 +434,8 @@ struct StatusBanner: View {
                 note(entry.lastError ?? "Couldn't send.", "exclamationmark.triangle", .red)
                 HStack {
                     if entry.isConflict {
-                        Button("Overwrite Ghost's version") { Task { await publisher.overwrite(entry) } }
-                        Button("Use Ghost's version") { Task { await publisher.takeSiteVersion(entry) } }
+                        Button("Overwrite \(site?.kind.title ?? "the site")'s version") { Task { await publisher.overwrite(entry) } }
+                        Button("Use \(site?.kind.title ?? "the site")'s version") { Task { await publisher.takeSiteVersion(entry) } }
                     } else {
                         Button("Retry") { Task { await publisher.publish(entry) } }
                     }

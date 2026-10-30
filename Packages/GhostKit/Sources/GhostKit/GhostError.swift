@@ -40,17 +40,17 @@ extension GhostError: LocalizedError {
         case .unreachable(let detail):
             "Couldn't reach the site. If it's on your tailnet, check that Tailscale is connected. (\(detail))"
         case .unauthorized(let message):
-            "Ghost rejected the key: \(message)"
+            "The site rejected the key: \(message)"
         case .outcomeUnknown(let detail):
-            "The connection dropped before Ghost answered. (\(detail))"
+            "The connection dropped before the site answered. (\(detail))"
         case .notFound:
             "Not found on the site. Check the address."
         case .conflict(let message):
-            "The post was changed in Ghost since it was last synced. \(message)"
+            "The post was changed on the site since it was last synced. \(message)"
         case .rejected(let message):
-            "Ghost refused the request: \(message)"
+            "The site refused the request: \(message)"
         case .server(let status, let message):
-            "Ghost returned an error (\(status)): \(message)"
+            "The site returned an error (\(status)): \(message)"
         case .unexpectedResponse(let detail):
             "The site didn't respond like a Ghost Admin API. \(detail)"
         }

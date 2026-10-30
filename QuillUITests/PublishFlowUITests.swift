@@ -322,6 +322,70 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertEqual(titleField.value as? String, "Held back", "unticked title was lost")
     }
 
+    /// Setting up a real Micro.blog account and browsing its posts. This must never tap the send
+    /// button: a published post reaches followers and cross-posts. MicroblogLiveTests covers sending.
+    @MainActor
+    func testMicroblogSite() async throws {
+        let token = try XCTUnwrap(ProcessInfo.processInfo.environment["MICROBLOG_TOKEN"].flatMap { $0.isEmpty ? nil : $0 },
+                                  "needs .dev/microblog.env")
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        allowFaceIDIfAsked()
+        let kind = app.buttons["siteKind.microblog"]
+        let editor = app.textViews["editor"]
+        XCTAssertTrue(kind.waitForExistence(timeout: 30) || editor.exists, "didn't unlock")
+        if !kind.exists {
+            showSidebar(app)
+            app.buttons["Add Site"].tap()
+            XCTAssertTrue(kind.waitForExistence(timeout: 5))
+        }
+        kind.tap()
+        let tokenField = app.secureTextFields.firstMatch
+        XCTAssertTrue(tokenField.waitForExistence(timeout: 5))
+        tokenField.tap()
+        tokenField.typeText(token)
+        let name = "Micro \(UUID().uuidString.prefix(4))"
+        let nameField = app.textFields.firstMatch
+        nameField.tap()
+        nameField.typeText(name)
+        attach("microblog-form", app)
+        app.buttons["Save"].tap()
+
+        // Listed with its real posts, and marked public.
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 20), "site wasn't added")
+        showSidebar(app)
+        app.cells.containing(.staticText, identifier: name).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Public"].waitForExistence(timeout: 15), "not shown as public")
+        let post = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Muse'")).firstMatch
+        XCTAssertTrue(post.waitForExistence(timeout: 15), "real posts didn't load")
+        attach("microblog-posts", app)
+
+        // Writing here asks before going public. Stop short of sending.
+        showSidebar(app)
+        app.buttons["New Entry"].firstMatch.tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Site:'")).firstMatch.tap()
+        app.buttons[name].firstMatch.tap()
+        editor.tap()
+        editor.typeText("Never sent")
+        XCTAssertEqual(app.buttons["sendButton"].label, "Publish publicly")
+        attach("microblog-writing", app)
+        editor.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10))
+
+        // Removing it leaves the blog alone.
+        showSidebar(app)
+        app.cells.containing(.staticText, identifier: name).firstMatch.tap()
+        let edit = app.buttons["Edit Site"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        edit.tap()
+        let remove = app.buttons["Remove Site"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5))
+        remove.tap()
+        app.buttons["Remove"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts[name].waitForNonExistence(timeout: 10), "site wasn't removed")
+    }
+
     /// Sending a new entry gives no message, it just moves on to a fresh page.
     private func waitForBlankPage(_ editor: XCUIElement) {
         let blank = expectation(for: NSPredicate(format: "value == ''"), evaluatedWith: editor)

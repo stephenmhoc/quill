@@ -95,19 +95,19 @@ final class AppLock {
         keyCache[siteID] = nil
     }
 
-    func client(for site: Site) throws -> GhostClient {
+    func key(for site: Site) throws -> String {
         guard isUnlocked else { throw VaultError.locked }
-        guard let url = site.url else { throw GhostError.invalidURL }
-        let key: String
-        if let cached = keyCache[site.id] {
-            key = cached
-        } else if let stored = try TokenStore.read(site.id, context: context) {
-            keyCache[site.id] = stored
-            key = stored
-        } else {
+        if let cached = keyCache[site.id] { return cached }
+        guard let stored = try TokenStore.read(site.id, context: context) else {
             throw VaultError.missingKey(site.name)
         }
-        return GhostClient(baseURL: url, credentials: try GhostCredentials(apiKey: key))
+        keyCache[site.id] = stored
+        return stored
+    }
+
+    func client(for site: Site) throws -> GhostClient {
+        guard let url = site.url else { throw GhostError.invalidURL }
+        return GhostClient(baseURL: url, credentials: try GhostCredentials(apiKey: try key(for: site)))
     }
 }
 

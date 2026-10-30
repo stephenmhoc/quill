@@ -14,6 +14,11 @@ trap cleanup EXIT
 scripts/testenv.sh start
 set -a; . .dev/ghost-dev.env; set +a
 export TEST_RUNNER_GHOST_DEV_URL="$GHOST_DEV_URL" TEST_RUNNER_GHOST_DEV_ADMIN_KEY="$GHOST_DEV_ADMIN_KEY"
+# Optional: the Micro.blog suite only creates drafts, and deletes them. See TESTING.md.
+if [[ -f .dev/microblog.env ]]; then
+  set -a; . .dev/microblog.env; set +a
+  export TEST_RUNNER_MICROBLOG_TOKEN="$MICROBLOG_TOKEN"
+fi
 
 xcodegen generate >/dev/null
 xcrun simctl boot "$SIM" 2>/dev/null || true

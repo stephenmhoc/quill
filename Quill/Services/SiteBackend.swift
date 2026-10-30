@@ -46,6 +46,9 @@ extension Publisher {
     func backend(for site: Site) throws -> any SiteBackend {
         switch site.kind {
         case .ghost: GhostBackend(client: try lock.client(for: site), site: site, context: context)
+        case .microblog:
+            MicroblogBackend(client: MicropubClient(token: try lock.key(for: site), destination: site.urlString),
+                             site: site, context: context)
         case .local: LocalBackend(site: site, context: context)
         }
     }

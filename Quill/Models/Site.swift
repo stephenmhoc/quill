@@ -5,50 +5,53 @@ import SwiftUI
 /// The kinds of site Quill can write to. To add one: add a case here, then the compiler points
 /// at the rest, which is a `SiteBackend` in `Publisher.backend(for:)` and a form in `siteForm`.
 enum SiteKind: String, CaseIterable, Identifiable {
-    case ghost, local
+    case ghost, microblog, local
 
     var id: String { rawValue }
     var title: String {
         switch self {
         case .ghost: "Ghost"
+        case .microblog: "Micro.blog"
         case .local: "Local"
         }
     }
     var summary: String {
         switch self {
         case .ghost: "Publish to a Ghost site with a staff access token."
+        case .microblog: "Publish to your Micro.blog with an app token."
         case .local: "Keep everything on this device. No account, no server."
         }
     }
     var systemImage: String {
         switch self {
         case .ghost: "network"
+        case .microblog: "at"
         case .local: "iphone"
         }
     }
     /// The send button for a new entry, and for an update.
     var publishLabel: String {
         switch self {
-        case .ghost: "Publish"
+        case .ghost, .microblog: "Publish"
         case .local: "Saved"
         }
     }
     var updateLabel: String {
         switch self {
-        case .ghost: "Update"
+        case .ghost, .microblog: "Update"
         case .local: "Saved"
         }
     }
     /// How a finished entry describes itself.
     var doneLabel: String {
         switch self {
-        case .ghost: "Published"
+        case .ghost, .microblog: "Published"
         case .local: "Saved"
         }
     }
 }
 
-/// A site Quill can write to. A Ghost site's key lives in the Keychain (see `Vault`), never here.
+/// A site Quill can write to. A site's key lives in the Keychain (see `Vault`), never here.
 @Model
 final class Site {
     @Attribute(.unique) var id: UUID
@@ -62,9 +65,10 @@ final class Site {
     var createdAt: Date
     var lastUsedAt: Date?
 
-    init(name: String, url: URL, isPublic: Bool, color: SiteColor) {
+    init(name: String, url: URL, isPublic: Bool, color: SiteColor, kind: SiteKind = .ghost) {
         id = UUID()
         self.name = name
+        kindRaw = kind.rawValue
         urlString = url.absoluteString
         self.isPublic = isPublic
         colorRaw = color.rawValue

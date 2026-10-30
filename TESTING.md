@@ -57,6 +57,20 @@ scripts/testenv.sh destroy
 
 `start` copies the compose file to the host, starts Ghost, opens the tunnel, then creates a test owner and an Admin API key. Credentials go to `.dev/ghost-dev.env`, which is gitignored and deleted by `destroy`.
 
+## Micro.blog
+
+`.dev/microblog.env` (gitignored) holds `MICROBLOG_TOKEN=<app token>`. With it, `test-app.sh` also
+runs `MicroblogLiveTests` and `testMicroblogSite` against the real account. To skip them, leave
+the file out and pass `-skip-testing:QuillUITests/PublishFlowUITests/testMicroblogSite`.
+
+That account has real followers and cross-posts, so these tests:
+
+- **Only create drafts.** A published post can reach followers before it could be deleted.
+- **Delete what they make**, posts and images, and check it's gone.
+- **Never tap the send button** in the UI test.
+
+This means publishing a new post, and publishing an existing draft, can't be tested here.
+
 ## Running tests
 
 ```sh

@@ -102,6 +102,7 @@ struct EditSiteView: View {
 @ViewBuilder func siteForm(kind: SiteKind, site: Site?, isCentered: Bool, onDone: @escaping () -> Void) -> some View {
     switch kind {
     case .ghost: GhostSiteForm(site: site, isCentered: isCentered, onDone: onDone)
+    case .microblog: MicroblogSiteForm(site: site, isCentered: isCentered, onDone: onDone)
     case .local: LocalSiteForm(site: site, isCentered: isCentered, onDone: onDone)
     }
 }

@@ -25,7 +25,7 @@ struct GhostBackend: SiteBackend {
         guard post.status == .published || post.status == .draft,
               let body = HTMLToMarkdown.convert(post.html ?? "") else { return nil }
         // A second tap can have finished importing while this one waited.
-        if let existing = try localCopy(of: id) { return existing }
+        if let existing = try Entry.copy(of: id, on: site.id, in: context) { return existing }
         let entry = Entry(siteID: site.id)
         apply(post, body: body, to: entry)
         entry.createdAt = post.publishedAt ?? post.createdAt ?? .now
@@ -56,12 +56,6 @@ struct GhostBackend: SiteBackend {
         entry.remoteUpdatedAt = post.updatedAt
         entry.remoteURLString = post.url?.absoluteString
         entry.remoteStatusRaw = post.status.rawValue
-    }
-
-    private func localCopy(of id: String) throws -> Entry? {
-        let siteID = site.id
-        return try context.fetch(FetchDescriptor<Entry>(
-            predicate: #Predicate { $0.remotePostID == id && $0.siteID == siteID })).first
     }
 
     /// Permanently deletes a post from Ghost, and Quill's copy of it.
@@ -114,10 +108,7 @@ struct GhostBackend: SiteBackend {
         guard post.status == .published || post.status == .draft,
               let body = HTMLToMarkdown.convert(post.html ?? "") else { throw UnsupportedPost() }
         apply(post, body: body, to: entry)
-        entry.clearPublishedCopy()
-        entry.failureReason = nil
-        entry.lastError = nil
-        entry.state = .sent
+        entry.resolveConflict()
         try context.save()
     }
 
@@ -129,17 +120,8 @@ struct GhostBackend: SiteBackend {
         try await client.uploadImage(jpeg, filename: filename, mimeType: "image/jpeg")
     }
 
-    /// Posts stay in Ghost, so only Quill's copies of them go. Unsent writing stays in Drafts.
-    func removeSiteData() throws {
-        let siteID = site.id
-        let sent = Entry.State.sent.rawValue
-        let copies = try context.fetch(FetchDescriptor<Entry>(
-            predicate: #Predicate { $0.siteID == siteID && $0.stateRaw == sent }))
-        for entry in copies { context.delete(entry) }
-        let uploaded = try context.fetch(FetchDescriptor<Entry>(
-            predicate: #Predicate { $0.uploadedToSiteID == siteID }))
-        for entry in uploaded { entry.uploadedToSiteID = nil }
-    }
+    /// Posts stay in Ghost, so only Quill's copies of them go.
+    func removeSiteData() throws { try Entry.removeCopies(on: site.id, in: context) }
 
     private func resolvedUpdatedAt(_ entry: Entry, id: String) async throws -> String {
         if let known = entry.remoteUpdatedAt { return known }

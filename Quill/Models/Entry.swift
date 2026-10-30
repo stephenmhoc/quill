@@ -93,6 +93,23 @@ final class Entry {
 
     func touch() { updatedAt = .now }
 
+    /// Quill's copy of a post on a site.
+    static func copy(of postID: String, on siteID: UUID, in context: ModelContext) throws -> Entry? {
+        try context.fetch(FetchDescriptor<Entry>(
+            predicate: #Predicate { $0.remotePostID == postID && $0.siteID == siteID })).first
+    }
+
+    /// For a site that's going away: its posts stay there, unsent writing stays in Drafts.
+    static func removeCopies(on siteID: UUID, in context: ModelContext) throws {
+        let sent = State.sent.rawValue
+        let copies = try context.fetch(FetchDescriptor<Entry>(
+            predicate: #Predicate { $0.siteID == siteID && $0.stateRaw == sent }))
+        for entry in copies { context.delete(entry) }
+        let uploaded = try context.fetch(FetchDescriptor<Entry>(
+            predicate: #Predicate { $0.uploadedToSiteID == siteID }))
+        for entry in uploaded { entry.uploadedToSiteID = nil }
+    }
+
     func beginEdit() {
         publishedTitle = title
         publishedBody = body
@@ -109,6 +126,14 @@ final class Entry {
         clearPublishedCopy()
         state = .sent
         try? modelContext?.save()
+    }
+
+    /// A conflict was settled by taking the site's version.
+    func resolveConflict() {
+        clearPublishedCopy()
+        failureReason = nil
+        lastError = nil
+        state = .sent
     }
 
     func clearPublishedCopy() {

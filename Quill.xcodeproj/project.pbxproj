@@ -7,10 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		014CBC56651D96198361A67A /* MicroblogLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 325987E418B375BC9BEDA7D2 /* MicroblogLiveTests.swift */; };
 		01DADE2485C35FD8283B6F7D /* GhostKit in Frameworks */ = {isa = PBXBuildFile; productRef = 50AA175CB5E00ABE45A6F873 /* GhostKit */; };
 		09E8817F2D1600265476DAC6 /* GhostKit in Frameworks */ = {isa = PBXBuildFile; productRef = 65D9C7189A68C5BF5AC6F620 /* GhostKit */; };
 		0B7D80E42855F6324227E08E /* LocalSiteForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D36D7CE15ACC63A9361E466 /* LocalSiteForm.swift */; };
 		20EBC6E5E44C65F0921126E5 /* LocalBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE560BD846C9515352C0A7B2 /* LocalBackend.swift */; };
+		22085D4C3562398CCEF206C1 /* MicroblogSiteForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 874F94F3CF6520EE05693513 /* MicroblogSiteForm.swift */; };
 		2BFD621207C24D0D45BF7932 /* LockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4829D02BAD5836F8776B8F8F /* LockView.swift */; };
 		2DECFDE235C863317DFF34BF /* Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD30CED7B199FBAC661EA02 /* Entry.swift */; };
 		42387E640DDEC9B914B85410 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF31C8EE91FDE72C86EE086E /* SettingsView.swift */; };
@@ -19,6 +21,7 @@
 		6DA99894461AF26112196137 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB8425B76428A097BB6A89 /* SidebarView.swift */; };
 		760C5A038A9ACBF3229EAEB7 /* GhostSiteForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC2A3CC27E227D11249E64A /* GhostSiteForm.swift */; };
 		7E146DC24D130D44E61F2CB0 /* PublishFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9234120738BBF6CBF48467A3 /* PublishFlowUITests.swift */; };
+		89ED104166F51DB445F0056E /* MicroblogBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = A95758EBD292D01EBDCDB5F3 /* MicroblogBackend.swift */; };
 		8BDD2968EEB5C5B8281245A0 /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C6295CF0492AC51BC221F16 /* AppLock.swift */; };
 		94DAE2697E72826219D9F01E /* AddSiteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8EE99F1C2FDC7AC5F379E9 /* AddSiteView.swift */; };
 		9A17C942B6A0E268D6AAC3C6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AF8430782BE47927308B3295 /* Assets.xcassets */; };
@@ -64,6 +67,7 @@
 		1641461940ABADF3553A64FE /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		16B4BED4FCFB678EB2FD47B5 /* QuillUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = QuillUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D36D7CE15ACC63A9361E466 /* LocalSiteForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSiteForm.swift; sourceTree = "<group>"; };
+		325987E418B375BC9BEDA7D2 /* MicroblogLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicroblogLiveTests.swift; sourceTree = "<group>"; };
 		37E75D2A90726438075942B1 /* TagEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagEditor.swift; sourceTree = "<group>"; };
 		4433B57A9D396E73486DFF7A /* EntryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryListView.swift; sourceTree = "<group>"; };
 		4829D02BAD5836F8776B8F8F /* LockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockView.swift; sourceTree = "<group>"; };
@@ -72,6 +76,7 @@
 		64CF96E4FEB2C5D36281BB0D /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		652A2E7C67C2F9335547BBB9 /* Site.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Site.swift; sourceTree = "<group>"; };
 		7ECB4E88FFB544CBB3212EA2 /* EditorTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTextView.swift; sourceTree = "<group>"; };
+		874F94F3CF6520EE05693513 /* MicroblogSiteForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicroblogSiteForm.swift; sourceTree = "<group>"; };
 		8E4C7A3CBF2CA60807133F56 /* SiteBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteBackend.swift; sourceTree = "<group>"; };
 		9234120738BBF6CBF48467A3 /* PublishFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishFlowUITests.swift; sourceTree = "<group>"; };
 		95E8C48ADF7597448F3FD904 /* Quill.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Quill.entitlements; sourceTree = "<group>"; };
@@ -80,6 +85,7 @@
 		9DD30CED7B199FBAC661EA02 /* Entry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entry.swift; sourceTree = "<group>"; };
 		9DD607DFB83009FE4EF6CB19 /* QuillTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = QuillTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A65A91C0E406B03993C6B547 /* PublisherLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublisherLiveTests.swift; sourceTree = "<group>"; };
+		A95758EBD292D01EBDCDB5F3 /* MicroblogBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicroblogBackend.swift; sourceTree = "<group>"; };
 		AF31C8EE91FDE72C86EE086E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		AF8430782BE47927308B3295 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B7F24F49FE29A3A98B5E6680 /* GhostBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostBackend.swift; sourceTree = "<group>"; };
@@ -151,6 +157,7 @@
 		4FA2B8A80CCB68BE57F36012 /* QuillTests */ = {
 			isa = PBXGroup;
 			children = (
+				325987E418B375BC9BEDA7D2 /* MicroblogLiveTests.swift */,
 				A65A91C0E406B03993C6B547 /* PublisherLiveTests.swift */,
 			);
 			path = QuillTests;
@@ -211,6 +218,7 @@
 				BBC2A3CC27E227D11249E64A /* GhostSiteForm.swift */,
 				2D36D7CE15ACC63A9361E466 /* LocalSiteForm.swift */,
 				4829D02BAD5836F8776B8F8F /* LockView.swift */,
+				874F94F3CF6520EE05693513 /* MicroblogSiteForm.swift */,
 				F9D0E9058F0132B412E20176 /* RootView.swift */,
 				AF31C8EE91FDE72C86EE086E /* SettingsView.swift */,
 				BBBB8425B76428A097BB6A89 /* SidebarView.swift */,
@@ -235,6 +243,7 @@
 				9C75A0693926536929AB2478 /* AppIconChoice.swift */,
 				B7F24F49FE29A3A98B5E6680 /* GhostBackend.swift */,
 				FE560BD846C9515352C0A7B2 /* LocalBackend.swift */,
+				A95758EBD292D01EBDCDB5F3 /* MicroblogBackend.swift */,
 				9A601AE5954D328F6E161E61 /* Navigation.swift */,
 				D1F21B3D2ECEA6CDF2B70A82 /* Publisher.swift */,
 				8E4C7A3CBF2CA60807133F56 /* SiteBackend.swift */,
@@ -391,6 +400,8 @@
 				0B7D80E42855F6324227E08E /* LocalSiteForm.swift in Sources */,
 				2BFD621207C24D0D45BF7932 /* LockView.swift in Sources */,
 				CBA847A0D91FF6CF35722C21 /* MarkdownFormat.swift in Sources */,
+				89ED104166F51DB445F0056E /* MicroblogBackend.swift in Sources */,
+				22085D4C3562398CCEF206C1 /* MicroblogSiteForm.swift in Sources */,
 				B0E281DA3517CFFD44162CBE /* Navigation.swift in Sources */,
 				E113677E2C88F72B38258BFF /* Publisher.swift in Sources */,
 				D4A4486ECDF96AE03E6D8076 /* QuillApp.swift in Sources */,
@@ -409,6 +420,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				014CBC56651D96198361A67A /* MicroblogLiveTests.swift in Sources */,
 				F5F0BBB891F093490DBFDF2C /* PublisherLiveTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
