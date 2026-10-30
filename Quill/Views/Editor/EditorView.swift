@@ -6,11 +6,10 @@ import SwiftUI
 struct EditorView: View {
     @Bindable var entry: Entry
 
-    @Environment(AppLock.self) private var lock
     @Environment(Navigation.self) private var navigation
     @Environment(Publisher.self) private var publisher
     @Environment(\.modelContext) private var context
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.usesColumns) private var usesColumns
     @Query(sort: \Site.createdAt) private var sites: [Site]
 
     @State private var selection: TextSelection?
@@ -22,13 +21,15 @@ struct EditorView: View {
     @State private var pendingPublicPhoto: PhotosPickerItem?
     @State private var bodyFocused = false
     @State private var focusRequest = 0
-    /// The title stays out of the way until asked for, or if the entry already has one.
-    @State private var wantsTitle = false
+    /// The title stays out of the way unless it's ticked on, or the entry already has one.
+    @State private var showsTitle = false
+    @State private var focusTitle = false
+    /// Unticking removes the title from the entry. This brings it back if it's ticked again.
+    @State private var hiddenTitle = ""
 
     private var site: Site? { sites.first { $0.id == entry.siteID } }
     private var isEditable: Bool { entry.state == .editing }
     private var tint: Color { site?.color.color ?? .accentColor }
-    private var showsTitle: Bool { wantsTitle || !entry.title.isEmpty }
     private var canSend: Bool {
         isEditable && !entry.isBlank && site != nil && !uploading && !publisher.sending.contains(entry.id)
     }
@@ -36,14 +37,14 @@ struct EditorView: View {
     var body: some View {
         EditorTextView(text: $entry.body, selection: $selection, isFocused: $bodyFocused,
                        focusRequest: focusRequest, isEditable: isEditable, tint: tint,
-                       margin: sizeClass == .regular ? 48 : 20) {
+                       margin: usesColumns ? 48 : 20) {
             // Hosted inside UIKit, so the environment has to be passed along.
             EditorHeader(entry: entry, site: site, isEditable: isEditable, showsTitle: showsTitle,
-                         focusesTitle: wantsTitle && entry.title.isEmpty, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 })
+                         focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 })
                 .environment(navigation)
                 .environment(publisher)
         }
-        .background(tint.opacity(0.035))
+        .background(Color.paper.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
                 if bodyFocused && isEditable { formatBar }
@@ -84,7 +85,11 @@ struct EditorView: View {
             guard let item else { return }
             if site?.isPublic == true { pendingPublicPhoto = item } else { Task { await insertPhoto(item) } }
         }
-        .onAppear { if isEditable && entry.isBlank { focusRequest += 1 } }
+        .onAppear {
+            showsTitle = !entry.title.isEmpty
+            if isEditable && entry.isBlank && navigation.focusNextEntry { focusRequest += 1 }
+            navigation.focusNextEntry = false
+        }
     }
 
     private func touchIfStale() {
@@ -97,12 +102,15 @@ struct EditorView: View {
         ToolbarItem(placement: .principal) {
             SitePicker(entry: entry, sites: sites, locked: entry.remotePostID != nil || entry.uploadedToSiteID != nil || uploading || !isEditable)
         }
-        if sizeClass == .regular {
+        if usesColumns {
             ToolbarItem(placement: .primaryAction) {
+                let focused = navigation.columnVisibility == .detailOnly
                 Button { navigation.toggleFocus() } label: {
-                    Label("Focus", systemImage: navigation.columnVisibility == .detailOnly
-                          ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    Image(systemName: focused ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                        .foregroundStyle(.primary)
                 }
+                .accessibilityLabel("Focus")
+                .id(focused)
                 .keyboardShortcut("f", modifiers: [.command, .shift])
             }
         }
@@ -118,7 +126,7 @@ struct EditorView: View {
             Button(action: hideKeyboard) { Image(systemName: "keyboard.chevron.compact.down") }
                 .accessibilityLabel("Hide Keyboard")
         }
-        .padding(.horizontal, sizeClass == .regular ? 48 : 16)
+        .padding(.horizontal, usesColumns ? 48 : 16)
         .padding(.vertical, 8)
         .background(.bar)
     }
@@ -150,11 +158,10 @@ struct EditorView: View {
             }
             .disabled(!isEditable)
 
-            if !showsTitle {
-                Button { wantsTitle = true } label: {
-                    Label("Add Title", systemImage: "textformat")
-                }
+            Button(action: toggleTitle) {
+                Label("Title", systemImage: showsTitle ? "checkmark.square.fill" : "square")
             }
+            .accessibilityAddTraits(showsTitle ? .isSelected : [])
 
             Spacer()
 
@@ -177,14 +184,26 @@ struct EditorView: View {
             .keyboardShortcut(.return, modifiers: .command)
             .accessibilityIdentifier("sendButton")
         }
-        .padding(.horizontal, sizeClass == .regular ? 48 : 16)
+        .padding(.horizontal, usesColumns ? 48 : 16)
         .padding(.vertical, 10)
         .background(.bar)
     }
 
     private var sendLabel: String {
-        if entry.remotePostID != nil, entry.remoteStatus != .draft { return "Update" }
-        return site?.isPublic == true ? "Publish publicly" : "Publish"
+        let kind = site?.kind ?? .ghost
+        if entry.remotePostID != nil, entry.remoteStatus != .draft { return kind.updateLabel }
+        return site?.isPublic == true ? "Publish publicly" : kind.publishLabel
+    }
+
+    private func toggleTitle() {
+        showsTitle.toggle()
+        focusTitle = showsTitle
+        if showsTitle {
+            entry.title = hiddenTitle
+        } else {
+            hiddenTitle = entry.title
+            entry.title = ""
+        }
     }
 
     private func requestSend() {
@@ -230,8 +249,8 @@ struct EditorView: View {
                 uploadError = "Couldn't read that image."
                 return
             }
-            let url = try await lock.client(for: site)
-                .uploadImage(jpeg, filename: "quill-\(Int(Date.now.timeIntervalSince1970)).jpg", mimeType: "image/jpeg")
+            let url = try await publisher.backend(for: site)
+                .uploadImage(jpeg, filename: "quill-\(Int(Date.now.timeIntervalSince1970)).jpg")
             entry.uploadedToSiteID = site.id
             let (text, newSelection) = MarkdownFormat.insert("\n![](\(url.absoluteString))\n", into: entry.body, at: selection)
             entry.body = text
@@ -257,14 +276,14 @@ struct SitePicker: View {
                 Button {
                     entry.siteID = s.id
                 } label: {
-                    Label(s.name, systemImage: s.isPublic ? "globe" : "lock")
+                    Label(s.name, systemImage: s.accessIcon)
                 }
             }
         } label: {
             HStack(spacing: 6) {
                 Circle().fill(site?.color.color ?? .gray).frame(width: 8, height: 8)
                 Text(site?.name ?? "Choose site").fontWeight(.semibold)
-                if let site { Image(systemName: site.isPublic ? "globe" : "lock").font(.caption2) }
+                if let site { Image(systemName: site.accessIcon).font(.caption2) }
                 if !locked { Image(systemName: "chevron.down").font(.caption2.weight(.bold)) }
             }
             .font(.system(.subheadline, design: .monospaced))
@@ -374,7 +393,7 @@ struct StatusBanner: View {
             }
         case .sent:
             HStack {
-                note(entry.remoteStatus == .draft ? "Draft" : "Published", "checkmark.circle", .green)
+                note(entry.remoteStatus == .draft ? "Draft" : site?.kind.doneLabel ?? "Published", "checkmark.circle", .green)
                 Spacer()
                 if let url = entry.remoteURL, entry.remoteStatus != .draft {
                     Button("View") { openURL(url) }

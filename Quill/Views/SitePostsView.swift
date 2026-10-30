@@ -1,4 +1,3 @@
-import GhostKit
 import SwiftData
 import SwiftUI
 
@@ -6,22 +5,21 @@ import SwiftUI
 struct SitePostsView: View {
     let siteID: UUID
 
-    @Environment(AppLock.self) private var lock
     @Environment(Navigation.self) private var navigation
     @Environment(Publisher.self) private var publisher
     @Environment(\.openURL) private var openURL
     @Environment(\.modelContext) private var context
     @Query private var sites: [Site]
     @Query private var entries: [Entry]
-    @State private var posts: [GhostPost] = []
+    @State private var posts: [SitePost] = []
     @State private var error: String?
     @State private var loading = false
     @State private var editing = false
     @State private var page = 1
     @State private var hasMore = false
     @State private var opening: String?
-    @State private var pendingDelete: GhostPost?
-    @State private var unsupported: GhostPost?
+    @State private var pendingDelete: SitePost?
+    @State private var unsupported: SitePost?
 
     private var site: Site? { sites.first { $0.id == siteID } }
 
@@ -32,16 +30,24 @@ struct SitePostsView: View {
                     .font(.footnote)
                     .foregroundStyle(.red)
             }
-            ForEach(posts) { post in
-                Button { Task { await open(post) } } label: { row(post) }
-                    .buttonStyle(.plain)
-                    .disabled(opening != nil)
-                    .swipeActions(edge: .trailing) {
-                        Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
-                    }
-                    .contextMenu {
-                        Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
-                    }
+            Section {
+                ForEach(posts) { post in
+                    Button { Task { await open(post) } } label: { row(post) }
+                        .buttonStyle(.plain)
+                        .disabled(opening != nil)
+                        .swipeActions(edge: .trailing) {
+                            Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
+                        }
+                        .contextMenu {
+                            Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
+                        }
+                }
+            } header: {
+                if let site {
+                    Label(site.accessLabel, systemImage: site.accessIcon)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
             }
             if hasMore {
                 ProgressView()
@@ -62,14 +68,14 @@ struct SitePostsView: View {
             }
         }
         .sheet(isPresented: $editing) {
-            if let site { SiteFormView(site: site) }
+            if let site { EditSiteView(site: site) }
         }
-        .confirmationDialog("Delete “\(pendingDelete.map(displayTitle) ?? "")”?",
+        .confirmationDialog("Delete “\(pendingDelete?.title ?? "")”?",
                             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
                             titleVisibility: .visible, presenting: pendingDelete) { post in
-            Button("Delete from \(site?.name ?? "Ghost")", role: .destructive) { Task { await delete(post) } }
+            Button("Delete from \(site?.name ?? "site")", role: .destructive) { Task { await delete(post) } }
         } message: { _ in
-            Text("This permanently deletes the post from Ghost. It can't be undone.")
+            Text("This permanently deletes the post. It can't be undone.")
         }
         .alert("Quill can't edit this post", isPresented: Binding(get: { unsupported != nil }, set: { if !$0 { unsupported = nil } }),
                presenting: unsupported) { post in
@@ -84,37 +90,31 @@ struct SitePostsView: View {
         .onChange(of: publisher.lastResult?.id) { Task { await load() } }
     }
 
-    private func row(_ post: GhostPost) -> some View {
-        let untitled = post.tags?.contains { $0.name == EntryBuilder.untitledTag } ?? false
-        return VStack(alignment: .leading, spacing: 4) {
+    private func row(_ post: SitePost) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text((post.publishedAt ?? .now).formatted(date: .abbreviated, time: .omitted).uppercased())
+                Text((post.date ?? .now).formatted(date: .abbreviated, time: .omitted).uppercased())
                 Spacer()
-                if post.status != .published { Text(post.status.rawValue.uppercased()) }
+                if let badge = post.badge { Text(badge) }
                 if opening == post.id { ProgressView().controlSize(.mini) }
-                else if localEntry(for: post) != nil { Image(systemName: "pencil.circle") }
+                else if localEntry(for: post)?.state == .editing { Image(systemName: "pencil.circle") }
             }
             .font(.system(.caption2, design: .monospaced))
             .foregroundStyle(.secondary)
-            Text(displayTitle(post))
+            Text(post.title)
                 .font(.system(.headline, design: .serif))
-                .italic(untitled)
+                .italic(post.isUntitled)
                 .lineLimit(2)
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
     }
 
-    private func displayTitle(_ post: GhostPost) -> String {
-        let untitled = post.tags?.contains { $0.name == EntryBuilder.untitledTag } ?? false
-        return untitled ? (post.excerpt ?? post.title) : post.title
-    }
-
-    private func localEntry(for post: GhostPost) -> Entry? {
+    private func localEntry(for post: SitePost) -> Entry? {
         entries.first { $0.remotePostID == post.id && $0.siteID == siteID }
     }
 
-    private func open(_ post: GhostPost) async {
+    private func open(_ post: SitePost) async {
         guard let site else { return }
         opening = post.id
         defer { opening = nil }
@@ -131,7 +131,7 @@ struct SitePostsView: View {
         }
     }
 
-    private func delete(_ post: GhostPost) async {
+    private func delete(_ post: SitePost) async {
         guard let site else { return }
         if let entry = localEntry(for: post), navigation.selectedEntry == entry { navigation.selectedEntry = nil }
         do {
@@ -148,7 +148,7 @@ struct SitePostsView: View {
         loading = true
         defer { loading = false }
         do {
-            let first = try await lock.client(for: site).recentPosts(limit: Self.pageSize)
+            let first = try await publisher.backend(for: site).posts(limit: Self.pageSize, page: 1)
             posts = first
             page = 1
             hasMore = first.count == Self.pageSize
@@ -161,7 +161,7 @@ struct SitePostsView: View {
     private func loadMore() async {
         guard let site else { return }
         do {
-            let next = try await lock.client(for: site).recentPosts(limit: Self.pageSize, page: page + 1)
+            let next = try await publisher.backend(for: site).posts(limit: Self.pageSize, page: page + 1)
             let known = Set(posts.map(\.id))
             posts += next.filter { !known.contains($0.id) }
             hasMore = next.count == Self.pageSize

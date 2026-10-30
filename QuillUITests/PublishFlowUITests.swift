@@ -17,18 +17,21 @@ final class PublishFlowUITests: XCTestCase {
         allowFaceIDIfAsked()
 
         // First run: unlocking lands on Add Site, and there's no way past it without one.
-        let urlField = app.textFields["https://journal.example.com"]
-        XCTAssertTrue(urlField.waitForExistence(timeout: 30), "Face ID unlock / Add Site didn't appear")
+        let ghost = app.buttons["siteKind.ghost"]
+        XCTAssertTrue(ghost.waitForExistence(timeout: 30), "Face ID unlock / site choice didn't appear")
         attach("add-site", app)
+        XCTAssertTrue(app.buttons["siteKind.local"].exists, "local must be offered at setup")
         XCTAssertFalse(app.buttons["Cancel"].exists, "first site must not be skippable")
         XCTAssertFalse(app.textViews["editor"].exists, "no writing before a site exists")
+        ghost.tap()
+        let urlField = app.textFields["https://journal.example.com"]
+        XCTAssertTrue(urlField.waitForExistence(timeout: 5))
         urlField.tap()
         urlField.typeText(url)
         let keyField = app.secureTextFields.firstMatch
         keyField.tap()
         keyField.typeText(key)
-        XCTAssertFalse(app.buttons["Save"].isEnabled, "Save must need an explicit Private/Public choice")
-        app.buttons["Private"].tap()
+        XCTAssertTrue(app.buttons["Private"].isSelected, "new sites default to private")
         app.buttons["Save"].tap()
 
         // Then the blank page, on the new site.
@@ -36,6 +39,9 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["Site: Quill Dev"].waitForExistence(timeout: 10), "site not selected")
         attach("blank-page", app)
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            XCTAssertFalse(app.keyboards.firstMatch.exists, "the keyboard shouldn't open by itself on iPad")
+        }
         XCTAssertFalse(app.textFields["titleField"].exists, "title stays hidden until asked for")
         XCTAssertFalse(app.buttons["Draft"].exists, "drafts are automatic")
 
@@ -48,18 +54,21 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Published to Quill Dev"].waitForExistence(timeout: 20), "no success banner")
         attach("published", app)
 
-        // Asking for a title shows it, and it's focused to type in.
-        app.buttons["Add Title"].tap()
+        // The title is a tick box: on shows it, focused to type in; off removes it; on restores it.
+        let titleBox = app.buttons["Title"]
+        XCTAssertFalse(titleBox.isSelected)
+        titleBox.tap()
         let titleField = app.textFields["titleField"]
         XCTAssertTrue(titleField.waitForExistence(timeout: 5), "Add Title didn't show the field")
         titleField.typeText("Kept draft")
         XCTAssertEqual(titleField.value as? String, "Kept draft", "title field wasn't focused")
+        titleBox.tap()
+        XCTAssertTrue(titleField.waitForNonExistence(timeout: 5), "unticking didn't hide the title")
+        titleBox.tap()
+        XCTAssertTrue(titleField.waitForExistence(timeout: 5))
+        XCTAssertEqual(titleField.value as? String, "Kept draft", "ticking again didn't restore the title")
 
         // Going back from a new entry goes home, with the writing kept as a draft.
-        if UIDevice.current.userInterfaceIdiom == .pad {
-            app.textViews["editor"].tap()
-            app.buttons["Hide Keyboard"].tap()
-        }
         showSidebar(app)
         XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 5), "back didn't go home")
         attach("home", app)
@@ -104,16 +113,18 @@ final class PublishFlowUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
         allowFaceIDIfAsked()
-        let urlField = app.textFields["https://journal.example.com"]
+        let ghost = app.buttons["siteKind.ghost"]
         let editorView = app.textViews["editor"]
-        XCTAssertTrue(urlField.waitForExistence(timeout: 30) || editorView.exists, "didn't unlock")
-        if urlField.exists {
+        XCTAssertTrue(ghost.waitForExistence(timeout: 30) || editorView.exists, "didn't unlock")
+        if ghost.exists {
+            ghost.tap()
+            let urlField = app.textFields["https://journal.example.com"]
+            XCTAssertTrue(urlField.waitForExistence(timeout: 5))
             urlField.tap()
             urlField.typeText(url)
             let keyField = app.secureTextFields.firstMatch
             keyField.tap()
             keyField.typeText(key)
-            app.buttons["Private"].tap()
             app.buttons["Save"].tap()
             XCTAssertTrue(editorView.waitForExistence(timeout: 15))
         }
@@ -132,10 +143,8 @@ final class PublishFlowUITests: XCTestCase {
         app.cells.containing(.staticText, identifier: "Quill Dev").firstMatch.tap()
         let row = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 15), "post not listed")
+        XCTAssertTrue(app.staticTexts["Private"].exists, "private site shows no lock label")
         attach("site-posts", app)
-        // Re-selecting the current site leaves the iPad sidebar floating over the list.
-        if app.buttons["Hide Sidebar"].firstMatch.exists { app.buttons["Hide Sidebar"].firstMatch.tap() }
-        try await Task.sleep(for: .seconds(1))
         row.tap()
         let editor = app.textViews["editor"]
         XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 15), "post didn't open")
@@ -173,6 +182,7 @@ final class PublishFlowUITests: XCTestCase {
             attach("focus-mode", app)
             app.buttons["Focus"].tap()
             XCTAssertTrue(list.waitForExistence(timeout: 5), "focus mode didn't exit")
+            XCTAssertTrue(app.buttons["Focus"].isHittable, "the focus button went away")
         }
 
         // Delete asks first, then it's gone from Ghost.
@@ -204,14 +214,85 @@ final class PublishFlowUITests: XCTestCase {
     }
 
     override func setUp() {
-        // All three iPad columns fit in landscape.
-        if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
+        XCUIDevice.shared.orientation = .portrait
+    }
+
+    /// A local site does everything a Ghost site does, with no server and "Saved" for Publish.
+    /// Stands alone: it's the app's only site on a fresh install, and one of several otherwise.
+    @MainActor
+    func testLocalSite() async throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        allowFaceIDIfAsked()
+        let name = "Notebook \(UUID().uuidString.prefix(4))"
+        let local = app.buttons["siteKind.local"]
+        let editor = app.textViews["editor"]
+        XCTAssertTrue(local.waitForExistence(timeout: 30) || editor.exists, "didn't unlock")
+        if !local.exists {
+            showSidebar(app)
+            app.buttons["Add Site"].tap()
+            XCTAssertTrue(local.waitForExistence(timeout: 5), "Add Site must offer every kind")
+            XCTAssertTrue(app.buttons["siteKind.ghost"].exists)
+            attach("add-site-kinds", app)
+        }
+        local.tap()
+        let nameField = app.textFields["Name"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.secureTextFields.firstMatch.exists, "a local site needs no key")
+        nameField.tap()
+        nameField.typeText(name)
+        app.buttons["Plum"].tap()
+        attach("local-form", app)
+        app.buttons["Save"].tap()
+
+        // Write on it. Saved stands in for Publish, and it's listed under the site.
+        showSidebar(app)
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 10))
+        app.buttons["New Entry"].tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Site:'")).firstMatch.tap()
+        app.buttons[name].firstMatch.tap()
+        let text = "Only on this device \(UUID().uuidString.prefix(8))"
+        editor.tap()
+        editor.typeText(text)
+        let saved = app.buttons["sendButton"]
+        XCTAssertEqual(saved.label, "Saved")
+        attach("local-writing", app)
+        saved.tap()
+        XCTAssertTrue(app.staticTexts["Saved to \(name)"].waitForExistence(timeout: 10), "no saved banner")
+
+        showSidebar(app)
+        app.cells.containing(.staticText, identifier: name).firstMatch.tap()
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "saved entry not listed")
+        XCTAssertTrue(app.staticTexts["On this device"].exists)
+        attach("local-posts", app)
+
+        // Edit it again, then delete it, just like a post on a site.
+        row.tap()
+        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Saved"].exists)
+        app.buttons["Edit"].tap()
+        editor.tap()
+        editor.typeText(" edited")
+        app.buttons["sendButton"].tap()
+        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 10))
+        XCTAssertTrue((editor.value as? String)?.contains("edited") == true, "got: \(editor.value ?? "nil")")
+        if app.buttons["BackButton"].exists { app.buttons["BackButton"].tap() }
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.swipeLeft()
+        app.buttons["Delete"].firstMatch.tap()
+        let confirm = app.buttons["Delete from \(name)"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "delete must confirm")
+        confirm.tap()
+        XCTAssertTrue(row.waitForNonExistence(timeout: 10))
     }
 
     private func showSidebar(_ app: XCUIApplication) {
         for _ in 0..<3 where !app.buttons["Settings"].isHittable {
             let back = app.buttons["BackButton"]
-            (back.exists ? back : app.buttons["Show Sidebar"]).tap()
+            (back.exists ? back : app.buttons["Show Sidebar"].firstMatch).tap()
             _ = app.buttons["Settings"].waitForExistence(timeout: 2)
         }
     }

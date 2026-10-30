@@ -8,7 +8,7 @@ struct EntryListView: View {
     @Environment(Navigation.self) private var navigation
     @Environment(Publisher.self) private var publisher
     @Environment(\.modelContext) private var context
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.usesColumns) private var usesColumns
     @Query(sort: \Entry.updatedAt, order: .reverse) private var entries: [Entry]
     @Query private var sites: [Site]
 
@@ -38,7 +38,7 @@ struct EntryListView: View {
                     EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID })
                 }
                 .buttonStyle(.plain)
-                .listRowBackground(entry == navigation.selectedEntry && sizeClass == .regular
+                .listRowBackground(entry == navigation.selectedEntry && usesColumns
                                    ? Color.accentColor.opacity(0.15) : nil)
                 .swipeActions(edge: .trailing) {
                     if entry.state != .sending {

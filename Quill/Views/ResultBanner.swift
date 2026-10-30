@@ -33,7 +33,6 @@ struct ResultBanner: View {
     }
 
     private func message(_ result: Publisher.Result) -> String {
-        if result.wasUpdate { return "Updated on \(result.siteName)" }
-        return result.status == .draft ? "Draft sent to \(result.siteName)" : "Published to \(result.siteName)"
+        result.kind.doneMessage(siteName: result.siteName, wasUpdate: result.wasUpdate)
     }
 }

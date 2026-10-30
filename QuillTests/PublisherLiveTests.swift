@@ -35,6 +35,23 @@ struct PublisherLiveTests {
         try await client.recentPosts(limit: 50).filter { $0.title == title }.count
     }
 
+    @Test func localSiteSavesWithoutAnyServer() async throws {
+        let site = Site(name: "Notebook", kind: .local, color: .plum)
+        context.insert(site)
+        let lock = AppLock()
+        lock.unlockForTesting(keys: [:])
+        let publisher = Publisher(lock: lock, context: context)
+        let e = entry(site)
+        await publisher.publish(e)
+        #expect(e.state == .sent)
+        #expect(e.remotePostID == e.id.uuidString)
+        #expect(e.remoteURL == nil)
+        let listed = try await publisher.backend(for: site).posts(limit: 10, page: 1)
+        #expect(listed.map(\.id) == [e.id.uuidString])
+        try await publisher.deletePost(id: e.id.uuidString, site: site)
+        #expect(try await publisher.backend(for: site).posts(limit: 10, page: 1).isEmpty)
+    }
+
     @Test func publishesUntitledEntry() async throws {
         let (publisher, site, client) = harness()
         let e = entry(site)

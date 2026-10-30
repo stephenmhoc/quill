@@ -9,7 +9,6 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Query(sort: \Site.createdAt) private var sites: [Site]
-    @State private var sidebarOverlays = false
 
     var body: some View {
         @Bindable var navigation = navigation
@@ -17,7 +16,7 @@ struct RootView: View {
             if !lock.isUnlocked {
                 LockView()
             } else if sites.isEmpty {
-                SiteFormView(site: nil, isRequired: true)
+                AddSiteView(isRequired: true)
             } else {
                 Group {
                     if sizeClass == .regular {
@@ -29,13 +28,9 @@ struct RootView: View {
                             DetailColumn()
                         }
                         .navigationSplitViewStyle(.balanced)
-                        // Narrow iPad: the sidebar floats over the list, so it stays out of the way.
                         .onGeometryChange(for: Bool.self) { $0.size.width < 1100 } action: { overlays in
-                            sidebarOverlays = overlays
+                            navigation.sidebarOverlays = overlays
                             if overlays { navigation.columnVisibility = .doubleColumn }
-                        }
-                        .onChange(of: navigation.sidebar) {
-                            if sidebarOverlays { withAnimation { navigation.columnVisibility = .doubleColumn } }
                         }
                     } else {
                         NavigationStack(path: $navigation.path) {
@@ -49,8 +44,9 @@ struct RootView: View {
                         }
                     }
                 }
+                .environment(\.usesColumns, sizeClass == .regular)
                 .sheet(isPresented: $navigation.showingSettings) { SettingsView() }
-                .sheet(isPresented: $navigation.showingAddSite) { SiteFormView(site: nil) }
+                .sheet(isPresented: $navigation.showingAddSite) { AddSiteView() }
                 .overlay(alignment: .top) { ResultBanner() }
                 .task(id: lock.isUnlocked) { await runOutbox() }
                 .onReceive(NotificationCenter.default.publisher(for: .quillNewEntry)) { _ in
@@ -60,7 +56,7 @@ struct RootView: View {
                     if navigation.sidebar == nil { navigation.sidebar = sites.first.map { .site($0.id) } }
                     // Also after setup, when the last site was removed and a new one added.
                     if !sites.contains(where: { $0.id == navigation.selectedEntry?.siteID }) {
-                        navigation.openBlankEntry(in: context)
+                        navigation.openBlankEntry(in: context, focus: sizeClass != .regular)
                     }
                 }
             }

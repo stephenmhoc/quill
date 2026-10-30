@@ -5,7 +5,7 @@ struct TagEditor: View {
     @Bindable var entry: Entry
     let site: Site?
 
-    @Environment(AppLock.self) private var lock
+    @Environment(Publisher.self) private var publisher
     @Environment(\.dismiss) private var dismiss
     @State private var input = ""
     @State private var suggestions: [String] = []
@@ -64,7 +64,7 @@ struct TagEditor: View {
     }
 
     private func loadSuggestions() async {
-        guard let site, let client = try? lock.client(for: site) else { return }
-        suggestions = ((try? await client.tags()) ?? []).filter { !$0.isInternal }.map(\.name)
+        guard let site, let backend = try? publisher.backend(for: site) else { return }
+        suggestions = (try? await backend.tags()) ?? []
     }
 }

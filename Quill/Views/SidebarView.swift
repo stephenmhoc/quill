@@ -4,7 +4,7 @@ import SwiftUI
 struct SidebarView: View {
     @Environment(Navigation.self) private var navigation
     @Environment(\.modelContext) private var context
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.usesColumns) private var usesColumns
     @Query(sort: \Site.createdAt) private var sites: [Site]
     @Query private var entries: [Entry]
     /// Ticks so a slow send shows up without anything else changing.
@@ -14,13 +14,14 @@ struct SidebarView: View {
         @Bindable var navigation = navigation
         Group {
             // Selection plus NavigationLink pushes twice on iPhone.
-            if sizeClass == .regular {
+            if usesColumns {
                 List(selection: $navigation.sidebar) { rows }
             } else {
                 List { rows }
             }
         }
-        .navigationTitle("Quill")
+        // The iPad sidebar's toolbar has no room for it.
+        .navigationTitle(usesColumns ? "" : "Quill")
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(10))
@@ -49,7 +50,7 @@ struct SidebarView: View {
                         HStack {
                             Text(site.name)
                             Spacer()
-                            Image(systemName: site.isPublic ? "globe" : "lock")
+                            Image(systemName: site.accessIcon)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -99,8 +100,14 @@ struct SidebarView: View {
 
     /// In the iPad sidebar a row selects; on iPhone it pushes onto the stack.
     @ViewBuilder private func link(_ item: SidebarItem, @ViewBuilder label: () -> some View) -> some View {
-        if sizeClass == .regular {
+        if usesColumns {
+            // The gesture takes over from the List's selection, and also sees the selected row
+            // being tapped again, which has to close the floating sidebar too.
             NavigationLink(value: item, label: label)
+                .simultaneousGesture(TapGesture().onEnded {
+                    navigation.sidebar = item
+                    navigation.closeSidebarOverlay()
+                })
         } else {
             NavigationLink(value: Route.list(item), label: label)
         }

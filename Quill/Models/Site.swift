@@ -2,11 +2,65 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-/// A Ghost site Quill can publish to. Its key lives in the Keychain (see `Vault`), never here.
+/// The kinds of site Quill can write to. To add one: add a case here, then the compiler points
+/// at the rest, which is a `SiteBackend` in `Publisher.backend(for:)` and a form in `siteForm`.
+enum SiteKind: String, CaseIterable, Identifiable {
+    case ghost, local
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .ghost: "Ghost"
+        case .local: "Local"
+        }
+    }
+    var summary: String {
+        switch self {
+        case .ghost: "Publish to a Ghost site with a staff access token."
+        case .local: "Keep everything on this device. No account, no server."
+        }
+    }
+    var systemImage: String {
+        switch self {
+        case .ghost: "network"
+        case .local: "iphone"
+        }
+    }
+    /// The send button for a new entry, and for an update.
+    var publishLabel: String {
+        switch self {
+        case .ghost: "Publish"
+        case .local: "Saved"
+        }
+    }
+    var updateLabel: String {
+        switch self {
+        case .ghost: "Update"
+        case .local: "Saved"
+        }
+    }
+    /// How a finished entry describes itself.
+    var doneLabel: String {
+        switch self {
+        case .ghost: "Published"
+        case .local: "Saved"
+        }
+    }
+    func doneMessage(siteName: String, wasUpdate: Bool) -> String {
+        switch self {
+        case .ghost: wasUpdate ? "Updated on \(siteName)" : "Published to \(siteName)"
+        case .local: "Saved to \(siteName)"
+        }
+    }
+}
+
+/// A site Quill can write to. A Ghost site's key lives in the Keychain (see `Vault`), never here.
 @Model
 final class Site {
     @Attribute(.unique) var id: UUID
     var name: String
+    var kindRaw: String = SiteKind.ghost.rawValue
+    /// Empty for kinds of site with no address.
     var urlString: String
     /// Public sites get a confirmation before publishing.
     var isPublic: Bool
@@ -23,12 +77,28 @@ final class Site {
         createdAt = .now
     }
 
+    /// A site with no address, like a local one.
+    init(name: String, kind: SiteKind, color: SiteColor) {
+        id = UUID()
+        self.name = name
+        kindRaw = kind.rawValue
+        urlString = ""
+        isPublic = false
+        colorRaw = color.rawValue
+        createdAt = .now
+    }
+
+    var kind: SiteKind { SiteKind(rawValue: kindRaw) ?? .ghost }
     var url: URL? { URL(string: urlString) }
     var color: SiteColor {
         get { SiteColor(rawValue: colorRaw) ?? .rust }
         set { colorRaw = newValue.rawValue }
     }
     var host: String { url?.host() ?? urlString }
+
+    /// Who can read this site, in words and as a symbol.
+    var accessLabel: String { kind == .local ? "On this device" : isPublic ? "Public" : "Private" }
+    var accessIcon: String { kind == .local ? "iphone" : isPublic ? "globe" : "lock" }
 }
 
 enum SiteColor: String, CaseIterable, Identifiable {
