@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Manage the test Ghost. See TESTING.md.
+# The test scripts run start and destroy themselves, so these are for working by hand.
+#   scripts/testenv.sh start   delete anything left over, then deploy a fresh Ghost
+#   scripts/testenv.sh destroy stop Ghost, close the tunnel, delete all content and credentials
 #   scripts/testenv.sh up      deploy, start, open the tunnel, seed credentials
 #   scripts/testenv.sh tunnel  reopen just the tunnel
 #   scripts/testenv.sh status  show what's running
-#   scripts/testenv.sh reset   delete all test content and start fresh
 #   scripts/testenv.sh down    stop Ghost and close the tunnel (keeps content)
 # Settings: QUILL_TEST_HOST (ssh host, default docker-server),
 #           QUILL_TEST_DIR  (remote directory, default /opt/ghost-dev)
@@ -45,6 +47,12 @@ deploy() {
   ssh "$HOST" "cd '$DIR' && docker compose pull -q && docker compose up -d"
 }
 
+destroy() {
+  close_tunnel
+  ssh "$HOST" "if [ -f '$DIR/docker-compose.yml' ]; then cd '$DIR' && docker compose down && find content -mindepth 1 -delete; fi"
+  rm -f .dev/ghost-dev.env
+}
+
 case "${1:-}" in
   up)
     deploy; open_tunnel; wait_ready; scripts/dev-ghost-seed.sh ;;
@@ -55,13 +63,13 @@ case "${1:-}" in
     tunnel_up && echo "tunnel: open" || echo "tunnel: closed"
     curl -s -m 5 -o /dev/null -w "ghost at $URL: %{http_code}\n" "$URL/ghost/api/admin/site/" || true
     [[ -f .dev/ghost-dev.env ]] && echo "credentials: .dev/ghost-dev.env" || echo "credentials: missing" ;;
-  reset)
-    ssh "$HOST" "cd '$DIR' && docker compose down && find content -mindepth 1 -delete"
-    rm -f .dev/ghost-dev.env
-    deploy; open_tunnel; wait_ready; scripts/dev-ghost-seed.sh ;;
+  start)
+    destroy; deploy; open_tunnel; wait_ready; scripts/dev-ghost-seed.sh ;;
+  destroy)
+    destroy ;;
   down)
     close_tunnel
     ssh "$HOST" "cd '$DIR' && docker compose down" ;;
   *)
-    sed -n '2,8p' "$0"; exit 1 ;;
+    sed -n '2,9p' "$0"; exit 1 ;;
 esac

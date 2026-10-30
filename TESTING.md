@@ -13,13 +13,15 @@ There are three parts:
 
 ## Quick start
 
-If you've already done the one-time setup below:
+After the one-time setup below:
 
 ```sh
-scripts/testenv.sh up     # start the test Ghost, open the tunnel, seed credentials
-scripts/test-app.sh       # run everything on the iPhone simulator
-SIM="iPad Pro 13-inch (M5)" scripts/test-app.sh    # and on iPad
+scripts/test-app.sh                                  # everything, on the iPhone simulator
+SIM="iPad Pro 13-inch (M5)" scripts/test-app.sh      # and on iPad
+scripts/test-ghostkit.sh                             # the API client
 ```
+
+You don't need to start anything first. Each run creates a fresh Ghost and deletes it when it ends, whether the tests pass, fail or you press Ctrl-C.
 
 ## One-time setup
 
@@ -45,18 +47,15 @@ export QUILL_TEST_DIR=/srv/ghost-dev
 Port `2369` must be free on both machines. Ghost listens on the host's loopback only, so it's
 never exposed to the network; your Mac reaches it through an SSH tunnel.
 
-**Start it**
+**Check it works**
 
 ```sh
-scripts/testenv.sh up
+scripts/testenv.sh start     # first run pulls the image, about a minute
+scripts/testenv.sh status    # container running, tunnel: open, ghost ...: 200
+scripts/testenv.sh destroy
 ```
 
-This copies the compose file to the host, starts Ghost, opens the tunnel, then creates a test
-owner account and an Admin API key. Generated credentials go to `.dev/ghost-dev.env`, which is
-gitignored. The first start takes about a minute.
-
-Check it with `scripts/testenv.sh status`. You should see the container running, `tunnel: open`,
-and `ghost at http://localhost:2369: 200`.
+`start` copies the compose file to the host, starts Ghost, opens the tunnel, then creates a test owner and an Admin API key. Credentials go to `.dev/ghost-dev.env`, which is gitignored and deleted by `destroy`.
 
 ## Running tests
 
@@ -77,19 +76,24 @@ step, run `open build/results.xcresult`.
 
 ## Managing the test Ghost
 
+Test runs handle this for you. To look at the site or Ghost Admin after a run, keep it:
+
+```sh
+KEEP_GHOST=1 scripts/test-app.sh
+```
+
+Then open <http://localhost:2369/ghost/> and sign in with `GHOST_DEV_EMAIL` and `GHOST_DEV_PASSWORD` from `.dev/ghost-dev.env`. Run `scripts/testenv.sh destroy` when you're done.
+
 | Command | What it does |
 |---|---|
-| `scripts/testenv.sh up` | Start or update, open the tunnel, seed if needed |
+| `scripts/testenv.sh start` | Delete anything left over and start a fresh Ghost |
+| `scripts/testenv.sh destroy` | Stop Ghost, close the tunnel, **delete all test content and credentials** |
+| `scripts/testenv.sh up` | Start or update without deleting content |
+| `scripts/testenv.sh down` | Stop Ghost and close the tunnel, keeping content |
 | `scripts/testenv.sh tunnel` | Reopen the tunnel, for example after the Mac slept |
 | `scripts/testenv.sh status` | Show the container, tunnel and credentials |
-| `scripts/testenv.sh reset` | **Delete all test posts** and start fresh with new credentials |
-| `scripts/testenv.sh down` | Stop Ghost and close the tunnel, keeping its content |
 
-Tests leave their posts behind. That's harmless, because each one uses a unique title. Run
-`reset` whenever you want a clean site.
-
-To look at the site or Ghost Admin, open <http://localhost:2369/ghost/> and sign in with
-`GHOST_DEV_EMAIL` and `GHOST_DEV_PASSWORD` from `.dev/ghost-dev.env`.
+Only run one test script at a time, because they share the same Ghost.
 
 ## Safety
 
@@ -103,10 +107,8 @@ To look at the site or Ghost Admin, open <http://localhost:2369/ghost/> and sign
 
 | Symptom | Fix |
 |---|---|
-| `.dev/ghost-dev.env: No such file` | Run `scripts/testenv.sh up` |
-| Publisher tests fail with connection errors | The tunnel dropped: `scripts/testenv.sh tunnel` |
+| A run was killed and left Ghost running | The next run clears it, or run `scripts/testenv.sh destroy` |
 | `bind: address already in use` on 2369 | Something else has the port. Find it with `lsof -i :2369` |
-| Seed fails with 401 or the key stops working | Credentials and Ghost are out of step: `scripts/testenv.sh reset` |
 | UI test stops at "Face ID unlock / Add Site didn't appear" | Open the Simulator and use Features → Face ID → Enrolled, then rerun |
 | `Unable to find a device matching` | The `SIM` name doesn't exist; list them with `xcrun simctl list devices available` |
 | Ghost won't start | `ssh $QUILL_TEST_HOST 'cd /opt/ghost-dev && docker compose logs --tail 50'` |
