@@ -23,5 +23,5 @@ trap 'kill $MATCHER 2>/dev/null || true' EXIT
 rm -rf build/results.xcresult
 xcodebuild test -project Quill.xcodeproj -scheme Quill \
   -destination "platform=iOS Simulator,name=$SIM" \
-  -derivedDataPath build -resultBundlePath build/results.xcresult \
+  -derivedDataPath build -resultBundlePath build/results.xcresult -collect-test-diagnostics never \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= "$@"

@@ -46,7 +46,7 @@ struct SitePostsView: View {
             if hasMore {
                 ProgressView()
                     .frame(maxWidth: .infinity)
-                    .task(id: page) { await loadMore() }
+                    .task(id: page) { await Task { await loadMore() }.value }
             }
         }
         .overlay {
@@ -78,8 +78,10 @@ struct SitePostsView: View {
         } message: { _ in
             Text("It has layouts Markdown can't hold, like galleries or embeds, and saving it here would remove them.")
         }
-        .refreshable { await load() }
-        .task(id: siteID) { await load() }
+        // Unstructured: SwiftUI cancels view tasks during column transitions and list refreshes.
+        .refreshable { await Task { await load() }.value }
+        .task { await Task { await load() }.value }
+        .onChange(of: publisher.lastResult?.id) { Task { await load() } }
     }
 
     private func row(_ post: GhostPost) -> some View {

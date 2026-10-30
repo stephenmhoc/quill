@@ -70,7 +70,7 @@ private struct ContentColumn: View {
 
     var body: some View {
         switch navigation.sidebar {
-        case .site(let id): SitePostsView(siteID: id)
+        case .site(let id): SitePostsView(siteID: id).id(id)
         case .some(let item): EntryListView(section: item)
         case nil: ContentUnavailableView("Nothing selected", systemImage: "sidebar.left")
         }

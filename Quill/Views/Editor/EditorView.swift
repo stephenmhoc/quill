@@ -154,8 +154,10 @@ struct EditorView: View {
         Button { apply(.italic) } label: { Image(systemName: "italic") }
             .keyboardShortcut("i")
         Button { apply(.heading) } label: { Image(systemName: "number") }
+            .accessibilityLabel("Heading")
         Button { apply(.bullet) } label: { Image(systemName: "list.bullet") }
         Button { apply(.quote) } label: { Image(systemName: "text.quote") }
+            .accessibilityLabel("Quote")
         Button { apply(.link) } label: { Image(systemName: "link") }
             .keyboardShortcut("k")
         PhotosPicker(selection: $photoItem, matching: .images) {
@@ -362,7 +364,7 @@ struct StatusBanner: View {
                 }
                 Button("Edit") {
                     entry.state = .editing
-                    navigation.sidebar = .drafts
+                    if case .site = navigation.sidebar {} else { navigation.sidebar = .drafts }
                 }
             }
             .buttonStyle(.bordered)

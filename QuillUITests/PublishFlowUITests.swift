@@ -96,11 +96,13 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Dark"].waitForExistence(timeout: 5))
         app.buttons["Dark"].tap()
         attach("settings-dark", app)
+        chooseIcon("Ink", app)
+        attach("settings-icon", app)
         app.buttons["Done"].tap()
 
         // The post is listed under its site and opens with its formatting as Markdown.
-        app.staticTexts["Quill Dev"].firstMatch.tap()
-        let row = app.staticTexts[title]
+        app.cells.containing(.staticText, identifier: "Quill Dev").firstMatch.tap()
+        let row = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 15), "post not listed")
         attach("site-posts", app)
         row.tap()
@@ -126,7 +128,7 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "delete must confirm")
         attach("delete-confirm", app)
         confirm.tap()
-        XCTAssertTrue(row.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts[title].waitForNonExistence(timeout: 10))
         let remaining = try await client.recentPosts(limit: 50)
         XCTAssertFalse(remaining.contains { $0.id == created.id }, "still in Ghost")
 
@@ -139,16 +141,29 @@ final class PublishFlowUITests: XCTestCase {
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.buttons["Dark"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Dark"].isSelected, "appearance wasn't saved")
+        XCTAssertTrue(app.buttons["Ink icon"].isSelected, "icon wasn't saved")
         app.buttons["Auto"].tap()
+        chooseIcon("Auto", app)
         app.buttons["Done"].tap()
     }
 
     private func showSidebar(_ app: XCUIApplication) {
         for _ in 0..<3 where !app.buttons["Settings"].isHittable {
             let back = app.buttons["BackButton"]
-            (back.exists ? back : app.buttons["ToggleSidebar"]).tap()
+            (back.exists ? back : app.buttons["Show Sidebar"]).tap()
             _ = app.buttons["Settings"].waitForExistence(timeout: 2)
         }
+    }
+
+    private func chooseIcon(_ name: String, _ app: XCUIApplication) {
+        let button = app.buttons["\(name) icon"]
+        button.tap()
+        // iOS confirms every icon change with its own alert.
+        let ok = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["OK"]
+        if ok.waitForExistence(timeout: 3) { ok.tap() }
+        let selected = NSPredicate(format: "isSelected == true")
+        XCTAssertEqual(XCTWaiter.wait(for: [expectation(for: selected, evaluatedWith: button)], timeout: 5), .completed,
+                       "\(name) icon wasn't selected")
     }
 
     private func allowFaceIDIfAsked() {

@@ -47,7 +47,8 @@ final class Navigation {
             context.insert(entry)
         }
         try? context.save()
-        sidebar = .drafts
+        // Stay on a site's posts: that's where you came from after updating one of them.
+        if case .site = sidebar {} else { sidebar = .drafts }
         selectedEntry = entry
         preferredCompactColumn = .detail
     }

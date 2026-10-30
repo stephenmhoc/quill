@@ -13,6 +13,7 @@
 		2CC3D1968680F73908563F74 /* ResultBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D77473C7C72BECB34E408C /* ResultBanner.swift */; };
 		2DECFDE235C863317DFF34BF /* Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD30CED7B199FBAC661EA02 /* Entry.swift */; };
 		42387E640DDEC9B914B85410 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF31C8EE91FDE72C86EE086E /* SettingsView.swift */; };
+		4D3B3EE692DDC20217F87624 /* AppIconChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C75A0693926536929AB2478 /* AppIconChoice.swift */; };
 		6DA99894461AF26112196137 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB8425B76428A097BB6A89 /* SidebarView.swift */; };
 		7E146DC24D130D44E61F2CB0 /* PublishFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9234120738BBF6CBF48467A3 /* PublishFlowUITests.swift */; };
 		8A051949489ABF2A4737978D /* SiteFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB02CE3A2A9AB41D90CEC3C /* SiteFormView.swift */; };
@@ -66,6 +67,7 @@
 		9234120738BBF6CBF48467A3 /* PublishFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishFlowUITests.swift; sourceTree = "<group>"; };
 		95E8C48ADF7597448F3FD904 /* Quill.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Quill.entitlements; sourceTree = "<group>"; };
 		9A601AE5954D328F6E161E61 /* Navigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Navigation.swift; sourceTree = "<group>"; };
+		9C75A0693926536929AB2478 /* AppIconChoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconChoice.swift; sourceTree = "<group>"; };
 		9DD30CED7B199FBAC661EA02 /* Entry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entry.swift; sourceTree = "<group>"; };
 		9DD607DFB83009FE4EF6CB19 /* QuillTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = QuillTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A65A91C0E406B03993C6B547 /* PublisherLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublisherLiveTests.swift; sourceTree = "<group>"; };
@@ -218,6 +220,7 @@
 			isa = PBXGroup;
 			children = (
 				64CF96E4FEB2C5D36281BB0D /* Appearance.swift */,
+				9C75A0693926536929AB2478 /* AppIconChoice.swift */,
 				9A601AE5954D328F6E161E61 /* Navigation.swift */,
 				D1F21B3D2ECEA6CDF2B70A82 /* Publisher.swift */,
 			);
@@ -359,6 +362,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4D3B3EE692DDC20217F87624 /* AppIconChoice.swift in Sources */,
 				8BDD2968EEB5C5B8281245A0 /* AppLock.swift in Sources */,
 				AC6278DA04BDDA7F884010AF /* Appearance.swift in Sources */,
 				AFB5235167ECFC2E9294CE68 /* EditorView.swift in Sources */,
@@ -410,6 +414,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Quill/Quill.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_PREVIEWS = YES;
@@ -465,6 +470,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Quill/Quill.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_PREVIEWS = YES;
