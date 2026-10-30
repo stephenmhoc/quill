@@ -34,6 +34,13 @@ final class Entry {
     var remoteStatusRaw: String?
     var sentAt: Date?
     var lastError: String?
+    /// "conflict" when Ghost changed underneath us; nil otherwise.
+    var failureReason: String?
+    /// Set before a create; cleared once we know the outcome. If it's still set on retry, the
+    /// post may already exist, so look for it instead of creating a duplicate.
+    var createAttemptedAt: Date?
+    /// Images already live on this site, so the entry can't move to another one.
+    var uploadedToSiteID: UUID?
 
     init(siteID: UUID?) {
         id = UUID()

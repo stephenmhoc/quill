@@ -7,6 +7,8 @@ public enum GhostError: Error, Equatable, Sendable {
     case invalidURL
     /// The site couldn't be reached (offline, DNS, Tailscale not connected, TLS failure).
     case unreachable(String)
+    /// The connection dropped after the request may have reached the server.
+    case outcomeUnknown(String)
     /// 401/403: the token is wrong, revoked, or lacks permission.
     case unauthorized(String)
     case notFound
@@ -21,7 +23,7 @@ public enum GhostError: Error, Equatable, Sendable {
     /// Worth retrying later without the user changing anything.
     public var isTransient: Bool {
         switch self {
-        case .unreachable: true
+        case .unreachable, .outcomeUnknown: true
         case .server(let status, _): status >= 500
         default: false
         }
@@ -39,6 +41,8 @@ extension GhostError: LocalizedError {
             "Couldn't reach the site. If it's on your tailnet, check that Tailscale is connected. (\(detail))"
         case .unauthorized(let message):
             "Ghost rejected the key: \(message)"
+        case .outcomeUnknown(let detail):
+            "The connection dropped before Ghost answered. (\(detail))"
         case .notFound:
             "Not found on the site. Check the address."
         case .conflict(let message):

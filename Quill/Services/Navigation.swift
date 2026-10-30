@@ -20,15 +20,15 @@ final class Navigation {
 
     static let defaultSiteKey = "defaultSiteID"
 
-    /// The site new entries go to: the chosen default, else the last used, else the first.
+    /// The site new entries go to: the chosen default, else the last-used private site.
     func defaultSiteID(in context: ModelContext) -> UUID? {
         let sites = (try? context.fetch(FetchDescriptor<Site>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
         if let raw = UserDefaults.standard.string(forKey: Self.defaultSiteKey),
            let id = UUID(uuidString: raw), sites.contains(where: { $0.id == id }) {
             return id
         }
-        return sites.max { ($0.lastUsedAt ?? .distantPast) < ($1.lastUsedAt ?? .distantPast) }?.id
-            ?? sites.first?.id
+        let candidates = sites.contains { !$0.isPublic } ? sites.filter { !$0.isPublic } : sites
+        return candidates.max { ($0.lastUsedAt ?? .distantPast) < ($1.lastUsedAt ?? .distantPast) }?.id
     }
 
     /// Reuse an empty draft if there is one, so the app opens to a blank page without piling up blanks.

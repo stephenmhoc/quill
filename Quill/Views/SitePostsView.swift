@@ -70,7 +70,7 @@ struct SitePostsView: View {
     }
 
     private func localEntry(for post: GhostPost) -> Entry? {
-        entries.first { $0.remotePostID == post.id }
+        entries.first { $0.remotePostID == post.id && $0.siteID == siteID }
     }
 
     /// Entries written in Quill reopen in the editor; anything else opens in the browser.

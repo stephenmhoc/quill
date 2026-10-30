@@ -13,7 +13,8 @@ struct SiteFormView: View {
     @State private var name = ""
     @State private var urlText = ""
     @State private var key = ""
-    @State private var isPublic = false
+    /// No default for a new site: Private or Public must be chosen.
+    @State private var visibility: Bool?
     @State private var color: SiteColor = .rust
     @State private var checking = false
     @State private var error: String?
@@ -21,7 +22,7 @@ struct SiteFormView: View {
 
     private var isNew: Bool { site == nil }
     private var canSave: Bool {
-        !urlText.trimmingCharacters(in: .whitespaces).isEmpty && (!isNew || !key.isEmpty) && !checking
+        !urlText.trimmingCharacters(in: .whitespaces).isEmpty && (!isNew || !key.isEmpty) && visibility != nil && !checking
     }
 
     var body: some View {
@@ -33,6 +34,8 @@ struct SiteFormView: View {
                         .textContentType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .disabled(!isNew)
+                        .foregroundStyle(isNew ? .primary : .secondary)
                     TextField("Name (uses the site title if empty)", text: $name)
                 }
                 Section {
@@ -46,9 +49,13 @@ struct SiteFormView: View {
                     Text("Ghost Admin → your profile → Staff access token. Stored in this device's Keychain, protected by \(lock.biometryName), and never synced.")
                 }
                 Section {
-                    Toggle("Public site", isOn: $isPublic)
+                    Picker("Visibility", selection: $visibility) {
+                        Text("Private").tag(Bool?.some(false))
+                        Text("Public").tag(Bool?.some(true))
+                    }
+                    .pickerStyle(.segmented)
                 } footer: {
-                    Text("Publishing to a public site always asks for confirmation.")
+                    Text("Publishing to a public site always asks for confirmation. To change a site's address, remove it and add it again.")
                 }
                 Section("Colour") {
                     HStack(spacing: 14) {
@@ -98,7 +105,7 @@ struct SiteFormView: View {
         guard let site else { return }
         name = site.name
         urlText = site.urlString
-        isPublic = site.isPublic
+        visibility = site.isPublic
         color = site.color
     }
 
@@ -107,7 +114,8 @@ struct SiteFormView: View {
         defer { checking = false }
         error = nil
         do {
-            let url = try GhostClient.normalizeSiteURL(urlText)
+            let url = try site?.url ?? GhostClient.normalizeSiteURL(urlText)
+            let isPublic = visibility ?? true
             let credentials: GhostCredentials? = key.isEmpty ? nil : try GhostCredentials(apiKey: key)
             var title = name.trimmingCharacters(in: .whitespaces)
             if let credentials {
@@ -120,7 +128,6 @@ struct SiteFormView: View {
             if let site {
                 target = site
                 target.name = title.isEmpty ? site.name : title
-                target.urlString = url.absoluteString
                 target.isPublic = isPublic
                 target.color = color
             } else {

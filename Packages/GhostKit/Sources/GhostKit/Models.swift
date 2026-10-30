@@ -40,6 +40,7 @@ public struct GhostPost: Decodable, Sendable, Equatable, Identifiable {
     public let url: URL?
     /// Opaque server timestamp; must be echoed back on edits for collision detection.
     public let updatedAt: String
+    public let createdAt: Date?
     public let publishedAt: Date?
     public let excerpt: String?
     public let tags: [GhostTag]?
@@ -47,6 +48,7 @@ public struct GhostPost: Decodable, Sendable, Equatable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, title, slug, status, url, excerpt, tags
         case updatedAt = "updated_at"
+        case createdAt = "created_at"
         case publishedAt = "published_at"
     }
 }

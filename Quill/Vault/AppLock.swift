@@ -10,12 +10,17 @@ final class AppLock {
 
     private(set) var isUnlocked = false
     private(set) var isAuthenticating = false
+    /// False from backgrounding until the app is active again (and re-checked against the grace period).
+    private(set) var isForeground = true
     var lastError: String?
 
     private var context: LAContext?
     private var backgroundedAt: Date?
     /// Keys read during this unlocked session; cleared on lock.
     private var keyCache: [UUID: String] = [:]
+
+    /// New sends only start while unlocked and on screen.
+    var canWork: Bool { isUnlocked && isForeground }
 
     var biometryName: String {
         let ctx = LAContext()
@@ -59,14 +64,24 @@ final class AppLock {
 
     func didEnterBackground() {
         backgroundedAt = .now
+        isForeground = false
     }
 
     func didBecomeActive() {
+        isForeground = true
         guard isUnlocked, let since = backgroundedAt else { return }
         backgroundedAt = nil
         let grace = UserDefaults.standard.object(forKey: Self.graceKey) as? Double ?? 30
         if Date.now.timeIntervalSince(since) > grace { lock() }
     }
+
+    #if DEBUG
+    /// Tests run without Face ID or a Keychain entitlement.
+    func unlockForTesting(keys: [UUID: String]) {
+        isUnlocked = true
+        keyCache = keys
+    }
+    #endif
 
     // MARK: Site keys (only while unlocked)
 

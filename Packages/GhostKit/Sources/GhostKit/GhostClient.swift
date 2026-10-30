@@ -9,11 +9,20 @@ public struct GhostClient: Sendable {
     let credentials: GhostCredentials
     let session: URLSession
 
-    public init(baseURL: URL, credentials: GhostCredentials, session: URLSession = .shared) {
+    public init(baseURL: URL, credentials: GhostCredentials, session: URLSession = GhostClient.privateSession) {
         self.baseURL = baseURL
         self.credentials = credentials
         self.session = session
     }
+
+    /// No disk cache or cookies, and redirects are refused: a signed request (and the writing
+    /// in it) only ever goes to the exact site the user chose.
+    public static let privateSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.urlCache = nil
+        config.httpCookieStorage = nil
+        return URLSession(configuration: config, delegate: NoRedirects(), delegateQueue: nil)
+    }()
 
     /// Normalizes what people paste: adds https, drops `/ghost`, query, trailing slash.
     public static func normalizeSiteURL(_ input: String) throws -> URL {
@@ -24,6 +33,7 @@ public struct GhostClient: Sendable {
               let scheme = components.scheme?.lowercased(), scheme == "https" || scheme == "http",
               let host = components.host, !host.isEmpty
         else { throw GhostError.invalidURL }
+        guard scheme == "https" || ["localhost", "127.0.0.1"].contains(host) else { throw GhostError.invalidURL }
         components.scheme = scheme
         components.query = nil
         components.fragment = nil
@@ -74,7 +84,7 @@ public struct GhostClient: Sendable {
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "order", value: "updated_at desc"),
             URLQueryItem(name: "include", value: "tags"),
-            URLQueryItem(name: "fields", value: "id,title,slug,status,url,updated_at,published_at,excerpt"),
+            URLQueryItem(name: "fields", value: "id,title,slug,status,url,created_at,updated_at,published_at,excerpt"),
         ])
         return try decode(PostsEnvelopeIn.self, from: data).posts
     }
@@ -136,7 +146,7 @@ public struct GhostClient: Sendable {
         do {
             (data, response) = try await session.data(for: request)
         } catch let error as URLError {
-            throw GhostError.unreachable(error.localizedDescription)
+            throw Self.error(from: error)
         }
         guard let http = response as? HTTPURLResponse else {
             throw GhostError.unexpectedResponse("Not an HTTP response.")
@@ -147,11 +157,24 @@ public struct GhostClient: Sendable {
         return data
     }
 
+    /// Failures before the request could be delivered are safe to resend; others may have landed.
+    static func error(from error: URLError) -> GhostError {
+        switch error.code {
+        case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .notConnectedToInternet,
+             .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
+             .serverCertificateNotYetValid, .serverCertificateHasUnknownRoot, .appTransportSecurityRequiresSecureConnection:
+            .unreachable(error.localizedDescription)
+        default:
+            .outcomeUnknown(error.localizedDescription)
+        }
+    }
+
     static func error(status: Int, data: Data) -> GhostError {
         let message = (try? JSONDecoder().decode(ErrorEnvelope.self, from: data))?.errors.first.map {
             [$0.message, $0.context].compactMap { $0 }.joined(separator: " ")
         } ?? HTTPURLResponse.localizedString(forStatusCode: status)
         switch status {
+        case 300..<400: return .rejected("The site redirected to another address. Use the final address instead.")
         case 401, 403: return .unauthorized(message)
         case 404: return .notFound
         case 409: return .conflict(message)
@@ -181,6 +204,11 @@ public struct GhostClient: Sendable {
             throw GhostError.unexpectedResponse(String(describing: error))
         }
     }
+}
+
+private final class NoRedirects: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest) async -> URLRequest? { nil }
 }
 
 // MARK: Wire formats

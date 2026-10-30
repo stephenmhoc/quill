@@ -23,10 +23,16 @@ enum TokenStore {
     }
 
     static func save(_ key: String, for siteID: UUID, context: LAContext?) throws {
-        delete(siteID)
+        var match = baseQuery(siteID)
+        if let context { match[kSecUseAuthenticationContext as String] = context }
+        // Update in place so a failed write can't lose the working key.
+        let updated = SecItemUpdate(match as CFDictionary, [kSecValueData as String: Data(key.utf8)] as CFDictionary)
+        if updated == errSecSuccess { return }
+        guard updated == errSecItemNotFound else { throw StoreError.status(updated) }
+
         var query = baseQuery(siteID)
         query[kSecValueData as String] = Data(key.utf8)
-        query.merge(protection(), uniquingKeysWith: { $1 })
+        query.merge(try protection(), uniquingKeysWith: { $1 })
         if let context { query[kSecUseAuthenticationContext as String] = context }
         let status = SecItemAdd(query as CFDictionary, nil)
         if status == errSecAuthFailed || status == errSecNotAvailable { throw StoreError.noPasscode }
@@ -58,7 +64,7 @@ enum TokenStore {
         ]
     }
 
-    private static func protection() -> [String: Any] {
+    private static func protection() throws -> [String: Any] {
         #if targetEnvironment(simulator)
         // The simulator has no passcode, so a presence-bound item can't be created there.
         // The app-level Face ID lock still applies.
@@ -68,7 +74,7 @@ enum TokenStore {
         guard let access = SecAccessControlCreateWithFlags(
             nil, kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly, .userPresence, &error
         ) else {
-            return [kSecAttrAccessible as String: kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly]
+            throw StoreError.noPasscode
         }
         return [kSecAttrAccessControl as String: access]
         #endif

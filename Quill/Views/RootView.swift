@@ -37,17 +37,18 @@ struct RootView: View {
                 LockView()
             }
 
-            // Hide content from the app switcher snapshot and while Face ID is up.
-            if scenePhase != .active && lock.isUnlocked {
-                PrivacyCover()
-            }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
-            case .background: lock.didEnterBackground()
-            case .active: lock.didBecomeActive()
-            default: break
+            case .background:
+                lock.didEnterBackground()
+                try? context.save()
+            case .active:
+                lock.didBecomeActive()
+            default:
+                break
             }
+            PrivacyWindow.shared.setVisible(phase != .active)
         }
     }
 
@@ -88,6 +89,27 @@ private struct DetailColumn: View {
                     .buttonStyle(.borderedProminent)
             }
         }
+    }
+}
+
+/// Covers everything, sheets included, in the app switcher snapshot and while Face ID is up.
+/// It needs its own window because sheets sit above the root view.
+final class PrivacyWindow {
+    static let shared = PrivacyWindow()
+    private var window: UIWindow?
+
+    func setVisible(_ visible: Bool) {
+        guard visible else {
+            window?.isHidden = true
+            window = nil
+            return
+        }
+        guard window == nil, let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
+        let cover = UIWindow(windowScene: scene)
+        cover.windowLevel = .alert + 1
+        cover.rootViewController = UIHostingController(rootView: PrivacyCover())
+        cover.isHidden = false
+        window = cover
     }
 }
 

@@ -23,10 +23,12 @@ final class Publisher {
     private let lock: AppLock
     private let context: ModelContext
     private let monitor = NWPathMonitor()
+    private var isFlushing = false
 
     init(lock: AppLock, context: ModelContext) {
         self.lock = lock
         self.context = context
+        recoverInterrupted()
         monitor.pathUpdateHandler = { [weak self] path in
             guard path.status == .satisfied else { return }
             Task { @MainActor in await self?.flushOutbox() }
@@ -34,18 +36,27 @@ final class Publisher {
         monitor.start(queue: .main)
     }
 
-    /// Queue and try right away.
+    /// Queue and try right away. Saved first, so a save failure never looks like a send.
     func publish(_ entry: Entry) async {
+        guard [.editing, .queued, .failed].contains(entry.state) else { return }
         entry.state = .queued
         entry.lastError = nil
+        entry.failureReason = nil
         entry.touch()
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            fail(entry, error)
+            return
+        }
         await send(entry)
     }
 
     func flushOutbox() async {
-        guard lock.isUnlocked else { return }
-        let queued = State.queued.rawValue
+        guard lock.canWork, !isFlushing else { return }
+        isFlushing = true
+        defer { isFlushing = false }
+        let queued = Entry.State.queued.rawValue
         let descriptor = FetchDescriptor<Entry>(predicate: #Predicate { $0.stateRaw == queued },
                                                 sortBy: [SortDescriptor(\.updatedAt)])
         for entry in (try? context.fetch(descriptor)) ?? [] {
@@ -55,23 +66,35 @@ final class Publisher {
 
     /// Conflict resolution: replace whatever is in Ghost with this version.
     func overwrite(_ entry: Entry) async {
-        guard let site = site(for: entry), let postID = entry.remotePostID else { return }
+        guard entry.state == .failed, !sending.contains(entry.id),
+              let site = site(for: entry), let postID = entry.remotePostID else { return }
+        sending.insert(entry.id)
         do {
             let latest = try await lock.client(for: site).post(id: postID)
             entry.remoteUpdatedAt = latest.updatedAt
+            sending.remove(entry.id)
             await publish(entry)
         } catch {
+            sending.remove(entry.id)
             fail(entry, error)
         }
     }
 
-    private typealias State = Entry.State
+    /// A crash or kill mid-send leaves `.sending` behind; put those back in the outbox.
+    private func recoverInterrupted() {
+        let stuck = Entry.State.sending.rawValue
+        let descriptor = FetchDescriptor<Entry>(predicate: #Predicate { $0.stateRaw == stuck })
+        for entry in (try? context.fetch(descriptor)) ?? [] { entry.state = .queued }
+        try? context.save()
+    }
 
     private func send(_ entry: Entry) async {
-        guard lock.isUnlocked, !sending.contains(entry.id) else { return }
+        // Re-checked here because a flush can hold a list fetched before an earlier await.
+        guard lock.canWork, entry.state == .queued, !sending.contains(entry.id) else { return }
         guard let site = site(for: entry) else {
             entry.state = .failed
             entry.lastError = "Choose a site for this entry."
+            try? context.save()
             return
         }
         sending.insert(entry.id)
@@ -85,9 +108,15 @@ final class Publisher {
             let outgoing = entry.outgoing()
             let isUpdate = entry.remotePostID != nil
             let post: GhostPost
-            if let id = entry.remotePostID, let updatedAt = entry.remoteUpdatedAt {
+            if let id = entry.remotePostID {
+                let updatedAt = try await resolvedUpdatedAt(entry, id: id, client: client)
                 post = try await client.updatePost(id: id, updatedAt: updatedAt, outgoing)
+            } else if let attempted = entry.createAttemptedAt,
+                      let existing = try await findCreated(outgoing, since: attempted, client: client) {
+                post = existing
             } else {
+                if entry.createAttemptedAt == nil { entry.createAttemptedAt = .now }
+                try context.save()
                 post = try await client.createPost(outgoing)
             }
             entry.remotePostID = post.id
@@ -96,10 +125,17 @@ final class Publisher {
             entry.remoteStatusRaw = post.status.rawValue
             entry.sentAt = .now
             entry.lastError = nil
+            entry.createAttemptedAt = nil
             entry.state = .sent
             site.lastUsedAt = .now
             lastResult = Result(entryID: entry.id, siteName: site.name, url: post.url,
                                 status: post.status, wasUpdate: isUpdate)
+        } catch GhostError.unreachable(let detail) where entry.remotePostID == nil && entry.createAttemptedAt != nil
+            && (entry.lastError == nil) {
+            // Never left the phone, and no earlier attempt is unresolved: safe to create later.
+            entry.createAttemptedAt = nil
+            entry.state = .queued
+            entry.lastError = GhostError.unreachable(detail).localizedDescription
         } catch let error as GhostError where error.isTransient {
             entry.state = .queued
             entry.lastError = error.localizedDescription
@@ -108,9 +144,28 @@ final class Publisher {
         }
     }
 
+    private func resolvedUpdatedAt(_ entry: Entry, id: String, client: GhostClient) async throws -> String {
+        if let known = entry.remoteUpdatedAt { return known }
+        return try await client.post(id: id).updatedAt
+    }
+
+    /// After an attempt with an unknown outcome: did that post land? Title plus creation time
+    /// identifies it; more than one match needs a human.
+    private func findCreated(_ outgoing: OutgoingPost, since: Date, client: GhostClient) async throws -> GhostPost? {
+        let cutoff = since.addingTimeInterval(-120) // allow for clock differences
+        let matches = try await client.recentPosts(limit: 30).filter {
+            $0.title == outgoing.title && ($0.createdAt ?? .distantPast) >= cutoff
+        }
+        if matches.count > 1 {
+            throw GhostError.rejected("Found \(matches.count) posts with this title. Check Ghost for duplicates.")
+        }
+        return matches.first
+    }
+
     private func fail(_ entry: Entry, _ error: Error) {
         entry.state = .failed
         entry.lastError = error.localizedDescription
+        if case GhostError.conflict = error { entry.failureReason = "conflict" }
         try? context.save()
     }
 
@@ -121,7 +176,5 @@ final class Publisher {
 }
 
 extension Entry {
-    var isConflict: Bool {
-        state == .failed && (lastError?.contains("changed in Ghost") ?? false)
-    }
+    var isConflict: Bool { state == .failed && failureReason == "conflict" }
 }

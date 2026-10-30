@@ -19,6 +19,7 @@ struct EditorView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var uploading = false
     @State private var uploadError: String?
+    @State private var pendingPublicPhoto: PhotosPickerItem?
     @FocusState private var focus: Field?
 
     enum Field { case title, body }
@@ -26,7 +27,9 @@ struct EditorView: View {
     private var site: Site? { sites.first { $0.id == entry.siteID } }
     private var isEditable: Bool { entry.state == .editing }
     private var tint: Color { site?.color.color ?? .accentColor }
-    private var canSend: Bool { isEditable && !entry.isBlank && site != nil && !publisher.sending.contains(entry.id) }
+    private var canSend: Bool {
+        isEditable && !entry.isBlank && site != nil && !uploading && !publisher.sending.contains(entry.id)
+    }
 
     var body: some View {
         ScrollView {
@@ -82,14 +85,27 @@ struct EditorView: View {
         .confirmationDialog("Publish to \(site?.name ?? "")?", isPresented: $confirmingPublic, titleVisibility: .visible) {
             Button(entry.publishStatus == .published ? "Publish publicly" : "Send draft") { send() }
         } message: {
-            Text("\(site?.name ?? "This site") is a public site.")
+            Text("\(site?.host ?? "This site") is a public site.")
+        }
+        .confirmationDialog("Upload image to \(site?.name ?? "")?", isPresented: Binding(
+            get: { pendingPublicPhoto != nil }, set: { if !$0 { pendingPublicPhoto = nil; photoItem = nil } }
+        ), titleVisibility: .visible) {
+            Button("Upload to public site") {
+                if let item = pendingPublicPhoto { Task { await insertPhoto(item) } }
+                pendingPublicPhoto = nil
+            }
+        } message: {
+            Text("The image goes to \(site?.host ?? "the site") now, before you publish, and this entry stays on that site.")
         }
         .alert("Image upload failed", isPresented: Binding(get: { uploadError != nil }, set: { if !$0 { uploadError = nil } })) {
             Button("OK") { uploadError = nil }
         } message: { Text(uploadError ?? "") }
         .onChange(of: entry.title) { entry.touch() }
         .onChange(of: entry.body) { entry.touch() }
-        .onChange(of: photoItem) { _, item in if let item { Task { await insertPhoto(item) } } }
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            if site?.isPublic == true { pendingPublicPhoto = item } else { Task { await insertPhoto(item) } }
+        }
         .onAppear { if isEditable && entry.isBlank { focus = .body } }
     }
 
@@ -97,7 +113,7 @@ struct EditorView: View {
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .principal) {
-            SitePicker(entry: entry, sites: sites, locked: entry.remotePostID != nil || !isEditable)
+            SitePicker(entry: entry, sites: sites, locked: entry.remotePostID != nil || entry.uploadedToSiteID != nil || uploading || !isEditable)
         }
         if sizeClass == .regular {
             ToolbarItem(placement: .primaryAction) {
@@ -210,6 +226,7 @@ struct EditorView: View {
             }
             let url = try await lock.client(for: site)
                 .uploadImage(jpeg, filename: "quill-\(Int(Date.now.timeIntervalSince1970)).jpg", mimeType: "image/jpeg")
+            entry.uploadedToSiteID = site.id
             let (text, newSelection) = MarkdownFormat.insert("\n![](\(url.absoluteString))\n", into: entry.body, at: selection)
             entry.body = text
             selection = newSelection
@@ -282,7 +299,9 @@ struct StatusBanner: View {
             if entry.remotePostID != nil {
                 note("Editing a sent entry. Update replaces it in \(site?.name ?? "Ghost").", "pencil", .secondary)
             }
-        case .queued, .sending:
+        case .sending:
+            note("Sending to \(site?.name ?? "the site")…", "arrow.up.circle", .secondary)
+        case .queued:
             VStack(alignment: .leading, spacing: 8) {
                 note(entry.lastError ?? "Waiting to send to \(site?.name ?? "the site").", "clock", .orange)
                 HStack {
@@ -301,7 +320,7 @@ struct StatusBanner: View {
                     } else {
                         Button("Retry") { Task { await publisher.publish(entry) } }
                     }
-                    Button("Edit") { entry.state = .editing }
+                    Button("Edit") { entry.state = .editing; entry.failureReason = nil }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
