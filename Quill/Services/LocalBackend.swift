@@ -37,6 +37,8 @@ struct LocalBackend: SiteBackend {
     /// Only this device writes to a local site, so there's never another version.
     func adoptLatestVersion(of entry: Entry) async throws {}
 
+    func takeLatestVersion(of entry: Entry) async throws {}
+
     func tags() async throws -> [String] {
         Array(Set(try saved().flatMap(\.tags))).sorted()
     }

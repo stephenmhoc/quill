@@ -51,6 +51,9 @@ struct RootView: View {
                 .onReceive(NotificationCenter.default.publisher(for: .quillNewEntry)) { _ in
                     navigation.openBlankEntry(in: context)
                 }
+                .onChange(of: sizeClass) { _, size in
+                    if size != .regular { navigation.rebuildPath() }
+                }
                 .onChange(of: sites.count) {
                     repairSidebar()
                     if sizeClass == .regular, navigation.selectedEntry == nil {

@@ -286,6 +286,40 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "delete must confirm")
         confirm.tap()
         XCTAssertTrue(row.waitForNonExistence(timeout: 10))
+
+        // Formatting can be undone, and an unticked title survives a relaunch.
+        showSidebar(app)
+        app.buttons["New Entry"].firstMatch.tap() // iPad's empty detail column has one too
+        XCTAssertTrue(editor.waitForExistence(timeout: 10))
+        let kept = "Kept across a relaunch \(UUID().uuidString.prefix(8))"
+        editor.tap()
+        editor.typeText(kept)
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            app.buttons["Bold"].tap()
+            XCTAssertNotEqual(editor.value as? String, kept, "bold changed nothing")
+            editor.typeKey("z", modifierFlags: .command)
+            XCTAssertEqual(editor.value as? String, kept, "undo didn't take back the formatting")
+        }
+        app.buttons["Title"].tap()
+        let titleField = app.textFields["titleField"]
+        XCTAssertTrue(titleField.waitForExistence(timeout: 5))
+        titleField.typeText("Held back")
+        app.buttons["Title"].tap()
+        XCTAssertTrue(titleField.waitForNonExistence(timeout: 5))
+        try await Task.sleep(for: .seconds(3)) // autosave
+        app.terminate()
+        app.launch()
+        allowFaceIDIfAsked()
+        XCTAssertTrue(editor.waitForExistence(timeout: 30))
+        showSidebar(app)
+        app.staticTexts["Drafts"].tap()
+        let draft = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", kept)).firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 10), "draft not listed after relaunch")
+        draft.tap()
+        XCTAssertTrue(app.buttons["Title"].waitForExistence(timeout: 10))
+        app.buttons["Title"].tap()
+        XCTAssertTrue(titleField.waitForExistence(timeout: 5))
+        XCTAssertEqual(titleField.value as? String, "Held back", "unticked title was lost")
     }
 
     /// Sending a new entry gives no message, it just moves on to a fresh page.

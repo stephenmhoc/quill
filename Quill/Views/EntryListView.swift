@@ -15,7 +15,7 @@ struct EntryListView: View {
     private var visible: [Entry] {
         switch section {
         case .drafts:
-            entries.filter { $0.state == .editing && !$0.isBlank && $0.remotePostID == nil }
+            entries.filter { $0.state == .editing && !$0.isBlank }
         case .outbox:
             entries.filter { [.queued, .sending, .failed].contains($0.state) }
         case .site:

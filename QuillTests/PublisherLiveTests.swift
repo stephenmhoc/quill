@@ -101,6 +101,27 @@ struct PublisherLiveTests {
         #expect(try await client.post(id: id).title == "From Quill")
     }
 
+    @Test func conflictCanTakeGhostsVersion() async throws {
+        let (publisher, site, client) = harness()
+        let e = entry(site, title: "Conflict \(UUID())")
+        await publisher.publish(e)
+        let id = try #require(e.remotePostID)
+
+        try await Task.sleep(for: .seconds(1.1))
+        _ = try await client.updatePost(id: id, updatedAt: try #require(e.remoteUpdatedAt),
+                                        OutgoingPost(title: "From Ghost", html: "<p>Written there</p>", status: .published, tags: []))
+        e.state = .editing
+        e.title = "From Quill"
+        await publisher.publish(e)
+        #expect(e.isConflict)
+
+        await publisher.takeSiteVersion(e)
+        #expect(e.state == .sent)
+        #expect(e.title == "From Ghost")
+        #expect(e.body == "Written there")
+        #expect(try await client.post(id: id).title == "From Ghost")
+    }
+
     @Test func doubleTapPublishCreatesOnePost() async throws {
         let (publisher, site, client) = harness()
         let title = "Double \(UUID())"
@@ -126,10 +147,12 @@ struct PublisherLiveTests {
         e.remoteUpdatedAt = nil
         e.createAttemptedAt = .now.addingTimeInterval(-5)
         e.state = .queued
+        // A post with the same title isn't this one, and the entry's own title can't be relied on.
+        _ = try await client.createPost(OutgoingPost(title: title, html: "<p>Another</p>", status: .published, tags: []))
         await publisher.flushOutbox()
         #expect(e.state == .sent)
         #expect(e.remotePostID == id)
-        #expect(try await count(client, title: title) == 1)
+        #expect(try await count(client, title: title) == 2)
     }
 
     @Test func editsThenDeletesAPostWrittenElsewhere() async throws {

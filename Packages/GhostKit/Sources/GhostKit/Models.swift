@@ -46,9 +46,12 @@ public struct GhostPost: Decodable, Sendable, Equatable, Identifiable {
     public let tags: [GhostTag]?
     /// Only present when asked for: `post(id:)` includes it, lists don't.
     public let html: String?
+    /// Carries the marker of the Quill entry that created the post.
+    public let codeinjectionFoot: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, slug, status, url, excerpt, tags, html
+        case codeinjectionFoot = "codeinjection_foot"
         case updatedAt = "updated_at"
         case createdAt = "created_at"
         case publishedAt = "published_at"
@@ -62,6 +65,8 @@ public struct OutgoingPost: Sendable, Equatable {
     public var status: GhostPost.Status
     public var tags: [String]
     public var publishedAt: Date?
+    /// Identifies a new post, so a retry can find it if the first response was lost.
+    public var marker: String?
 
     public init(title: String, html: String, status: GhostPost.Status, tags: [String], publishedAt: Date? = nil) {
         self.title = title

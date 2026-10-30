@@ -80,6 +80,18 @@ final class Publisher {
         }
     }
 
+    /// Conflict resolution: drop this edit and take what's on the site.
+    func takeSiteVersion(_ entry: Entry) async {
+        guard entry.isConflict, !sending.contains(entry.id), let site = site(for: entry) else { return }
+        sending.insert(entry.id)
+        defer { sending.remove(entry.id) }
+        do {
+            try await backend(for: site).takeLatestVersion(of: entry)
+        } catch where entry.modelContext != nil && !entry.isDeleted {
+            entry.lastError = error.localizedDescription
+        } catch {}
+    }
+
     /// Brings a post into Quill so it can be edited.
     /// Nil if the post has content Markdown can't hold: editing it here would lose that content.
     func importPost(id: String, site: Site) async throws -> Entry? {

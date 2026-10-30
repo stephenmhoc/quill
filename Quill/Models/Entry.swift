@@ -45,6 +45,8 @@ final class Entry {
     var publishedTitle: String?
     var publishedBody: String?
     var publishedTags: [String]?
+    /// A title that's been unticked, so ticking it again brings it back.
+    var hiddenTitle: String?
 
     init(siteID: UUID?) {
         id = UUID()
@@ -113,5 +115,6 @@ final class Entry {
         publishedTitle = nil
         publishedBody = nil
         publishedTags = nil
+        hiddenTitle = nil
     }
 }

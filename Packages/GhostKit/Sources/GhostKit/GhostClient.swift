@@ -97,6 +97,29 @@ public struct GhostClient: Sendable {
         return try decode(PostsEnvelopeIn.self, from: data).posts
     }
 
+    /// The post created with this marker, if it landed. Goes by creation order, which later
+    /// edits to other posts can't disturb.
+    public func post(marker: String, createdSince cutoff: Date) async throws -> GhostPost? {
+        let pageSize = 100
+        var page = 1
+        while true {
+            let data = try await send("GET", "posts/", query: [
+                URLQueryItem(name: "limit", value: String(pageSize)),
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "order", value: "created_at desc"),
+                URLQueryItem(name: "fields", value: "id,title,slug,status,url,created_at,updated_at,published_at,codeinjection_foot"),
+            ])
+            let posts = try decode(PostsEnvelopeIn.self, from: data).posts
+            if let match = posts.first(where: { $0.codeinjectionFoot == Self.footer(for: marker) }) { return match }
+            let reachedCutoff = posts.last.flatMap(\.createdAt).map { $0 < cutoff } ?? true
+            if reachedCutoff || posts.count < pageSize { return nil }
+            page += 1
+        }
+    }
+
+    /// An HTML comment, so it never shows on the page.
+    static func footer(for marker: String) -> String { "<!-- quill:\(marker) -->" }
+
     public func tags(limit: Int = 100) async throws -> [GhostTag] {
         let data = try await send("GET", "tags/", query: [
             URLQueryItem(name: "limit", value: String(limit)),
@@ -241,6 +264,7 @@ private struct PostBody: Encodable {
     let tags: [Tag]
     let updatedAt: String?
     let publishedAt: Date?
+    let codeinjectionFoot: String?
 
     init(_ post: OutgoingPost, updatedAt: String?) {
         title = post.title
@@ -249,10 +273,12 @@ private struct PostBody: Encodable {
         tags = post.tags.map(Tag.init(name:))
         self.updatedAt = updatedAt
         publishedAt = post.publishedAt
+        codeinjectionFoot = post.marker.map(GhostClient.footer(for:))
     }
 
     enum CodingKeys: String, CodingKey {
         case title, html, status, tags
+        case codeinjectionFoot = "codeinjection_foot"
         case updatedAt = "updated_at"
         case publishedAt = "published_at"
     }
@@ -265,5 +291,6 @@ private struct PostBody: Encodable {
         try c.encode(tags, forKey: .tags)
         try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
         try c.encodeIfPresent(publishedAt, forKey: .publishedAt)
+        try c.encodeIfPresent(codeinjectionFoot, forKey: .codeinjectionFoot)
     }
 }

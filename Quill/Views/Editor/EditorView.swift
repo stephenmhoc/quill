@@ -24,10 +24,9 @@ struct EditorView: View {
     /// The title stays out of the way unless it's ticked on, or the entry already has one.
     @State private var showsTitle = false
     @State private var focusTitle = false
-    /// Unticking removes the title from the entry. This brings it back if it's ticked again.
-    @State private var hiddenTitle = ""
     /// The controls fade while words are arriving and come back in a pause.
     @State private var isTyping = false
+    @State private var saveFailed = false
 
     private var site: Site? { sites.first { $0.id == entry.siteID } }
     private var isEditable: Bool { entry.state == .editing }
@@ -52,12 +51,24 @@ struct EditorView: View {
         .background(Color.paper.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
-                if bodyFocused && isEditable { formatBar }
-                if isEditable { publishBar }
+                if saveFailed {
+                    Label("Couldn't save to this device. Keep this page open and free up some space.",
+                          systemImage: "exclamationmark.triangle")
+                        .font(.system(.footnote, design: .monospaced))
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, usesColumns ? 48 : 16)
+                        .padding(.vertical, 8)
+                        .background(Color.paper)
+                }
+                VStack(spacing: 0) {
+                    if bodyFocused && isEditable { formatBar }
+                    if isEditable { publishBar }
+                }
+                .tint(.secondary)
+                .opacity(isTyping ? 0.25 : 1)
+                .animation(.easeInOut(duration: 0.4), value: isTyping)
             }
-            .tint(.secondary)
-            .opacity(isTyping ? 0.25 : 1)
-            .animation(.easeInOut(duration: 0.4), value: isTyping)
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -90,7 +101,7 @@ struct EditorView: View {
         // Saved as you type, so there's nothing to do to keep a draft.
         .task(id: "\(entry.title)\(entry.body)") {
             try? await Task.sleep(for: .seconds(1))
-            if !Task.isCancelled { try? context.save() }
+            await saveUntilItWorks()
             try? await Task.sleep(for: .seconds(1))
             if !Task.isCancelled { isTyping = false }
         }
@@ -102,6 +113,19 @@ struct EditorView: View {
             showsTitle = !entry.title.isEmpty
             if isEditable && entry.isBlank && navigation.focusNextEntry { focusRequest += 1 }
             navigation.focusNextEntry = false
+        }
+    }
+
+    private func saveUntilItWorks() async {
+        while !Task.isCancelled {
+            do {
+                try context.save()
+                saveFailed = false
+                return
+            } catch {
+                saveFailed = true
+                try? await Task.sleep(for: .seconds(10))
+            }
         }
     }
 
@@ -214,9 +238,10 @@ struct EditorView: View {
         showsTitle.toggle()
         focusTitle = showsTitle
         if showsTitle {
-            entry.title = hiddenTitle
+            entry.title = entry.hiddenTitle ?? ""
+            entry.hiddenTitle = nil
         } else {
-            hiddenTitle = entry.title
+            entry.hiddenTitle = entry.title
             entry.title = ""
         }
     }
@@ -410,6 +435,7 @@ struct StatusBanner: View {
                 HStack {
                     if entry.isConflict {
                         Button("Overwrite Ghost's version") { Task { await publisher.overwrite(entry) } }
+                        Button("Use Ghost's version") { Task { await publisher.takeSiteVersion(entry) } }
                     } else {
                         Button("Retry") { Task { await publisher.publish(entry) } }
                     }

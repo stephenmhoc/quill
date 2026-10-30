@@ -2,6 +2,10 @@ import Foundation
 import GhostKit
 import SwiftData
 
+private struct UnsupportedPost: LocalizedError {
+    var errorDescription: String? { "This post has content Quill can't show, so edit it in Ghost." }
+}
+
 struct GhostBackend: SiteBackend {
     let client: GhostClient
     let site: Site
@@ -80,7 +84,9 @@ struct GhostBackend: SiteBackend {
             let updatedAt = try await resolvedUpdatedAt(entry, id: id)
             post = try await client.updatePost(id: id, updatedAt: updatedAt, outgoing)
         } else if let attempted = entry.createAttemptedAt,
-                  let existing = try await findCreated(outgoing, since: attempted) {
+                  let existing = try await client.post(marker: entry.id.uuidString,
+                                                        createdSince: attempted.addingTimeInterval(-120)) {
+            // The two minutes allow for clock differences.
             post = existing
         } else {
             if entry.createAttemptedAt == nil { entry.createAttemptedAt = .now }
@@ -88,6 +94,7 @@ struct GhostBackend: SiteBackend {
             // An entry that waited in the outbox is dated when it was written.
             var dated = outgoing
             if dated.status == .published { dated.publishedAt = entry.createdAt }
+            dated.marker = entry.id.uuidString
             post = try await client.createPost(dated)
         }
         return SentPost(id: post.id, updatedAt: post.updatedAt, url: post.url, status: post.status)
@@ -98,6 +105,20 @@ struct GhostBackend: SiteBackend {
         let latest = try await client.post(id: id).updatedAt
         // Edit can be tapped during the fetch; that entry is no longer overwriting anything.
         if entry.isConflict { entry.remoteUpdatedAt = latest }
+    }
+
+    func takeLatestVersion(of entry: Entry) async throws {
+        guard let id = entry.remotePostID else { return }
+        let post = try await client.post(id: id)
+        guard entry.isConflict, !entry.isDeleted else { return }
+        guard post.status == .published || post.status == .draft,
+              let body = HTMLToMarkdown.convert(post.html ?? "") else { throw UnsupportedPost() }
+        apply(post, body: body, to: entry)
+        entry.clearPublishedCopy()
+        entry.failureReason = nil
+        entry.lastError = nil
+        entry.state = .sent
+        try context.save()
     }
 
     func tags() async throws -> [String] {
@@ -123,18 +144,5 @@ struct GhostBackend: SiteBackend {
     private func resolvedUpdatedAt(_ entry: Entry, id: String) async throws -> String {
         if let known = entry.remoteUpdatedAt { return known }
         return try await client.post(id: id).updatedAt
-    }
-
-    /// After an attempt with an unknown outcome: did that post land? Title plus creation time
-    /// identifies it; more than one match needs a human.
-    private func findCreated(_ outgoing: OutgoingPost, since: Date) async throws -> GhostPost? {
-        let cutoff = since.addingTimeInterval(-120) // allow for clock differences
-        let matches = try await client.recentPosts(limit: 100).filter {
-            $0.title == outgoing.title && ($0.createdAt ?? .distantPast) >= cutoff
-        }
-        if matches.count > 1 {
-            throw GhostError.rejected("Found \(matches.count) posts with this title. Check Ghost for duplicates.")
-        }
-        return matches.first
     }
 }

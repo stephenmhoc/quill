@@ -33,6 +33,8 @@ protocol SiteBackend {
     func send(_ entry: Entry) async throws -> SentPost
     /// Accept the site's current version, so `send` replaces it instead of conflicting.
     func adoptLatestVersion(of entry: Entry) async throws
+    /// Replace a conflicted entry with the site's current version.
+    func takeLatestVersion(of entry: Entry) async throws
     func tags() async throws -> [String]
     /// Stores an image and returns the URL to put in the Markdown.
     func uploadImage(_ jpeg: Data, filename: String) async throws -> URL

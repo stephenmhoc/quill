@@ -28,7 +28,10 @@ final class Navigation {
         didSet { if oldValue != selectedEntry { oldValue?.cancelEdit() } }
     }
     var path: [Route] = [] {
-        didSet { if !path.contains(.editor) { selectedEntry?.cancelEdit() } }
+        didSet {
+            if !path.contains(.editor) { selectedEntry?.cancelEdit() }
+            if case .list(let item)? = path.first { sidebar = item }
+        }
     }
     var columnVisibility: NavigationSplitViewVisibility = .all
     /// Narrow iPad: the sidebar floats over the list, so it closes once it's been used.
@@ -63,6 +66,7 @@ final class Navigation {
             entry = blank
             entry.createdAt = .now
             entry.siteID = defaultSiteID(in: context)
+            entry.hiddenTitle = nil
         } else {
             entry = Entry(siteID: defaultSiteID(in: context))
             context.insert(entry)
@@ -84,6 +88,11 @@ final class Navigation {
     func show(_ entry: Entry) {
         selectedEntry = entry
         if path.last != .editor { path.append(.editor) }
+    }
+
+    /// The stack that matches the columns, for when an iPad window narrows.
+    func rebuildPath() {
+        path = (sidebar.map { [.list($0)] } ?? []) + (selectedEntry == nil ? [] : [.editor])
     }
 
     func closeSidebarOverlay() {

@@ -41,7 +41,7 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
         view.tintColor = UIColor(.cursor)
         view.setHeader(UIHostingConfiguration { header() }.margins(.all, 0))
         if view.text != text {
-            view.text = text
+            if view.isEditable, view.hasText { view.replaceChanges(with: text) } else { view.text = text }
             MarkdownStyler.style(view)
             view.placeholder.isHidden = !text.isEmpty
         }
@@ -133,6 +133,25 @@ final class PageTextView: UITextView {
             headerView = view
         }
         setNeedsLayout()
+    }
+
+    /// Changes only what differs, through UITextInput, so Undo can take it back. Setting `text`
+    /// would clear the undo stack.
+    func replaceChanges(with new: String) {
+        let old: String = text
+        let prefix = zip(old, new).prefix { $0 == $1 }.count
+        let suffix = zip(old.reversed(), new.reversed()).prefix { $0 == $1 }.count
+        let kept = min(suffix, min(old.count, new.count) - prefix)
+        let start = old.index(old.startIndex, offsetBy: prefix)
+        let changed = NSRange(start..<old.index(old.endIndex, offsetBy: -kept), in: old)
+        let replacement = String(new[new.index(new.startIndex, offsetBy: prefix)..<new.index(new.endIndex, offsetBy: -kept)])
+        guard let from = position(from: beginningOfDocument, offset: changed.location),
+              let to = position(from: from, offset: changed.length),
+              let range = textRange(from: from, to: to) else {
+            text = new
+            return
+        }
+        replace(range, withText: replacement)
     }
 
     func focusWhenReady() {

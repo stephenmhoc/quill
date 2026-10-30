@@ -86,7 +86,7 @@ struct SidebarView: View {
     }
 
     private var drafts: Int {
-        entries.filter { $0.state == .editing && !$0.isBlank && $0.remotePostID == nil }.count
+        entries.filter { $0.state == .editing && !$0.isBlank }.count
     }
 
     /// Nil while sends are going normally: the outbox only matters on an error or a slow send.
