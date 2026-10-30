@@ -6,9 +6,24 @@ profile, uploads it to App Store Connect and revokes the temporary signing asset
 ## One-time setup
 
 1. In App Store Connect, create an app with the bundle ID `com.merimerimeri.Quill`. The API
-   can't create app records, so this has to be done by hand.
-2. Add the same three secrets Tabata Ticker uses. GitHub won't reveal their values, so they
-   come from wherever the `.p8` file is kept:
+   can't create app records, so this has to be done by hand. The name must be unique across the
+   App Store, so the listing can't be plain "Quill". That only shows in App Store Connect and
+   TestFlight; the home screen name comes from the build.
+2. On that App ID, under Certificates, Identifiers & Profiles → Identifiers, enable **Data
+   Protection** with Complete Protection. Without it, signing fails on the app's entitlement.
+3. Create an App Store Connect API key: Users and Access → Integrations → App Store Connect API
+   → Team Keys. Give it the **Admin** role, because the workflow creates distribution
+   certificates. Then add these repository secrets:
+
+   | Secret | Where it comes from |
+   |---|---|
+   | `ASC_KEY_ID` | The **Key ID** column in the key's row |
+   | `ASC_ISSUER_ID` | **Issuer ID**, at the top of the same page |
+   | `ASC_API_KEY_P8_BASE64` | The `AuthKey_<Key ID>.p8` file, Base64 encoded |
+
+   The `.p8` can be downloaded only once, so keep a copy somewhere safe, such as a password
+   manager. If it's lost, revoke the key and create another. GitHub can't show secret values
+   afterwards, so they can't be copied from another repository.
 
    ```sh
    gh secret set ASC_KEY_ID -R stephenmhoc/quill
