@@ -273,12 +273,12 @@ final class PublishFlowUITests: XCTestCase {
         row.tap()
         XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Saved"].exists)
+        // Edit opens the keyboard with the cursor at the end, so typing just continues.
         app.buttons["Edit"].tap()
-        editor.tap()
         editor.typeText(" edited")
         app.buttons["sendButton"].tap()
         XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 10))
-        XCTAssertTrue((editor.value as? String)?.contains("edited") == true, "got: \(editor.value ?? "nil")")
+        XCTAssertTrue((editor.value as? String)?.hasSuffix(" edited") == true, "cursor moved: \(editor.value ?? "nil")")
         if app.buttons["BackButton"].exists { app.buttons["BackButton"].tap() }
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.swipeLeft()

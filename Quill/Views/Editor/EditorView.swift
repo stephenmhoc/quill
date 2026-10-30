@@ -40,7 +40,11 @@ struct EditorView: View {
                        margin: usesColumns ? 48 : 20) {
             // Hosted inside UIKit, so the environment has to be passed along.
             EditorHeader(entry: entry, site: site, isEditable: isEditable, showsTitle: showsTitle,
-                         focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 })
+                         focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 },
+                         onEdit: {
+                             selection = TextSelection(insertionPoint: entry.body.endIndex)
+                             focusRequest += 1
+                         })
                 .environment(navigation)
                 .environment(publisher)
         }
@@ -306,11 +310,17 @@ private struct EditorHeader: View {
     let focusesTitle: Bool
     let onTags: () -> Void
     let onSubmit: () -> Void
+    let onEdit: () -> Void
     @FocusState private var titleFocused: Bool
 
     var body: some View {
+        // Hosted by UIKit, so it can redraw once more after its entry is deleted.
+        if entry.modelContext != nil && !entry.isDeleted { content }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
-            StatusBanner(entry: entry, site: site)
+            StatusBanner(entry: entry, site: site, onEdit: onEdit)
                 .padding(.bottom, 16)
             if showsTitle {
                 TextField("Title", text: $entry.title, axis: .vertical)
@@ -356,6 +366,7 @@ struct TagStrip: View {
 struct StatusBanner: View {
     @Bindable var entry: Entry
     let site: Site?
+    let onEdit: () -> Void
     @Environment(Publisher.self) private var publisher
     @Environment(\.openURL) private var openURL
 
@@ -398,7 +409,10 @@ struct StatusBanner: View {
                 if let url = entry.remoteURL, entry.remoteStatus != .draft {
                     Button("View") { openURL(url) }
                 }
-                Button("Edit") { entry.beginEdit() }
+                Button("Edit") {
+                    entry.beginEdit()
+                    onEdit()
+                }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)

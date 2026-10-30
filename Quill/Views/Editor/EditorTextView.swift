@@ -44,9 +44,14 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
             MarkdownStyler.style(view)
             view.placeholder.isHidden = !text.isEmpty
         }
+        // Only a new request from SwiftUI moves the cursor. An older value still on its way back
+        // would otherwise undo a tap, like the first tap after Edit.
         if case .selection(let range)? = selection?.indices, range.upperBound <= text.endIndex {
             let wanted = NSRange(range, in: text)
-            if view.selectedRange != wanted { view.selectedRange = wanted }
+            if wanted != coordinator.lastSelection {
+                coordinator.lastSelection = wanted
+                if view.selectedRange != wanted { view.selectedRange = wanted }
+            }
         }
         if focusRequest != coordinator.handledFocusRequest {
             coordinator.handledFocusRequest = focusRequest
@@ -58,6 +63,7 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
         var parent: EditorTextView
         var isUpdating = false
         var handledFocusRequest = 0
+        var lastSelection: NSRange?
 
         init(_ parent: EditorTextView) { self.parent = parent }
 
@@ -70,6 +76,7 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
 
         func textViewDidChangeSelection(_ view: UITextView) {
             guard !isUpdating, let range = Range(view.selectedRange, in: view.text) else { return }
+            lastSelection = view.selectedRange
             parent.selection = TextSelection(range: range)
         }
 
