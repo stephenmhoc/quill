@@ -1,0 +1,60 @@
+import Foundation
+import Observation
+import SwiftData
+import SwiftUI
+
+enum SidebarItem: Hashable {
+    case drafts, outbox, sent
+    case site(UUID)
+}
+
+/// Split-view state shared by the sidebar, list and editor.
+@Observable
+final class Navigation {
+    var sidebar: SidebarItem? = .drafts
+    var selectedEntry: Entry?
+    var columnVisibility: NavigationSplitViewVisibility = .all
+    var preferredCompactColumn: NavigationSplitViewColumn = .detail
+    var showingSettings = false
+    var showingAddSite = false
+
+    static let defaultSiteKey = "defaultSiteID"
+
+    /// The site new entries go to: the chosen default, else the last used, else the first.
+    func defaultSiteID(in context: ModelContext) -> UUID? {
+        let sites = (try? context.fetch(FetchDescriptor<Site>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+        if let raw = UserDefaults.standard.string(forKey: Self.defaultSiteKey),
+           let id = UUID(uuidString: raw), sites.contains(where: { $0.id == id }) {
+            return id
+        }
+        return sites.max { ($0.lastUsedAt ?? .distantPast) < ($1.lastUsedAt ?? .distantPast) }?.id
+            ?? sites.first?.id
+    }
+
+    /// Reuse an empty draft if there is one, so the app opens to a blank page without piling up blanks.
+    func openBlankEntry(in context: ModelContext) {
+        let editing = Entry.State.editing.rawValue
+        let drafts = (try? context.fetch(FetchDescriptor<Entry>(
+            predicate: #Predicate { $0.stateRaw == editing && $0.remotePostID == nil },
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]))) ?? []
+        let entry: Entry
+        if let blank = drafts.first(where: \.isBlank) {
+            entry = blank
+            entry.createdAt = .now
+            if entry.siteID == nil { entry.siteID = defaultSiteID(in: context) }
+        } else {
+            entry = Entry(siteID: defaultSiteID(in: context))
+            context.insert(entry)
+        }
+        try? context.save()
+        sidebar = .drafts
+        selectedEntry = entry
+        preferredCompactColumn = .detail
+    }
+
+    func toggleFocus() {
+        withAnimation {
+            columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+        }
+    }
+}

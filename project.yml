@@ -1,0 +1,59 @@
+name: Quill
+options:
+  bundleIdPrefix: com.merimerimeri
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+
+packages:
+  GhostKit:
+    path: Packages/GhostKit
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: 8G4H6268W7
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+
+targets:
+  Quill:
+    type: application
+    platform: iOS
+    sources:
+      - Quill
+    dependencies:
+      - package: GhostKit
+    entitlements:
+      path: Quill/Quill.entitlements
+      properties:
+        # Everything the app writes is unreadable while the phone is locked.
+        com.apple.developer.default-data-protection: NSFileProtectionComplete
+    info:
+      path: Quill/Info.plist
+      properties:
+        CFBundleDisplayName: Quill
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIRequiresFullScreen: false
+        UIApplicationSupportsIndirectInputEvents: true
+        NSFaceIDUsageDescription: Quill uses Face ID to keep your writing and site keys private.
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          # Lets the simulator reach a dev Ghost on http://localhost; real sites use HTTPS.
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.merimerimeri.Quill
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
