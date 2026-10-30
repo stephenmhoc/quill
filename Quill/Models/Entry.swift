@@ -41,6 +41,10 @@ final class Entry {
     var createAttemptedAt: Date?
     /// Images already live on this site, so the entry can't move to another one.
     var uploadedToSiteID: UUID?
+    /// The published version, kept while editing it so going back can restore it.
+    var publishedTitle: String?
+    var publishedBody: String?
+    var publishedTags: [String]?
 
     init(siteID: UUID?) {
         id = UUID()
@@ -86,4 +90,28 @@ final class Entry {
     }
 
     func touch() { updatedAt = .now }
+
+    func beginEdit() {
+        publishedTitle = title
+        publishedBody = body
+        publishedTags = tags
+        state = .editing
+    }
+
+    /// Leaving a published entry mid-edit cancels the edit.
+    func cancelEdit() {
+        guard state == .editing, remotePostID != nil else { return }
+        title = publishedTitle ?? title
+        body = publishedBody ?? body
+        tags = publishedTags ?? tags
+        clearPublishedCopy()
+        state = .sent
+        try? modelContext?.save()
+    }
+
+    func clearPublishedCopy() {
+        publishedTitle = nil
+        publishedBody = nil
+        publishedTags = nil
+    }
 }

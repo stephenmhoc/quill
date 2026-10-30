@@ -36,6 +36,8 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(editor.waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["Site: Quill Dev"].waitForExistence(timeout: 10), "site not selected")
         attach("blank-page", app)
+        XCTAssertFalse(app.textFields["titleField"].exists, "title stays hidden until asked for")
+        XCTAssertFalse(app.buttons["Draft"].exists, "drafts are automatic")
 
         let marker = "UI flow \(UUID().uuidString)"
         editor.tap()
@@ -45,6 +47,27 @@ final class PublishFlowUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Published to Quill Dev"].waitForExistence(timeout: 20), "no success banner")
         attach("published", app)
+
+        // Asking for a title shows it, and it's focused to type in.
+        app.buttons["Add Title"].tap()
+        let titleField = app.textFields["titleField"]
+        XCTAssertTrue(titleField.waitForExistence(timeout: 5), "Add Title didn't show the field")
+        titleField.typeText("Kept draft")
+        XCTAssertEqual(titleField.value as? String, "Kept draft", "title field wasn't focused")
+
+        // Going back from a new entry goes home, with the writing kept as a draft.
+        showSidebar(app)
+        XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 5), "back didn't go home")
+        attach("home", app)
+        XCTAssertFalse(app.staticTexts["Sent"].exists)
+        XCTAssertFalse(app.staticTexts["Outbox"].exists, "outbox shows only when something's wrong")
+        XCTAssertTrue(app.staticTexts["Drafts"].exists, "draft wasn't kept")
+        app.staticTexts["Drafts"].tap()
+        XCTAssertTrue(app.staticTexts["Kept draft"].waitForExistence(timeout: 5))
+        showSidebar(app)
+        XCTAssertTrue(app.buttons["New Entry"].waitForExistence(timeout: 5), "back didn't return home")
+        app.buttons["New Entry"].tap()
+        XCTAssertTrue(app.textViews["editor"].waitForExistence(timeout: 5))
 
         // Really in Ghost, as an untitled entry?
         let client = GhostClient(baseURL: URL(string: url)!, credentials: try GhostCredentials(apiKey: key))
@@ -109,6 +132,19 @@ final class PublishFlowUITests: XCTestCase {
         let editor = app.textViews["editor"]
         XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 15), "post didn't open")
         XCTAssertEqual(editor.value as? String, "Written **elsewhere**")
+        XCTAssertTrue(app.staticTexts["Published"].exists, "status shouldn't name the site")
+
+        // Going back mid-edit cancels it: the text is restored and edit mode is off.
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            app.buttons["Edit"].tap()
+            editor.tap()
+            editor.typeText(" abandoned")
+            app.buttons["BackButton"].tap()
+            XCTAssertTrue(row.waitForExistence(timeout: 10))
+            row.tap()
+            XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 15), "edit mode stuck after going back")
+            XCTAssertEqual(editor.value as? String, "Written **elsewhere**", "cancelled edit wasn't discarded")
+        }
 
         app.buttons["Edit"].tap()
         editor.tap()
@@ -116,6 +152,7 @@ final class PublishFlowUITests: XCTestCase {
         attach("editing-past-post", app)
         app.buttons["sendButton"].tap()
         XCTAssertTrue(app.staticTexts["Updated on Quill Dev"].waitForExistence(timeout: 20), "no update banner")
+        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 5), "an update returns to the entry")
         let edited = try await client.post(id: created.id)
         XCTAssertTrue(edited.html?.contains("edited") == true, "edit didn't reach Ghost")
 

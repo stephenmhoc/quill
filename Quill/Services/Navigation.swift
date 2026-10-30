@@ -4,17 +4,29 @@ import SwiftData
 import SwiftUI
 
 enum SidebarItem: Hashable {
-    case drafts, outbox, sent
+    case drafts, outbox
     case site(UUID)
+}
+
+/// iPhone only: a stack with home at the root, so back from a new entry goes home.
+enum Route: Hashable {
+    case list(SidebarItem)
+    case editor
 }
 
 /// Split-view state shared by the sidebar, list and editor.
 @Observable
 final class Navigation {
-    var sidebar: SidebarItem? = .drafts
-    var selectedEntry: Entry?
+    var sidebar: SidebarItem?
+    var selectedEntry: Entry? {
+        didSet { if oldValue != selectedEntry { oldValue?.cancelEdit() } }
+    }
+    var path: [Route] = [] {
+        didSet { if !path.contains(.editor) { selectedEntry?.cancelEdit() } }
+    }
     var columnVisibility: NavigationSplitViewVisibility = .all
-    var preferredCompactColumn: NavigationSplitViewColumn = .detail
+    /// Narrow iPad: the sidebar floats over the list.
+    var sidebarOverlays = false
     var showingSettings = false
     var showingAddSite = false
 
@@ -47,10 +59,17 @@ final class Navigation {
             context.insert(entry)
         }
         try? context.save()
-        // Stay on a site's posts: that's where you came from after updating one of them.
-        if case .site = sidebar {} else { sidebar = .drafts }
         selectedEntry = entry
-        preferredCompactColumn = .detail
+        path = [.editor]
+    }
+
+    func show(_ entry: Entry) {
+        selectedEntry = entry
+        if path.last != .editor { path.append(.editor) }
+    }
+
+    func closeSidebarOverlay() {
+        if sidebarOverlays { withAnimation { columnVisibility = .doubleColumn } }
     }
 
     func toggleFocus() {

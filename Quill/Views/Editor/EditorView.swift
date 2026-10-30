@@ -22,10 +22,13 @@ struct EditorView: View {
     @State private var pendingPublicPhoto: PhotosPickerItem?
     @State private var bodyFocused = false
     @State private var focusRequest = 0
+    /// The title stays out of the way until asked for, or if the entry already has one.
+    @State private var wantsTitle = false
 
     private var site: Site? { sites.first { $0.id == entry.siteID } }
     private var isEditable: Bool { entry.state == .editing }
     private var tint: Color { site?.color.color ?? .accentColor }
+    private var showsTitle: Bool { wantsTitle || !entry.title.isEmpty }
     private var canSend: Bool {
         isEditable && !entry.isBlank && site != nil && !uploading && !publisher.sending.contains(entry.id)
     }
@@ -35,8 +38,8 @@ struct EditorView: View {
                        focusRequest: focusRequest, isEditable: isEditable, tint: tint,
                        margin: sizeClass == .regular ? 48 : 20) {
             // Hosted inside UIKit, so the environment has to be passed along.
-            EditorHeader(entry: entry, site: site, isEditable: isEditable,
-                         onTags: { showingTags = true }, onSubmit: { focusRequest += 1 })
+            EditorHeader(entry: entry, site: site, isEditable: isEditable, showsTitle: showsTitle,
+                         focusesTitle: wantsTitle && entry.title.isEmpty, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 })
                 .environment(navigation)
                 .environment(publisher)
         }
@@ -52,7 +55,7 @@ struct EditorView: View {
         .toolbar { toolbar }
         .sheet(isPresented: $showingTags) { TagEditor(entry: entry, site: site) }
         .confirmationDialog("Publish to \(site?.name ?? "")?", isPresented: $confirmingPublic, titleVisibility: .visible) {
-            Button(entry.publishStatus == .published ? "Publish publicly" : "Send draft") { send() }
+            Button("Publish publicly") { send() }
         } message: {
             Text("\(site?.host ?? "This site") is a public site.")
         }
@@ -72,6 +75,11 @@ struct EditorView: View {
         // Throttled: updatedAt re-sorts every list on screen.
         .onChange(of: entry.title) { touchIfStale() }
         .onChange(of: entry.body) { touchIfStale() }
+        // Saved as you type, so there's nothing to do to keep a draft.
+        .task(id: "\(entry.title)\(entry.body)") {
+            try? await Task.sleep(for: .seconds(1))
+            if !Task.isCancelled { try? context.save() }
+        }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             if site?.isPublic == true { pendingPublicPhoto = item } else { Task { await insertPhoto(item) } }
@@ -141,13 +149,11 @@ struct EditorView: View {
             }
             .disabled(!isEditable)
 
-            Picker("Status", selection: $entry.publishStatus) {
-                Text("Publish").tag(GhostPost.Status.published)
-                Text("Draft").tag(GhostPost.Status.draft)
+            if !showsTitle {
+                Button { wantsTitle = true } label: {
+                    Label("Add Title", systemImage: "textformat")
+                }
             }
-            .pickerStyle(.segmented)
-            .fixedSize()
-            .disabled(!isEditable)
 
             Spacer()
 
@@ -176,8 +182,7 @@ struct EditorView: View {
     }
 
     private var sendLabel: String {
-        if entry.remotePostID != nil { return "Update" }
-        if entry.publishStatus == .draft { return "Send Draft" }
+        if entry.remotePostID != nil, entry.remoteStatus != .draft { return "Update" }
         return site?.isPublic == true ? "Publish publicly" : "Publish"
     }
 
@@ -189,10 +194,12 @@ struct EditorView: View {
     private func send() {
         hideKeyboard()
         let sent = entry
+        let isNew = sent.remotePostID == nil
+        sent.publishStatus = .published
         Task {
             await publisher.publish(sent)
-            // On success, start a fresh page; the sent entry stays in Sent.
-            if sent.state == .sent, navigation.selectedEntry == sent {
+            // A new entry is done, so start a fresh page. An update stays on the entry.
+            if isNew, sent.state == .sent, navigation.selectedEntry == sent {
                 navigation.openBlankEntry(in: context)
             }
         }
@@ -275,24 +282,32 @@ private struct EditorHeader: View {
     @Bindable var entry: Entry
     let site: Site?
     let isEditable: Bool
+    let showsTitle: Bool
+    let focusesTitle: Bool
     let onTags: () -> Void
     let onSubmit: () -> Void
+    @FocusState private var titleFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             StatusBanner(entry: entry, site: site)
                 .padding(.bottom, 16)
-            TextField("Title (optional)", text: $entry.title, axis: .vertical)
-                .font(.system(.title, design: .serif).weight(.semibold))
-                .lineLimit(1...4)
-                .disabled(!isEditable)
-                .padding(.bottom, 8)
-                // Multi-line so long titles wrap, but Return still moves on to the text.
-                .onChange(of: entry.title) { _, title in
-                    guard title.contains(where: \.isNewline) else { return }
-                    entry.title = title.filter { !$0.isNewline }
-                    onSubmit()
-                }
+            if showsTitle {
+                TextField("Title", text: $entry.title, axis: .vertical)
+                    .font(.system(.title, design: .serif).weight(.semibold))
+                    .lineLimit(1...4)
+                    .disabled(!isEditable)
+                    .focused($titleFocused)
+                    .accessibilityIdentifier("titleField")
+                    .padding(.bottom, 8)
+                    // Multi-line so long titles wrap, but Return still moves on to the text.
+                    .onChange(of: entry.title) { _, title in
+                        guard title.contains(where: \.isNewline) else { return }
+                        entry.title = title.filter { !$0.isNewline }
+                        onSubmit()
+                    }
+                    .task { if focusesTitle { titleFocused = true } }
+            }
             if !entry.tags.isEmpty {
                 TagStrip(tags: entry.tags, onTap: onTags)
                     .padding(.bottom, 8)
@@ -322,14 +337,13 @@ struct StatusBanner: View {
     @Bindable var entry: Entry
     let site: Site?
     @Environment(Publisher.self) private var publisher
-    @Environment(Navigation.self) private var navigation
     @Environment(\.openURL) private var openURL
 
     var body: some View {
         switch entry.state {
         case .editing:
             if entry.remotePostID != nil {
-                note("Editing a sent entry. Update replaces it in \(site?.name ?? "Ghost").", "pencil", .secondary)
+                note("Editing. Going back cancels.", "pencil", .secondary)
             }
         case .sending:
             note("Sending to \(site?.name ?? "the site")…", "arrow.up.circle", .secondary)
@@ -359,16 +373,12 @@ struct StatusBanner: View {
             }
         case .sent:
             HStack {
-                note("\(entry.remoteStatus == .draft ? "Saved as a draft" : "Published") to \(site?.name ?? "Ghost")",
-                     "checkmark.circle", .green)
+                note(entry.remoteStatus == .draft ? "Draft" : "Published", "checkmark.circle", .green)
                 Spacer()
                 if let url = entry.remoteURL, entry.remoteStatus != .draft {
                     Button("View") { openURL(url) }
                 }
-                Button("Edit") {
-                    entry.state = .editing
-                    if case .site = navigation.sidebar {} else { navigation.sidebar = .drafts }
-                }
+                Button("Edit") { entry.beginEdit() }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)

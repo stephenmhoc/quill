@@ -7,8 +7,8 @@ struct RootView: View {
     @Environment(Publisher.self) private var publisher
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Query(sort: \Site.createdAt) private var sites: [Site]
-    @State private var sidebarOverlays = false
 
     var body: some View {
         @Bindable var navigation = navigation
@@ -18,19 +18,28 @@ struct RootView: View {
             } else if sites.isEmpty {
                 SiteFormView(site: nil, isRequired: true)
             } else {
-                NavigationSplitView(columnVisibility: $navigation.columnVisibility,
-                                    preferredCompactColumn: $navigation.preferredCompactColumn) {
-                    SidebarView()
-                } content: {
-                    ContentColumn()
-                } detail: {
-                    DetailColumn()
-                }
-                .navigationSplitViewStyle(.balanced)
-                // Narrow iPad: the sidebar floats over the list, so get out of the way once it's used.
-                .onGeometryChange(for: Bool.self) { $0.size.width < 1100 } action: { sidebarOverlays = $0 }
-                .onChange(of: navigation.sidebar) {
-                    if sidebarOverlays { withAnimation { navigation.columnVisibility = .doubleColumn } }
+                Group {
+                    if sizeClass == .regular {
+                        NavigationSplitView(columnVisibility: $navigation.columnVisibility) {
+                            SidebarView()
+                        } content: {
+                            ContentColumn()
+                        } detail: {
+                            DetailColumn()
+                        }
+                        .navigationSplitViewStyle(.balanced)
+                        .onGeometryChange(for: Bool.self) { $0.size.width < 1100 } action: { navigation.sidebarOverlays = $0 }
+                    } else {
+                        NavigationStack(path: $navigation.path) {
+                            SidebarView()
+                                .navigationDestination(for: Route.self) { route in
+                                    switch route {
+                                    case .list(let item): SectionList(item: item)
+                                    case .editor: DetailColumn()
+                                    }
+                                }
+                        }
+                    }
                 }
                 .sheet(isPresented: $navigation.showingSettings) { SettingsView() }
                 .sheet(isPresented: $navigation.showingAddSite) { SiteFormView(site: nil) }
@@ -40,6 +49,7 @@ struct RootView: View {
                     navigation.openBlankEntry(in: context)
                 }
                 .onAppear {
+                    if navigation.sidebar == nil { navigation.sidebar = sites.first.map { .site($0.id) } }
                     // Also after setup, when the last site was removed and a new one added.
                     if !sites.contains(where: { $0.id == navigation.selectedEntry?.siteID }) {
                         navigation.openBlankEntry(in: context)
@@ -75,10 +85,21 @@ private struct ContentColumn: View {
     @Environment(Navigation.self) private var navigation
 
     var body: some View {
-        switch navigation.sidebar {
+        if let item = navigation.sidebar {
+            SectionList(item: item)
+        } else {
+            ContentUnavailableView("Nothing selected", systemImage: "sidebar.left")
+        }
+    }
+}
+
+private struct SectionList: View {
+    let item: SidebarItem
+
+    var body: some View {
+        switch item {
         case .site(let id): SitePostsView(siteID: id).id(id)
-        case .some(let item): EntryListView(section: item)
-        case nil: ContentUnavailableView("Nothing selected", systemImage: "sidebar.left")
+        default: EntryListView(section: item)
         }
     }
 }

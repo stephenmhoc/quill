@@ -168,6 +168,7 @@ final class Publisher {
             entry.sentAt = .now
             entry.lastError = nil
             entry.createAttemptedAt = nil
+            entry.clearPublishedCopy()
             entry.state = .sent
             site.lastUsedAt = .now
             lastResult = Result(entryID: entry.id, siteName: site.name, url: post.url,

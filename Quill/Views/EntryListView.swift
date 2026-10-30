@@ -1,25 +1,23 @@
 import SwiftData
 import SwiftUI
 
-/// Middle column for Drafts / Outbox / Sent.
+/// Middle column for Drafts / Outbox.
 struct EntryListView: View {
     let section: SidebarItem
 
     @Environment(Navigation.self) private var navigation
     @Environment(Publisher.self) private var publisher
     @Environment(\.modelContext) private var context
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Query(sort: \Entry.updatedAt, order: .reverse) private var entries: [Entry]
     @Query private var sites: [Site]
 
     private var visible: [Entry] {
         switch section {
         case .drafts:
-            entries.filter { $0.state == .editing && (!$0.isBlank || $0 == navigation.selectedEntry) }
+            entries.filter { $0.state == .editing && !$0.isBlank && $0.remotePostID == nil }
         case .outbox:
             entries.filter { [.queued, .sending, .failed].contains($0.state) }
-        case .sent:
-            entries.filter { $0.state == .sent }
-                .sorted { ($0.sentAt ?? .distantPast) > ($1.sentAt ?? .distantPast) }
         case .site:
             []
         }
@@ -29,24 +27,26 @@ struct EntryListView: View {
         switch section {
         case .drafts: "Drafts"
         case .outbox: "Outbox"
-        case .sent: "Sent"
         case .site: ""
         }
     }
 
     var body: some View {
-        @Bindable var navigation = navigation
-        List(selection: $navigation.selectedEntry) {
+        List {
             ForEach(visible) { entry in
-                EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID })
-                    .tag(entry)
-                    .swipeActions(edge: .trailing) {
-                        if entry.state != .sending {
-                            Button(role: .destructive) { delete(entry) } label: {
-                                Label(entry.state == .sent ? "Remove" : "Delete", systemImage: "trash")
-                            }
+                Button { navigation.show(entry) } label: {
+                    EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID })
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(entry == navigation.selectedEntry && sizeClass == .regular
+                                   ? Color.accentColor.opacity(0.15) : nil)
+                .swipeActions(edge: .trailing) {
+                    if entry.state != .sending {
+                        Button(role: .destructive) { delete(entry) } label: {
+                            Label("Delete", systemImage: "trash")
                         }
                     }
+                }
             }
         }
         .overlay {
@@ -58,9 +58,6 @@ struct EntryListView: View {
                 Button("Retry All") { Task { await publisher.flushOutbox() } }
             }
         }
-        .onChange(of: navigation.selectedEntry) { _, entry in
-            if entry != nil { navigation.preferredCompactColumn = .detail }
-        }
     }
 
     @ViewBuilder private var emptyState: some View {
@@ -69,7 +66,6 @@ struct EntryListView: View {
                                              description: Text("Unsent writing is kept here, on this device only."))
         case .outbox: ContentUnavailableView("Outbox empty", systemImage: "tray",
                                              description: Text("Entries that couldn't be sent wait here and retry automatically."))
-        case .sent: ContentUnavailableView("Nothing sent yet", systemImage: "paperplane")
         case .site: EmptyView()
         }
     }
@@ -124,13 +120,8 @@ struct EntryRow: View {
         case .failed:
             Label(entry.lastError ?? "Failed", systemImage: "exclamationmark.triangle")
                 .font(.caption).foregroundStyle(.red).lineLimit(2)
-        case .sent:
-            Label(entry.remoteStatus == .draft ? "Draft in Ghost" : "Published", systemImage: "checkmark.circle")
-                .font(.caption).foregroundStyle(.secondary)
-        case .editing:
-            if entry.remotePostID != nil {
-                Label("Editing sent entry", systemImage: "pencil").font(.caption).foregroundStyle(.secondary)
-            }
+        case .sent, .editing:
+            EmptyView()
         }
     }
 }

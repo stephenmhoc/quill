@@ -125,8 +125,7 @@ struct SitePostsView: View {
                 unsupported = post
                 return
             }
-            navigation.selectedEntry = entry
-            navigation.preferredCompactColumn = .detail
+            navigation.show(entry)
         } catch {
             self.error = error.localizedDescription
         }

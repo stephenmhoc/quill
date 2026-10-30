@@ -4,45 +4,29 @@ import SwiftUI
 struct SidebarView: View {
     @Environment(Navigation.self) private var navigation
     @Environment(\.modelContext) private var context
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Query(sort: \Site.createdAt) private var sites: [Site]
     @Query private var entries: [Entry]
+    /// Ticks so a slow send shows up without anything else changing.
+    @State private var now = Date.now
 
     var body: some View {
         @Bindable var navigation = navigation
-        List(selection: $navigation.sidebar) {
-            Section {
-                row("Drafts", "doc.text", .drafts, count: count { $0.state == .editing && !$0.isBlank })
-                row("Outbox", "tray.and.arrow.up", .outbox,
-                    count: count { [.queued, .sending, .failed].contains($0.state) },
-                    alert: entries.contains { $0.state == .failed })
-                row("Sent", "paperplane", .sent, count: nil)
-            }
-
-            Section {
-                ForEach(sites) { site in
-                    Label {
-                        HStack {
-                            Text(site.name)
-                            Spacer()
-                            Image(systemName: site.isPublic ? "globe" : "lock")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        Circle().fill(site.color.color).frame(width: 10, height: 10)
-                    }
-                    .tag(SidebarItem.site(site.id))
-                }
-                Button {
-                    navigation.showingAddSite = true
-                } label: {
-                    Label("Add Site", systemImage: "plus")
-                }
-            } header: {
-                Text("Sites")
+        Group {
+            // Selection plus NavigationLink pushes twice on iPhone.
+            if sizeClass == .regular {
+                List(selection: $navigation.sidebar) { rows }
+            } else {
+                List { rows }
             }
         }
         .navigationTitle("Quill")
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                now = .now
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button { navigation.showingSettings = true } label: {
@@ -57,22 +41,88 @@ struct SidebarView: View {
         }
     }
 
-    private func count(_ predicate: (Entry) -> Bool) -> Int { entries.filter(predicate).count }
-
-    private func row(_ title: String, _ icon: String, _ item: SidebarItem, count: Int?, alert: Bool = false) -> some View {
-        Label {
-            HStack {
-                Text(title)
-                Spacer()
-                if alert {
-                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
-                } else if let count, count > 0 {
-                    Text("\(count)").foregroundStyle(.secondary).monospacedDigit()
+    @ViewBuilder private var rows: some View {
+        Section {
+            ForEach(sites) { site in
+                link(.site(site.id)) {
+                    Label {
+                        HStack {
+                            Text(site.name)
+                            Spacer()
+                            Image(systemName: site.isPublic ? "globe" : "lock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Circle().fill(site.color.color).frame(width: 10, height: 10)
+                    }
                 }
             }
-        } icon: {
-            Image(systemName: icon)
+            Button {
+                navigation.showingAddSite = true
+            } label: {
+                Label("Add Site", systemImage: "plus")
+            }
+        } header: {
+            Text("Sites")
         }
-        .tag(item)
+
+        // Only when something needs attention.
+        if let outbox = outboxCount {
+            Section {
+                row("Outbox", "tray.and.arrow.up", .outbox, count: outbox,
+                    alert: entries.contains { $0.state == .failed })
+            }
+        }
+
+        if drafts > 0 {
+            Section {
+                row("Drafts", "doc.text", .drafts, count: drafts)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var drafts: Int {
+        entries.filter { $0.state == .editing && !$0.isBlank && $0.remotePostID == nil }.count
+    }
+
+    /// Nil while sends are going normally: the outbox only matters on an error or a slow send.
+    private var outboxCount: Int? {
+        let waiting = entries.filter { [.queued, .sending, .failed].contains($0.state) }
+        let needsAttention = waiting.contains {
+            $0.state == .failed || $0.lastError != nil || now.timeIntervalSince($0.updatedAt) > 30
+        }
+        return needsAttention ? waiting.count : nil
+    }
+
+    /// In the iPad sidebar a row selects; on iPhone it pushes onto the stack.
+    @ViewBuilder private func link(_ item: SidebarItem, @ViewBuilder label: () -> some View) -> some View {
+        if sizeClass == .regular {
+            // Also when it's already selected, which doesn't change the selection.
+            label().tag(item)
+                .simultaneousGesture(TapGesture().onEnded { navigation.closeSidebarOverlay() })
+        } else {
+            NavigationLink(value: Route.list(item), label: label)
+        }
+    }
+
+    private func row(_ title: String, _ icon: String, _ item: SidebarItem, count: Int, alert: Bool = false) -> some View {
+        link(item) {
+            Label {
+                HStack {
+                    Text(title)
+                    Spacer()
+                    if alert {
+                        Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
+                    } else {
+                        Text("\(count)").foregroundStyle(.secondary).monospacedDigit()
+                    }
+                }
+            } icon: {
+                Image(systemName: icon)
+            }
+        }
     }
 }
