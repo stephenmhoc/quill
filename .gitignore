@@ -6,3 +6,6 @@ DerivedData/
 .DS_Store
 .build/
 .swiftpm/
+
+# App Store Connect API keys
+*.p8
