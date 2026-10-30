@@ -100,9 +100,7 @@ struct SidebarView: View {
     /// In the iPad sidebar a row selects; on iPhone it pushes onto the stack.
     @ViewBuilder private func link(_ item: SidebarItem, @ViewBuilder label: () -> some View) -> some View {
         if sizeClass == .regular {
-            // Also when it's already selected, which doesn't change the selection.
-            label().tag(item)
-                .simultaneousGesture(TapGesture().onEnded { navigation.closeSidebarOverlay() })
+            NavigationLink(value: item, label: label)
         } else {
             NavigationLink(value: Route.list(item), label: label)
         }

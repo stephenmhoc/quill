@@ -103,6 +103,7 @@ struct EditorView: View {
                     Label("Focus", systemImage: navigation.columnVisibility == .detailOnly
                           ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
                 }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
             }
         }
     }

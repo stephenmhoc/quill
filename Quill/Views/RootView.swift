@@ -9,6 +9,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Query(sort: \Site.createdAt) private var sites: [Site]
+    @State private var sidebarOverlays = false
 
     var body: some View {
         @Bindable var navigation = navigation
@@ -28,7 +29,14 @@ struct RootView: View {
                             DetailColumn()
                         }
                         .navigationSplitViewStyle(.balanced)
-                        .onGeometryChange(for: Bool.self) { $0.size.width < 1100 } action: { navigation.sidebarOverlays = $0 }
+                        // Narrow iPad: the sidebar floats over the list, so it stays out of the way.
+                        .onGeometryChange(for: Bool.self) { $0.size.width < 1100 } action: { overlays in
+                            sidebarOverlays = overlays
+                            if overlays { navigation.columnVisibility = .doubleColumn }
+                        }
+                        .onChange(of: navigation.sidebar) {
+                            if sidebarOverlays { withAnimation { navigation.columnVisibility = .doubleColumn } }
+                        }
                     } else {
                         NavigationStack(path: $navigation.path) {
                             SidebarView()

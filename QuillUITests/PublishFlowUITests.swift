@@ -56,6 +56,10 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertEqual(titleField.value as? String, "Kept draft", "title field wasn't focused")
 
         // Going back from a new entry goes home, with the writing kept as a draft.
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            app.textViews["editor"].tap()
+            app.buttons["Hide Keyboard"].tap()
+        }
         showSidebar(app)
         XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 5), "back didn't go home")
         attach("home", app)
@@ -64,6 +68,7 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Drafts"].exists, "draft wasn't kept")
         app.staticTexts["Drafts"].tap()
         XCTAssertTrue(app.staticTexts["Kept draft"].waitForExistence(timeout: 5))
+        attach("drafts", app)
         showSidebar(app)
         XCTAssertTrue(app.buttons["New Entry"].waitForExistence(timeout: 5), "back didn't return home")
         app.buttons["New Entry"].tap()
@@ -128,6 +133,9 @@ final class PublishFlowUITests: XCTestCase {
         let row = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 15), "post not listed")
         attach("site-posts", app)
+        // Re-selecting the current site leaves the iPad sidebar floating over the list.
+        if app.buttons["Hide Sidebar"].firstMatch.exists { app.buttons["Hide Sidebar"].firstMatch.tap() }
+        try await Task.sleep(for: .seconds(1))
         row.tap()
         let editor = app.textViews["editor"]
         XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 15), "post didn't open")
@@ -156,6 +164,17 @@ final class PublishFlowUITests: XCTestCase {
         let edited = try await client.post(id: created.id)
         XCTAssertTrue(edited.html?.contains("edited") == true, "edit didn't reach Ghost")
 
+        // iPad: focus mode leaves only the page, and comes back.
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            let list = app.buttons["Edit Site"]
+            XCTAssertTrue(list.isHittable)
+            app.buttons["Focus"].tap()
+            XCTAssertTrue(list.waitForNonExistence(timeout: 5), "focus mode left the list on screen")
+            attach("focus-mode", app)
+            app.buttons["Focus"].tap()
+            XCTAssertTrue(list.waitForExistence(timeout: 5), "focus mode didn't exit")
+        }
+
         // Delete asks first, then it's gone from Ghost.
         if app.buttons["BackButton"].exists { app.buttons["BackButton"].tap() }
         XCTAssertTrue(row.waitForExistence(timeout: 10))
@@ -182,6 +201,11 @@ final class PublishFlowUITests: XCTestCase {
         app.buttons["Auto"].tap()
         chooseIcon("Auto", app)
         app.buttons["Done"].tap()
+    }
+
+    override func setUp() {
+        // All three iPad columns fit in landscape.
+        if UIDevice.current.userInterfaceIdiom == .pad { XCUIDevice.shared.orientation = .landscapeLeft }
     }
 
     private func showSidebar(_ app: XCUIApplication) {

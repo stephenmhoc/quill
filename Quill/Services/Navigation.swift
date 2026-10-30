@@ -25,8 +25,6 @@ final class Navigation {
         didSet { if !path.contains(.editor) { selectedEntry?.cancelEdit() } }
     }
     var columnVisibility: NavigationSplitViewVisibility = .all
-    /// Narrow iPad: the sidebar floats over the list.
-    var sidebarOverlays = false
     var showingSettings = false
     var showingAddSite = false
 
@@ -68,13 +66,9 @@ final class Navigation {
         if path.last != .editor { path.append(.editor) }
     }
 
-    func closeSidebarOverlay() {
-        if sidebarOverlays { withAnimation { columnVisibility = .doubleColumn } }
-    }
-
     func toggleFocus() {
         withAnimation {
-            columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+            columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
         }
     }
 }
