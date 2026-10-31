@@ -59,11 +59,13 @@ final class Site {
     var kindRaw: String = SiteKind.ghost.rawValue
     /// Empty for kinds of site with no address.
     var urlString: String
-    /// Public sites get a confirmation before publishing.
+    /// Public sites get a confirmation before an image is uploaded.
     var isPublic: Bool
     var colorRaw: String
     var createdAt: Date
     var lastUsedAt: Date?
+    /// The first page of posts as last seen, so the list can appear before the site answers.
+    var cachedPosts: Data?
 
     init(name: String, url: URL, isPublic: Bool, color: SiteColor, kind: SiteKind = .ghost) {
         id = UUID()
@@ -93,6 +95,9 @@ final class Site {
         set { colorRaw = newValue.rawValue }
     }
     var host: String { url?.host() ?? urlString }
+    var cachedPostList: [SitePost] {
+        cachedPosts.flatMap { try? JSONDecoder().decode([SitePost].self, from: $0) } ?? []
+    }
 
     /// Who can read this site, in words and as a symbol.
     var accessLabel: String { kind == .local ? "On this device" : isPublic ? "Public" : "Private" }

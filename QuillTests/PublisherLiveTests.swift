@@ -35,6 +35,22 @@ struct PublisherLiveTests {
         try await client.recentPosts(limit: 50).filter { $0.title == title }.count
     }
 
+    @Test func preloadKeepsEachSitesPostsOnTheDevice() async throws {
+        let (publisher, site, client) = harness()
+        let title = "Cached \(UUID())"
+        let post = try await client.createPost(OutgoingPost(title: title, html: "<p>Kept</p>", status: .published, tags: []))
+        defer { Task { try? await client.deletePost(id: post.id) } }
+        await publisher.preloadPosts()
+        let cached = site.cachedPostList
+        #expect(cached.contains { $0.title == title })
+
+        // Offline, the list still has what it last saw.
+        let (offline, dead, _) = harness(url: URL(string: "http://127.0.0.1:9")!)
+        dead.cachedPosts = site.cachedPosts
+        await offline.preloadPosts()
+        #expect(dead.cachedPostList == cached)
+    }
+
     @Test func localSiteSavesWithoutAnyServer() async throws {
         let site = Site(name: "Notebook", kind: .local, color: .plum)
         context.insert(site)

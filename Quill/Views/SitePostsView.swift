@@ -89,6 +89,7 @@ struct SitePostsView: View {
         }
         // Unstructured: SwiftUI cancels view tasks during column transitions and list refreshes.
         .refreshable { await Task { await load() }.value }
+        .onAppear { if posts.isEmpty, let site { posts = site.cachedPostList } }
         .task { await Task { await load() }.value }
         .onChange(of: publisher.sentCount) { Task { await load() } }
     }
@@ -152,6 +153,7 @@ struct SitePostsView: View {
         do {
             try await publisher.deletePost(id: post.id, site: site)
             posts.removeAll { $0.id == post.id }
+            publisher.remember(posts, on: site)
             error = nil
         } catch {
             self.error = error.localizedDescription
@@ -163,10 +165,10 @@ struct SitePostsView: View {
         loading = true
         defer { loading = false }
         do {
-            let first = try await publisher.backend(for: site).posts(limit: Self.pageSize, page: 1)
+            let first = try await publisher.loadPosts(of: site)
             posts = first
             page = 1
-            hasMore = first.count == Self.pageSize
+            hasMore = first.count == SitePost.pageSize
             error = nil
         } catch {
             self.error = error.localizedDescription
@@ -176,16 +178,14 @@ struct SitePostsView: View {
     private func loadMore() async {
         guard let site else { return }
         do {
-            let next = try await publisher.backend(for: site).posts(limit: Self.pageSize, page: page + 1)
+            let next = try await publisher.backend(for: site).posts(limit: SitePost.pageSize, page: page + 1)
             let known = Set(posts.map(\.id))
             posts += next.filter { !known.contains($0.id) }
-            hasMore = next.count == Self.pageSize
+            hasMore = next.count == SitePost.pageSize
             page += 1
         } catch {
             hasMore = false
             self.error = error.localizedDescription
         }
     }
-
-    private static let pageSize = 30
 }

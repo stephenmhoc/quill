@@ -48,6 +48,7 @@ struct RootView: View {
                 .sheet(isPresented: $navigation.showingSettings) { SettingsView() }
                 .sheet(isPresented: $navigation.showingAddSite) { AddSiteView() }
                 .task(id: lock.isUnlocked) { await runOutbox() }
+                .task(id: lock.isUnlocked, priority: .utility) { await publisher.preloadPosts() }
                 .onReceive(NotificationCenter.default.publisher(for: .quillNewEntry)) { _ in
                     navigation.openBlankEntry(in: context)
                 }

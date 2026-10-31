@@ -3,7 +3,9 @@ import GhostKit
 import SwiftData
 
 /// A post as listed under a site, whichever kind of site it's on.
-struct SitePost: Identifiable, Equatable {
+struct SitePost: Identifiable, Equatable, Codable {
+    static let pageSize = 30
+
     let id: String
     let title: String
     let isUntitled: Bool
@@ -43,6 +45,31 @@ protocol SiteBackend {
 }
 
 extension Publisher {
+    /// Fetches a site's first page of posts and keeps it on the device for next time.
+    func loadPosts(of site: Site) async throws -> [SitePost] {
+        let posts = try await backend(for: site).posts(limit: SitePost.pageSize, page: 1)
+        remember(posts, on: site)
+        return posts
+    }
+
+    /// Only writes when something changed, because a write redraws every view of the site.
+    func remember(_ posts: [SitePost], on site: Site) {
+        guard site.modelContext != nil, !site.isDeleted,
+              let data = try? JSONEncoder().encode(Array(posts.prefix(SitePost.pageSize))),
+              data != site.cachedPosts else { return }
+        site.cachedPosts = data
+        try? context.save()
+    }
+
+    /// Freshens each site's list after unlocking, one at a time so it stays out of the way.
+    func preloadPosts() async {
+        let sites = (try? context.fetch(FetchDescriptor<Site>())) ?? []
+        for site in sites where lock.canWork && !Task.isCancelled {
+            guard site.modelContext != nil, !site.isDeleted else { continue }
+            _ = try? await loadPosts(of: site)
+        }
+    }
+
     func backend(for site: Site) throws -> any SiteBackend {
         switch site.kind {
         case .ghost: GhostBackend(client: try lock.client(for: site), site: site, context: context)
