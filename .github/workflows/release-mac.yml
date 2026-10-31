@@ -66,7 +66,6 @@ jobs:
         run: |
           CERT="$RUNNER_TEMP/developer-id.p12"
           echo "$DEVELOPER_ID_CERT_BASE64" | base64 --decode -o "$CERT"
-          echo "DEVELOPER_ID_CERT_PATH=$CERT" >> "$GITHUB_ENV"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_NAME"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
@@ -80,7 +79,6 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
         run: |
           ruby Tools/app_store_connect_signing.rb developer-id-profile
           PROFILE="$RUNNER_TEMP/mac.provisionprofile"

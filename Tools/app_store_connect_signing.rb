@@ -273,9 +273,9 @@ def developer_id_profile
 
   unless profile
     bundle_id = find_or_create_bundle_id(client, identifier: env_fetch("IOS_BUNDLE_ID"), name: "Quill")
-    serial = OpenSSL::PKCS12.new(
-      File.binread(env_fetch("DEVELOPER_ID_CERT_PATH")), env_fetch("DEVELOPER_ID_CERT_PASSWORD")
-    ).certificate.serial.to_s(16).upcase
+    # From the keychain: OpenSSL 3 can't open the legacy encryption Keychain Access exports.
+    pem = IO.popen(["security", "find-certificate", "-c", "Developer ID Application", "-p", env_fetch("KEYCHAIN_NAME")], &:read)
+    serial = OpenSSL::X509::Certificate.new(pem).serial.to_s(16).upcase
     query = URI.encode_www_form("filter[certificateType]" => "DEVELOPER_ID_APPLICATION", "limit" => 200)
     certificate = client.get("/v1/certificates?#{query}").fetch("data").find do |candidate|
       candidate.fetch("attributes").fetch("serialNumber").upcase.sub(/\A0+/, "") == serial.sub(/\A0+/, "")
