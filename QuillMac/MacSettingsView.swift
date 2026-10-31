@@ -12,6 +12,7 @@ struct MacSettingsView: View {
 }
 
 private struct GeneralPane: View {
+    @Environment(AppLock.self) private var lock
     @Query(sort: \Site.createdAt) private var sites: [Site]
     @AppStorage(Appearance.key) private var appearance = Appearance.auto
     @AppStorage(Navigation.defaultSiteKey) private var defaultSite = ""
@@ -22,9 +23,11 @@ private struct GeneralPane: View {
                 ForEach(Appearance.allCases) { Text($0.label).tag($0) }
             }
             .pickerStyle(.segmented)
-            Picker("New entries go to:", selection: $defaultSite) {
-                Text("Last used").tag("")
-                ForEach(sites) { Text($0.name).tag($0.id.uuidString) }
+            if lock.isUnlocked {
+                Picker("New entries go to:", selection: $defaultSite) {
+                    Text("Last used").tag("")
+                    ForEach(sites) { Text($0.name).tag($0.id.uuidString) }
+                }
             }
             Toggle("Check for updates automatically", isOn: Binding(
                 get: { Updates.checksAutomatically }, set: { Updates.checksAutomatically = $0 }

@@ -8,6 +8,8 @@ struct MacRootView: View {
     @Environment(Publisher.self) private var publisher
     @Environment(\.modelContext) private var context
     @Query(sort: \Site.createdAt) private var sites: [Site]
+    /// Only an ID: the app's own state stays in its own locked-down store.
+    @SceneStorage("selectedEntry") private var restoredEntry = ""
 
     var body: some View {
         @Bindable var navigation = navigation
@@ -33,8 +35,12 @@ struct MacRootView: View {
                     repairSidebar()
                     if navigation.selectedEntry == nil { navigation.openBlankEntry(in: context, focus: false) }
                 }
+                .onChange(of: navigation.selectedEntry) { _, entry in
+                    restoredEntry = entry?.id.uuidString ?? ""
+                }
                 .onAppear {
                     repairSidebar()
+                    restoreEntry()
                     if !sites.contains(where: { $0.id == navigation.selectedEntry?.siteID }) {
                         navigation.openBlankEntry(in: context)
                     }
@@ -69,6 +75,12 @@ struct MacRootView: View {
     private func lockNow() {
         try? context.save()
         lock.lock()
+    }
+
+    /// Back to the entry that was open when Quill last quit.
+    private func restoreEntry() {
+        guard navigation.selectedEntry == nil, let id = UUID(uuidString: restoredEntry) else { return }
+        navigation.selectedEntry = try? context.fetch(FetchDescriptor<Entry>(predicate: #Predicate { $0.id == id })).first
     }
 
     private func repairSidebar() {

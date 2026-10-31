@@ -20,6 +20,8 @@ struct SitePostsView: View {
     @State private var page = 1
     @State private var hasMore = false
     @State private var opening: String?
+    /// Which open is the latest, because a Mac can select another row while one is loading.
+    @State private var openRequest = 0
     @State private var pendingDelete: SitePost?
     @State private var unsupported: SitePost?
     #if os(macOS)
@@ -168,8 +170,10 @@ struct SitePostsView: View {
 
     private func open(_ post: SitePost) async {
         guard let site else { return }
+        openRequest += 1
+        let request = openRequest
         opening = post.id
-        defer { opening = nil }
+        defer { if request == openRequest { opening = nil } }
         let (shownEntry, shownPath) = (navigation.selectedEntry, navigation.path)
         do {
             var entry = localEntry(for: post)
@@ -179,7 +183,7 @@ struct SitePostsView: View {
                 entry = try await publisher.importPost(id: post.id, site: site)
             }
             // Someone who moved on while this loaded stays where they went.
-            guard navigation.selectedEntry == shownEntry, navigation.path == shownPath else { return }
+            guard request == openRequest, navigation.selectedEntry == shownEntry, navigation.path == shownPath else { return }
             guard let entry else {
                 unsupported = post
                 return

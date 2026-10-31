@@ -11,6 +11,9 @@ struct EntryListView: View {
     @Environment(\.usesColumns) private var usesColumns
     @Query(sort: \Entry.updatedAt, order: .reverse) private var entries: [Entry]
     @Query private var sites: [Site]
+    #if os(macOS)
+    @State private var pendingDelete: Entry?
+    #endif
 
     private var visible: [Entry] {
         switch section {
@@ -54,10 +57,21 @@ struct EntryListView: View {
                     .tag(entry)
                     .contextMenu {
                         if entry.state != .sending {
-                            Button("Delete", systemImage: "trash", role: .destructive) { delete(entry) }
+                            Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = entry }
                         }
                     }
             }
+        }
+        .onDeleteCommand {
+            if let entry = navigation.selectedEntry, visible.contains(entry), entry.state != .sending { pendingDelete = entry }
+        }
+        // Nothing else keeps a copy of a draft.
+        .confirmationDialog("Delete “\(pendingDelete?.displayTitle ?? "")”?",
+                            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+                            titleVisibility: .visible, presenting: pendingDelete) { entry in
+            Button("Delete", role: .destructive) { delete(entry) }
+        } message: { _ in
+            Text("This can't be undone.")
         }
         #else
         List {

@@ -16,6 +16,7 @@
 		20DB7C0BAABAD4B82EF6613D /* AddSiteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8EE99F1C2FDC7AC5F379E9 /* AddSiteView.swift */; };
 		20EBC6E5E44C65F0921126E5 /* LocalBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE560BD846C9515352C0A7B2 /* LocalBackend.swift */; };
 		22085D4C3562398CCEF206C1 /* MicroblogSiteForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 874F94F3CF6520EE05693513 /* MicroblogSiteForm.swift */; };
+		24A730E1B0BF03370D2F3D1D /* EntryPrinter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDAF3617E80CB2B9F6DF0200 /* EntryPrinter.swift */; };
 		261E2D416DA26F84FB7C3C86 /* Updates.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8ADD783F27F7AB7676FF9E7 /* Updates.swift */; };
 		29B8A3FB3C5ED2397023FB80 /* MacSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4851296535464A92DA36EA6C /* MacSidebar.swift */; };
 		2BFD621207C24D0D45BF7932 /* LockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4829D02BAD5836F8776B8F8F /* LockView.swift */; };
@@ -159,6 +160,7 @@
 		C0C0502ECC5CD16D03EEE45D /* QuillStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuillStore.swift; sourceTree = "<group>"; };
 		C684F49AE50326D752C22416 /* QuillMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuillMacApp.swift; sourceTree = "<group>"; };
 		C9908E6604B2E633C1858956 /* NewEntryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewEntryButton.swift; sourceTree = "<group>"; };
+		CDAF3617E80CB2B9F6DF0200 /* EntryPrinter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryPrinter.swift; sourceTree = "<group>"; };
 		D1F21B3D2ECEA6CDF2B70A82 /* Publisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Publisher.swift; sourceTree = "<group>"; };
 		E38D052F3FD1038D28BD2E47 /* MarkdownFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownFormat.swift; sourceTree = "<group>"; };
 		E8ADD783F27F7AB7676FF9E7 /* Updates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updates.swift; sourceTree = "<group>"; };
@@ -247,6 +249,7 @@
 			isa = PBXGroup;
 			children = (
 				51AB582489BC0691928C32E0 /* Assets.xcassets */,
+				CDAF3617E80CB2B9F6DF0200 /* EntryPrinter.swift */,
 				B1B3C0BB71E3A467823D2623 /* Info.plist */,
 				9DA1485C541B586F00AD788C /* MacEditorView.swift */,
 				4A4B1C33DC311E92AFFB155E /* MacRootView.swift */,
@@ -558,6 +561,7 @@
 				51DF2F09CE5EB5D5B4DBE1A9 /* Entry.swift in Sources */,
 				D5B68511950210FC239A6B90 /* EntryListView.swift in Sources */,
 				CC9C55A85B9470D9507B8AA7 /* EntryPreview.swift in Sources */,
+				24A730E1B0BF03370D2F3D1D /* EntryPrinter.swift in Sources */,
 				30EB59F3629AE1545F12045B /* GhostBackend.swift in Sources */,
 				B9581F4EA2F51FC887BDAC7A /* GhostSiteForm.swift in Sources */,
 				DB0D262D2EA08024BEF28F58 /* LocalBackend.swift in Sources */,

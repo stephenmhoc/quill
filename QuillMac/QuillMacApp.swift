@@ -54,11 +54,16 @@ struct QuillMacApp: App {
 struct EditorActions {
     let canPublish: Bool
     let canPreview: Bool
+    let canEdit: Bool
+    /// Formatting needs a selection, and only the body's is one it can use.
+    let canFormat: Bool
+    let hasTitle: Bool
     let isPreviewing: Bool
     let publishLabel: String
     let publish: () -> Void
     let format: (MarkdownFormat) -> Void
     let togglePreview: () -> Void
+    let print: () -> Void
     let toggleTitle: () -> Void
     let chooseImage: () -> Void
 }
@@ -80,8 +85,13 @@ struct MacCommands: Commands {
         }
         SidebarCommands()
         TextEditingCommands()
-        // Nothing to print, and Page Setup would take ⇧⌘P from the preview.
-        CommandGroup(replacing: .printItem) {}
+        CommandGroup(replacing: .printItem) {
+            Button("Page Setup…") { NSApp.runPageLayout(nil) }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+            Button("Print…") { editor?.print() }
+                .keyboardShortcut("p")
+                .disabled(editor?.canPreview != true)
+        }
         CommandGroup(replacing: .newItem) {
             Button("New Entry") { navigation.openBlankEntry(in: context) }
                 .keyboardShortcut("n")
@@ -101,18 +111,22 @@ struct MacCommands: Commands {
                 Button("Italic") { editor?.format(.italic) }.keyboardShortcut("i")
                 Button("Link") { editor?.format(.link) }.keyboardShortcut("k")
                 Divider()
-                Button("Heading") { editor?.format(.heading) }.keyboardShortcut("h", modifiers: [.command, .option])
+                Button("Heading") { editor?.format(.heading) }.keyboardShortcut("1", modifiers: [.command, .option])
                 Button("List") { editor?.format(.bullet) }.keyboardShortcut("l", modifiers: [.command, .option])
                 Button("Quote") { editor?.format(.quote) }.keyboardShortcut("'", modifiers: [.command, .option])
-                Divider()
-                Button("Add Title") { editor?.toggleTitle() }.keyboardShortcut("t", modifiers: [.command, .option])
-                Button("Insert Image…") { editor?.chooseImage() }.keyboardShortcut("i", modifiers: [.command, .option])
             }
-            .disabled(editor == nil)
+            .disabled(editor?.canFormat != true)
+            Divider()
+            Group {
+                Button(editor?.hasTitle == true ? "Remove Title" : "Add Title") { editor?.toggleTitle() }
+                    .keyboardShortcut("t", modifiers: [.command, .control])
+                Button("Insert Image…") { editor?.chooseImage() }.keyboardShortcut("i", modifiers: [.command, .shift])
+            }
+            .disabled(editor?.canEdit != true)
         }
         CommandGroup(after: .sidebar) {
             Button(editor?.isPreviewing == true ? "Hide Preview" : "Show Preview") { editor?.togglePreview() }
-                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .keyboardShortcut("p", modifiers: [.command, .option])
                 .disabled(editor?.canPreview != true)
             Button("Focus Mode") {
                 withAnimation { navigation.columnVisibility = navigation.columnVisibility == .detailOnly ? .all : .detailOnly }

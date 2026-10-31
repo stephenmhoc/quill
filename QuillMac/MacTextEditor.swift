@@ -11,6 +11,7 @@ struct MacTextEditor<Header: View>: NSViewRepresentable {
     let focusRequest: Int
     let isEditable: Bool
     let onImages: ([Data]) -> Void
+    let onFocus: (Bool) -> Void
     @ViewBuilder let header: () -> Header
 
     func makeCoordinator() -> MacEditorCoordinator { MacEditorCoordinator(text: $text, selection: $selection) }
@@ -38,6 +39,7 @@ struct MacTextEditor<Header: View>: NSViewRepresentable {
         defer { coordinator.isUpdating = false }
 
         view.onImages = onImages
+        view.onFocus = onFocus
         view.isEditable = isEditable
         view.setHeader(AnyView(header()))
         if view.string != text {
@@ -106,6 +108,7 @@ final class MacPageTextView: NSTextView {
     private static let bottomInset: CGFloat = 60
 
     var onImages: (([Data]) -> Void)?
+    var onFocus: ((Bool) -> Void)?
     private var headerController: NSHostingController<AnyView>?
     private var top = MacPageTextView.topInset
     private var wantsFocus = false
@@ -211,6 +214,23 @@ final class MacPageTextView: NSTextView {
         didChangeText()
     }
 
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if became { report(focus: true) }
+        return became
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let resigned = super.resignFirstResponder()
+        if resigned { report(focus: false) }
+        return resigned
+    }
+
+    /// Later, because focus can move during a SwiftUI update.
+    private func report(focus: Bool) {
+        DispatchQueue.main.async { [weak self] in self?.onFocus?(focus) }
+    }
+
     func focusWhenReady() {
         if let window { window.makeFirstResponder(self) } else { wantsFocus = true }
     }
@@ -236,16 +256,20 @@ final class MacPageTextView: NSTextView {
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        Self.imageFiles(on: sender.draggingPasteboard).isEmpty ? super.draggingEntered(sender) : .copy
+        Self.imageFiles(on: sender.draggingPasteboard).isEmpty ? super.draggingEntered(sender) : imageDrop
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        Self.imageFiles(on: sender.draggingPasteboard).isEmpty ? super.draggingUpdated(sender) : .copy
+        Self.imageFiles(on: sender.draggingPasteboard).isEmpty ? super.draggingUpdated(sender) : imageDrop
     }
+
+    private var imageDrop: NSDragOperation { isEditable ? .copy : [] }
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         let files = Self.imageFiles(on: sender.draggingPasteboard)
         guard !files.isEmpty else { return super.performDragOperation(sender) }
+        guard isEditable else { return false }
+        setSelectedRange(NSRange(location: characterIndexForInsertion(at: convert(sender.draggingLocation, from: nil)), length: 0))
         onImages?(files.compactMap { try? Data(contentsOf: $0) })
         return true
     }

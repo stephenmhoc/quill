@@ -50,13 +50,13 @@ final class MacWritingUITests: XCTestCase {
         attach("writing", app)
 
         // The live preview renders beside the text.
-        app.typeKey("p", modifierFlags: [.command, .shift])
+        app.typeKey("p", modifierFlags: [.command, .option])
         sleep(1)
         attach("preview", app)
         XCTAssertGreaterThan(app.webViews.count, 0, "preview didn't open")
         XCTAssertGreaterThan(app.webViews.descendants(matching: .any).matching(NSPredicate(format: "value CONTAINS 'Written on a' OR label CONTAINS 'Written on a'")).count, 0,
                              "preview didn't render")
-        app.typeKey("p", modifierFlags: [.command, .shift])
+        app.typeKey("p", modifierFlags: [.command, .option])
 
         app.typeKey(.return, modifierFlags: .command)
         attach("after-publish", app)

@@ -22,6 +22,7 @@ final class AppLock {
 
     private var context: LAContext?
     private var backgroundedAt: Date?
+    private var lockDeadline: Task<Void, Never>?
     /// Keys read during this unlocked session; cleared on lock.
     private var keyCache: [UUID: String] = [:]
 
@@ -77,7 +78,12 @@ final class AppLock {
         }
     }
 
+    private var grace: Double {
+        UserDefaults.standard.object(forKey: Self.graceKey) as? Double ?? Self.defaultGrace
+    }
+
     func lock() {
+        lockDeadline?.cancel()
         isUnlocked = false
         context?.invalidate()
         context = nil
@@ -89,16 +95,26 @@ final class AppLock {
         isForeground = false
     }
 
-    /// Another app came forward. Quill keeps working behind it, unlike a backgrounded iPhone app.
+    /// Another app came forward. Quill keeps working behind it, unlike a backgrounded iPhone app,
+    /// but its window stays readable, so the grace period has to end without coming back.
     func didResignActive() {
         backgroundedAt = .now
+        lockDeadline?.cancel()
+        guard grace > 0 else {
+            lock()
+            return
+        }
+        lockDeadline = Task { [weak self, grace] in
+            try? await Task.sleep(for: .seconds(grace))
+            if !Task.isCancelled { self?.lock() }
+        }
     }
 
     func didBecomeActive() {
         isForeground = true
+        lockDeadline?.cancel()
         guard isUnlocked, let since = backgroundedAt else { return }
         backgroundedAt = nil
-        let grace = UserDefaults.standard.object(forKey: Self.graceKey) as? Double ?? Self.defaultGrace
         if Date.now.timeIntervalSince(since) > grace { lock() }
     }
 

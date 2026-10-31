@@ -102,6 +102,7 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.files.user-selected.read-only: true
+        com.apple.security.print: true
         # Lets Sparkle's installer run from inside the sandbox.
         com.apple.security.temporary-exception.mach-lookup.global-name:
           - $(PRODUCT_BUNDLE_IDENTIFIER)-spks

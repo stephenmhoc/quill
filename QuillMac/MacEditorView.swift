@@ -23,6 +23,7 @@ struct MacEditorView: View {
     @State private var uploadError: String?
     @State private var pendingPublicImages: [Data] = []
     @State private var saveFailed = false
+    @State private var bodyHasFocus = false
 
     private var site: Site? { sites.first { $0.id == entry.siteID } }
     private var isEditable: Bool { entry.state == .editing }
@@ -35,7 +36,7 @@ struct MacEditorView: View {
         HSplitView {
             page.frame(minWidth: 340, maxWidth: .infinity)
             if isPreviewing {
-                LivePreview(title: entry.title, markdown: entry.body)
+                LivePreview(title: entry.title, markdown: entry.body, site: site)
                     .frame(minWidth: 280, maxWidth: .infinity)
             }
         }
@@ -82,7 +83,7 @@ struct MacEditorView: View {
 
     private var page: some View {
         MacTextEditor(text: $entry.body, selection: $selection, focusRequest: focusRequest, isEditable: isEditable,
-                      onImages: receive) {
+                      onImages: receive, onFocus: { bodyHasFocus = $0 }) {
             // Hosted inside AppKit, so the environment has to be passed along.
             EditorHeader(entry: entry, site: site, isEditable: isEditable, showsTitle: showsTitle,
                          focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 },
@@ -152,8 +153,10 @@ struct MacEditorView: View {
     }
 
     private var actions: EditorActions {
-        EditorActions(canPublish: canSend, canPreview: !entry.isBlank, isPreviewing: isPreviewing, publishLabel: sendLabel,
-                      publish: send, format: apply, togglePreview: { showsPreview.toggle() },
+        EditorActions(canPublish: canSend, canPreview: !entry.isBlank, canEdit: isEditable,
+                      canFormat: isEditable && bodyHasFocus, hasTitle: showsTitle, isPreviewing: isPreviewing,
+                      publishLabel: sendLabel, publish: send, format: apply, togglePreview: { showsPreview.toggle() },
+                      print: { EntryPrinter.print(title: entry.title, markdown: entry.body, site: site) },
                       toggleTitle: toggleTitle, chooseImage: { showingImagePicker = true })
     }
 
@@ -183,6 +186,7 @@ struct MacEditorView: View {
     }
 
     private func toggleTitle() {
+        guard isEditable else { return }
         showsTitle.toggle()
         focusTitle = showsTitle
         if showsTitle {
@@ -218,7 +222,11 @@ struct MacEditorView: View {
 
     /// Pasted, dropped or chosen. A public site asks first, because an upload can't wait for Publish.
     private func receive(_ images: [Data]) {
-        guard !images.isEmpty, isEditable, site != nil, !uploading else { return }
+        guard isEditable, site != nil, !uploading else { return }
+        guard !images.isEmpty else {
+            uploadError = "Couldn't read that image."
+            return
+        }
         if site?.isPublic == true { pendingPublicImages = images } else { Task { await insert(images) } }
     }
 
@@ -251,10 +259,13 @@ struct MacEditorView: View {
 private struct LivePreview: View {
     let title: String
     let markdown: String
+    let site: Site?
     @Environment(\.colorScheme) private var colorScheme
     @State private var html: String?
 
-    private var source: String { EntryPage.html(title: title, markdown: markdown, isDark: colorScheme == .dark) }
+    private var source: String {
+        EntryPage.html(title: title, markdown: markdown, isDark: colorScheme == .dark, imageHosts: EntryPage.imageHosts(of: site))
+    }
 
     var body: some View {
         PreviewPage(html: html ?? source)

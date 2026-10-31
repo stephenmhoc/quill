@@ -31,11 +31,15 @@ struct EntryPreview: View {
 /// The HTML behind a preview.
 enum EntryPage {
     /// `isDark` comes from SwiftUI: the page's own dark mode query doesn't follow the app's
-    /// Appearance setting.
-    static func html(title: String, markdown: String, isDark: Bool) -> String {
+    /// Appearance setting. `imageHosts` limits where pictures can load from, for a preview that
+    /// updates by itself: pasting a tracked image shouldn't call its server from a private draft.
+    static func html(title: String, markdown: String, isDark: Bool, imageHosts: [String]? = nil) -> String {
         let heading = title.isEmpty ? "" : "<h1>\(escaped(title))</h1>"
+        let images = imageHosts.map { hosts in hosts.flatMap { ["https://\($0)", "http://\($0)"] }.joined(separator: " ") } ?? "http: https:"
         return """
         <!doctype html><meta charset="utf-8">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; \
+        img-src data: \(LocalBackend.imageScheme): \(images); form-action 'none'; base-uri 'none'">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
         :root { color-scheme: \(isDark ? "dark" : "light"); --ink: \(isDark ? "#ececec" : "#1a1a1a");
@@ -53,6 +57,21 @@ enum EntryPage {
         </style>
         \(heading)\(EntryBuilder.html(fromMarkdown: markdown))
         """
+    }
+
+    /// Where a site's own images live.
+    static func imageHosts(of site: Site?) -> [String] {
+        guard let site, site.kind != .local else { return [] }
+        return site.kind == .microblog ? [site.host, "*.micro.blog", "micro.blog"] : [site.host, "*.\(site.host)"]
+    }
+
+    /// Markdown can carry raw HTML. Show it, but don't run it or let it keep anything.
+    static func webConfiguration() -> WKWebViewConfiguration {
+        let configuration = WKWebViewConfiguration()
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+        configuration.websiteDataStore = .nonPersistent()
+        configuration.setURLSchemeHandler(LocalImages(), forURLScheme: LocalBackend.imageScheme)
+        return configuration
     }
 
     private static func escaped(_ text: String) -> String {
@@ -80,13 +99,11 @@ extension PreviewPage {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     fileprivate func makeWebView(_ coordinator: Coordinator) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        // Markdown can carry raw HTML. Show it, but don't run it or let it keep anything.
-        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
-        configuration.websiteDataStore = .nonPersistent()
-        configuration.setURLSchemeHandler(LocalImages(), forURLScheme: LocalBackend.imageScheme)
-        let view = WKWebView(frame: .zero, configuration: configuration)
+        let view = WKWebView(frame: .zero, configuration: EntryPage.webConfiguration())
         view.navigationDelegate = coordinator
+        #if os(iOS)
+        view.isOpaque = false
+        #endif
         return view
     }
 
@@ -114,11 +131,11 @@ extension PreviewPage {
         /// The page stays the preview: links go to the browser.
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
-            guard action.navigationType == .linkActivated, let url = action.request.url else {
+            guard let url = action.request.url, url.scheme != "about" else {
                 decisionHandler(.allow)
                 return
             }
-            openURL?(url)
+            if action.navigationType == .linkActivated { openURL?(url) }
             decisionHandler(.cancel)
         }
 
@@ -131,7 +148,7 @@ extension PreviewPage {
 }
 
 /// Serves images saved to a local site, which only exist on this device.
-private final class LocalImages: NSObject, WKURLSchemeHandler {
+final class LocalImages: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
         guard let url = task.request.url, let image = try? LocalBackend.image(named: url.lastPathComponent) else {
             task.didFailWithError(URLError(.fileDoesNotExist))
