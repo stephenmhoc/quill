@@ -17,6 +17,10 @@ struct MicroblogBackend: SiteBackend {
         }
     }
 
+    func stats() async throws -> PostStats {
+        try await client.publishedStats()
+    }
+
     func entry(forPost id: String) async throws -> Entry? {
         let post = try await client.post(url: id)
         if let existing = try Entry.copy(of: id, on: site.id, in: context) { return existing }

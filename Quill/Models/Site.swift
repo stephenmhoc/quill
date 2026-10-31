@@ -1,4 +1,6 @@
 import Foundation
+import GhostKit
+import GhostKit
 import SwiftData
 import SwiftUI
 
@@ -66,6 +68,7 @@ final class Site {
     var lastUsedAt: Date?
     /// The first page of posts as last seen, so the list can appear before the site answers.
     var cachedPosts: Data?
+    var cachedStats: Data?
 
     init(name: String, url: URL, isPublic: Bool, color: SiteColor, kind: SiteKind = .ghost) {
         id = UUID()
@@ -95,6 +98,9 @@ final class Site {
         set { colorRaw = newValue.rawValue }
     }
     var host: String { url?.host() ?? urlString }
+    var stats: PostStats? {
+        cachedStats.flatMap { try? JSONDecoder().decode(PostStats.self, from: $0) }
+    }
     var cachedPostList: [SitePost] {
         cachedPosts.flatMap { try? JSONDecoder().decode([SitePost].self, from: $0) } ?? []
     }

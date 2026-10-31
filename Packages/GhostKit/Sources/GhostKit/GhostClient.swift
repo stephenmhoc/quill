@@ -97,6 +97,26 @@ public struct GhostClient: Sendable {
         return try decode(PostsEnvelopeIn.self, from: data).posts
     }
 
+    /// Totals for every published post. Walks the whole site, so call it sparingly.
+    public func publishedStats() async throws -> PostStats {
+        let pageSize = 100
+        var texts: [String] = []
+        var page = 1
+        while true {
+            let data = try await send("GET", "posts/", query: [
+                URLQueryItem(name: "limit", value: String(pageSize)),
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "filter", value: "status:published"),
+                URLQueryItem(name: "formats", value: "plaintext"),
+                URLQueryItem(name: "fields", value: "id,plaintext"),
+            ])
+            let posts = try decode(PlaintextEnvelopeIn.self, from: data).posts
+            texts += posts.map { $0.plaintext ?? "" }
+            if posts.count < pageSize { return await PostStats.counting(texts) }
+            page += 1
+        }
+    }
+
     /// The post created with this marker, if it landed. Goes by creation order, which later
     /// edits to other posts can't disturb.
     public func post(marker: String, createdSince cutoff: Date) async throws -> GhostPost? {
@@ -249,6 +269,10 @@ private struct SiteEnvelope: Decodable { let site: GhostSiteInfo }
 private struct UsersEnvelope: Decodable { let users: [GhostUser] }
 private struct TagsEnvelope: Decodable { let tags: [GhostTag] }
 private struct PostsEnvelopeIn: Decodable { let posts: [GhostPost] }
+private struct PlaintextEnvelopeIn: Decodable {
+    struct Post: Decodable { let plaintext: String? }
+    let posts: [Post]
+}
 private struct ImagesEnvelope: Decodable { struct Image: Decodable { let url: URL }; let images: [Image] }
 private struct ErrorEnvelope: Decodable {
     struct Item: Decodable { let message: String?; let context: String? }

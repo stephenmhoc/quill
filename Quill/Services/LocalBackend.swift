@@ -18,6 +18,10 @@ struct LocalBackend: SiteBackend {
         }
     }
 
+    func stats() async throws -> PostStats {
+        await PostStats.counting(try saved().map(\.body))
+    }
+
     func entry(forPost id: String) async throws -> Entry? {
         try saved().first { $0.remotePostID == id }
     }

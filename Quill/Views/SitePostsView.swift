@@ -1,3 +1,4 @@
+import GhostKit
 import SwiftData
 import SwiftUI
 
@@ -29,6 +30,11 @@ struct SitePostsView: View {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .font(.footnote)
                     .foregroundStyle(.red)
+            }
+            if let stats = site?.stats {
+                SiteStatsRow(stats: stats)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
             Section {
                 ForEach(posts) { post in
@@ -66,6 +72,7 @@ struct SitePostsView: View {
         .scrollContentBackground(.hidden)
         .background(Color.paper.ignoresSafeArea())
         .navigationTitle(site?.name ?? "Site")
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { editing = true } label: { Label("Edit Site", systemImage: "slider.horizontal.3") }
@@ -170,6 +177,7 @@ struct SitePostsView: View {
             page = 1
             hasMore = first.count == SitePost.pageSize
             error = nil
+            Task(priority: .utility) { await publisher.refreshStats(of: site) }
         } catch {
             self.error = error.localizedDescription
         }
@@ -187,5 +195,37 @@ struct SitePostsView: View {
             hasMore = false
             self.error = error.localizedDescription
         }
+    }
+}
+
+/// A site's totals, above its posts.
+private struct SiteStatsRow: View {
+    let stats: PostStats
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            figure(stats.posts.formatted(), "Posts")
+            Spacer()
+            figure(stats.words.formatted(), "Words")
+            Spacer()
+            figure(readingTime, "To read")
+        }
+    }
+
+    /// At 200 words a minute.
+    private var readingTime: String {
+        let minutes = max(stats.words / 200, stats.words > 0 ? 1 : 0)
+        return minutes < 60 ? "\(minutes) min" : "\(minutes / 60)h \(minutes % 60)m"
+    }
+
+    private func figure(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.system(.title3, design: .serif).weight(.semibold))
+            Text(label.uppercased())
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

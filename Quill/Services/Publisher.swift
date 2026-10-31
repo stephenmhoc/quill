@@ -11,6 +11,8 @@ final class Publisher {
     private(set) var sending: Set<UUID> = []
     /// Goes up with every post a site accepts, so lists know to reload.
     private(set) var sentCount = 0
+    /// When each site's totals were last fetched.
+    var statsChecked: [UUID: (at: Date, sent: Int)] = [:]
 
     let lock: AppLock
     let context: ModelContext

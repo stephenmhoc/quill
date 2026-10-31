@@ -27,6 +27,8 @@ struct SentPost {
 /// `Publisher.backend(for:)` is the one place that picks an implementation.
 protocol SiteBackend {
     func posts(limit: Int, page: Int) async throws -> [SitePost]
+    /// Totals for everything published, which can mean reading the whole site.
+    func stats() async throws -> PostStats
     /// The entry for a listed post, brought into Quill if needed. Nil if Quill can't edit it safely.
     func entry(forPost id: String) async throws -> Entry?
     /// Updates an unedited copy of a post to match the site.
@@ -61,12 +63,26 @@ extension Publisher {
         try? context.save()
     }
 
-    /// Freshens each site's list after unlocking, one at a time so it stays out of the way.
+    /// Totals walk a whole site, so they wait a minute between runs unless something's been sent.
+    func refreshStats(of site: Site) async {
+        if let last = statsChecked[site.id], last.sent == sentCount, last.at.timeIntervalSinceNow > -60 { return }
+        statsChecked[site.id] = (.now, sentCount)
+        guard let stats = try? await backend(for: site).stats(), site.modelContext != nil, !site.isDeleted,
+              let data = try? JSONEncoder().encode(stats), data != site.cachedStats else { return }
+        site.cachedStats = data
+        try? context.save()
+    }
+
+    /// Freshens each site after unlocking, one at a time so it stays out of the way.
     func preloadPosts() async {
         let sites = (try? context.fetch(FetchDescriptor<Site>())) ?? []
         for site in sites where lock.canWork && !Task.isCancelled {
             guard site.modelContext != nil, !site.isDeleted else { continue }
             _ = try? await loadPosts(of: site)
+        }
+        for site in sites where lock.canWork && !Task.isCancelled {
+            guard site.modelContext != nil, !site.isDeleted else { continue }
+            await refreshStats(of: site)
         }
     }
 

@@ -55,6 +55,7 @@ struct EntryListView: View {
         .scrollContentBackground(.hidden)
         .background(Color.paper.ignoresSafeArea())
         .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             if section == .outbox, !visible.isEmpty {
                 Button("Retry All") { Task { await publisher.retryAll() } }

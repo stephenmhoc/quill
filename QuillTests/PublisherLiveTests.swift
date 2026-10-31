@@ -51,6 +51,27 @@ struct PublisherLiveTests {
         #expect(dead.cachedPostList == cached)
     }
 
+    @Test func statsCountPublishedPostsOnly() async throws {
+        let (publisher, site, client) = harness()
+        try await Task.sleep(for: .seconds(2)) // earlier tests delete their posts in the background
+        let before = try await publisher.backend(for: site).stats()
+        let post = try await client.createPost(OutgoingPost(title: "Stats \(UUID())", html: "<p>Four words right here</p>",
+                                                            status: .published, tags: []))
+        let draft = try await client.createPost(OutgoingPost(title: "Hidden \(UUID())", html: "<p>Not counted</p>",
+                                                             status: .draft, tags: []))
+        defer {
+            Task {
+                try? await client.deletePost(id: post.id)
+                try? await client.deletePost(id: draft.id)
+            }
+        }
+        let after = try await publisher.backend(for: site).stats()
+        #expect(after.posts == before.posts + 1, "\(before) -> \(after)")
+        #expect(after.words == before.words + 4, "\(before) -> \(after)")
+        await publisher.refreshStats(of: site)
+        #expect(site.stats == after)
+    }
+
     @Test func localSiteSavesWithoutAnyServer() async throws {
         let site = Site(name: "Notebook", kind: .local, color: .plum)
         context.insert(site)
@@ -64,6 +85,7 @@ struct PublisherLiveTests {
         #expect(e.remoteURL == nil)
         let listed = try await publisher.backend(for: site).posts(limit: 10, page: 1)
         #expect(listed.map(\.id) == [e.id.uuidString])
+        #expect(try await publisher.backend(for: site).stats().posts == 1)
         try await publisher.deletePost(id: e.id.uuidString, site: site)
         #expect(try await publisher.backend(for: site).posts(limit: 10, page: 1).isEmpty)
     }

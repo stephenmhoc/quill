@@ -27,8 +27,8 @@ struct SidebarView: View {
         .background(Color.paper.ignoresSafeArea())
         .newEntryButton(isShown: !usesColumns, dropTargets: siteFrames.filter { frame in sites.contains { $0.id == frame.key } },
                         dropSite: $dropSite)
-        // The iPad sidebar's toolbar has no room for it.
-        .navigationTitle(usesColumns ? "" : "Quill")
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(10))
@@ -52,31 +52,39 @@ struct SidebarView: View {
     }
 
     @ViewBuilder private var rows: some View {
-        Section {
-            ForEach(sites) { site in
-                link(.site(site.id)) {
-                    Label {
-                        HStack {
-                            Text(site.name)
-                            Spacer()
-                            Image(systemName: site.accessIcon)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+        if usesColumns {
+            Section("Sites") {
+                ForEach(sites) { site in
+                    link(.site(site.id)) {
+                        Label {
+                            HStack {
+                                Text(site.name)
+                                Spacer()
+                                Image(systemName: site.accessIcon)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Circle().fill(site.color.color).frame(width: 10, height: 10)
                         }
-                    } icon: {
-                        Circle().fill(site.color.color).frame(width: 10, height: 10)
                     }
                 }
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { siteFrames[site.id] = $0 }
-                .listRowBackground(dropSite == site.id ? Color.accentColor.opacity(0.25) : Color.card)
+                addSite
             }
-            Button {
-                navigation.showingAddSite = true
-            } label: {
-                Label("Add Site", systemImage: "plus")
+        } else {
+            Section {
+                ForEach(sites) { site in
+                    link(.site(site.id)) { SiteCard(site: site) }
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { siteFrames[site.id] = $0 }
+                        .listRowBackground(cardBackground(site))
+                }
+            } header: {
+                Text(now.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                    .font(.system(.subheadline, design: .monospaced))
+                    .textCase(nil)
+                    .accessibilityIdentifier("homeDate")
             }
-        } header: {
-            Text("Sites")
+            Section { addSite }
         }
 
         // Only when something needs attention.
@@ -94,6 +102,18 @@ struct SidebarView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var addSite: some View {
+        Button {
+            navigation.showingAddSite = true
+        } label: {
+            Label("Add Site", systemImage: "plus")
+        }
+    }
+
+    private func cardBackground(_ site: Site) -> some View {
+        Color.card.overlay(site.color.color.opacity(dropSite == site.id ? 0.4 : 0.12))
     }
 
     private var drafts: Int {
@@ -140,5 +160,35 @@ struct SidebarView: View {
                 Image(systemName: icon)
             }
         }
+    }
+}
+
+/// A site on the iPhone home page, with the latest post from its list.
+private struct SiteCard: View {
+    let site: Site
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Circle().fill(site.color.color).frame(width: 10, height: 10)
+                Text(site.name).font(.headline)
+                Spacer()
+                Image(systemName: site.accessIcon)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let latest = site.cachedPostList.first {
+                Text(latest.title)
+                    .font(.system(.subheadline, design: .serif))
+                    .italic(latest.isUntitled)
+                    .lineLimit(2)
+                if let date = latest.date {
+                    Text(date.formatted(.relative(presentation: .named)).uppercased())
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.vertical, 6)
     }
 }

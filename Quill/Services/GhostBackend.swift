@@ -20,6 +20,10 @@ struct GhostBackend: SiteBackend {
         }
     }
 
+    func stats() async throws -> PostStats {
+        try await client.publishedStats()
+    }
+
     func entry(forPost id: String) async throws -> Entry? {
         let post = try await client.post(id: id)
         guard post.status == .published || post.status == .draft,

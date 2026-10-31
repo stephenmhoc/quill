@@ -24,6 +24,15 @@ struct MicroblogLiveTests {
         return (Publisher(lock: lock, context: context), site, MicropubClient(token: token, destination: blog.uid))
     }
 
+    /// Read-only: walks the real blog without changing it.
+    @Test func statsCoverTheWholeBlog() async throws {
+        let (publisher, site, client) = try await harness()
+        let stats = try await publisher.backend(for: site).stats()
+        #expect(stats.posts > 30, "stopped at the first page")
+        #expect(stats.words > stats.posts)
+        #expect(stats.posts >= (try await client.posts(limit: 30, offset: 0)).filter { $0.status == .published }.count)
+    }
+
     private func draft(_ site: Site, body: String, title: String = "") -> Entry {
         let e = Entry(siteID: site.id)
         e.title = title

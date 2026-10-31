@@ -57,6 +57,19 @@ public struct MicropubClient: Sendable {
         return try decode(ItemsIn.self, from: data).items.map(\.post)
     }
 
+    /// Totals for every published post. Walks the whole blog, so call it sparingly.
+    public func publishedStats() async throws -> PostStats {
+        let pageSize = 100
+        var texts: [String] = []
+        var offset = 0
+        while true {
+            let page = try await posts(limit: pageSize, offset: offset)
+            if page.isEmpty { return await PostStats.counting(texts) }
+            texts += page.filter { $0.status == .published }.map(\.content)
+            offset += page.count
+        }
+    }
+
     public func post(url: String) async throws -> MicropubPost {
         let data = try await get(Self.endpoint, scoped([
             URLQueryItem(name: "q", value: "source"),

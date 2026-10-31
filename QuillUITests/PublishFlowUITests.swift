@@ -96,7 +96,7 @@ final class PublishFlowUITests: XCTestCase {
         allowFaceIDIfAsked()
         XCTAssertTrue(app.buttons["New Entry"].firstMatch.waitForExistence(timeout: 30), "didn't unlock on relaunch")
         if UIDevice.current.userInterfaceIdiom == .phone {
-            XCTAssertTrue(app.staticTexts["Sites"].exists, "iPhone should open on home")
+            XCTAssertTrue(app.staticTexts["homeDate"].exists, "iPhone should open on home")
             XCTAssertFalse(app.textViews["editor"].exists, "iPhone should open on home")
         }
         attach("relaunched", app)
@@ -148,6 +148,8 @@ final class PublishFlowUITests: XCTestCase {
         let row = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 15), "post not listed")
         XCTAssertTrue(app.staticTexts["Private"].exists, "private site shows no lock label")
+        // Totals arrive in the background, with a list already showing.
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'WORDS'")).firstMatch.waitForExistence(timeout: 15), "no stats")
         attach("site-posts", app)
         row.tap()
         let editor = app.textViews["editor"]
@@ -263,7 +265,7 @@ final class PublishFlowUITests: XCTestCase {
             // The button snaps back from anywhere but a site, and starts an entry on one.
             let button = app.buttons["New Entry"].firstMatch
             let corner = button.frame
-            button.press(forDuration: 0.1, thenDragTo: app.staticTexts["Sites"])
+            button.press(forDuration: 0.1, thenDragTo: app.staticTexts["homeDate"])
             try await Task.sleep(for: .seconds(1))
             XCTAssertFalse(editor.exists, "a drag to nowhere opened an entry")
             XCTAssertEqual(button.frame, corner, "the button didn't snap back")
