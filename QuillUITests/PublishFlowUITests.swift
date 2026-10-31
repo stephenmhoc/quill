@@ -249,10 +249,24 @@ final class PublishFlowUITests: XCTestCase {
         // Write on it. Saved stands in for Publish, and it's listed under the site.
         showSidebar(app)
         XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 10))
-        app.buttons["New Entry"].firstMatch.tap()
-        XCTAssertTrue(editor.waitForExistence(timeout: 10))
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Site:'")).firstMatch.tap()
-        app.buttons[name].firstMatch.tap()
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            // The button snaps back from anywhere but a site, and starts an entry on one.
+            let button = app.buttons["New Entry"].firstMatch
+            let corner = button.frame
+            button.press(forDuration: 0.1, thenDragTo: app.staticTexts["Sites"])
+            try await Task.sleep(for: .seconds(1))
+            XCTAssertFalse(editor.exists, "a drag to nowhere opened an entry")
+            XCTAssertEqual(button.frame, corner, "the button didn't snap back")
+            button.press(forDuration: 0.1, thenDragTo: app.staticTexts[name])
+            XCTAssertTrue(editor.waitForExistence(timeout: 10), "dropping on a site opened nothing")
+            let chosen = NSPredicate(format: "label BEGINSWITH 'Site:' AND label CONTAINS %@", name)
+            XCTAssertTrue(app.buttons.matching(chosen).firstMatch.exists, "entry isn't on the dropped site")
+        } else {
+            app.buttons["New Entry"].firstMatch.tap()
+            XCTAssertTrue(editor.waitForExistence(timeout: 10))
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Site:'")).firstMatch.tap()
+            app.buttons[name].firstMatch.tap()
+        }
         let text = "Only on this device \(UUID().uuidString.prefix(8))"
         editor.tap()
         editor.typeText(text)

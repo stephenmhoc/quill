@@ -25,7 +25,7 @@ struct LockView: View {
             Button {
                 Task { await lock.unlock() }
             } label: {
-                Label("Unlock with \(lock.biometryName)", systemImage: "faceid")
+                Label("Unlock with \(lock.biometryName)", systemImage: lock.biometryIcon)
                     .frame(maxWidth: 320)
                     .padding(.vertical, 6)
             }

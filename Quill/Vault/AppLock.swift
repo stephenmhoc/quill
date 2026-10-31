@@ -33,6 +33,15 @@ final class AppLock {
         }
     }()
 
+    var biometryIcon: String {
+        switch biometryName {
+        case "Face ID": "faceid"
+        case "Touch ID": "touchid"
+        case "Optic ID": "opticid"
+        default: "lock"
+        }
+    }
+
     func unlock() async {
         guard !isUnlocked, !isAuthenticating else { return }
         isAuthenticating = true

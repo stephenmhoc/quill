@@ -9,6 +9,9 @@ struct SidebarView: View {
     @Query private var entries: [Entry]
     /// Ticks so a slow send shows up without anything else changing.
     @State private var now = Date.now
+    /// Where each site's row is, so the new entry button can be dropped on one.
+    @State private var siteFrames: [UUID: CGRect] = [:]
+    @State private var dropSite: UUID?
 
     var body: some View {
         @Bindable var navigation = navigation
@@ -22,7 +25,7 @@ struct SidebarView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.paper.ignoresSafeArea())
-        .newEntryButton(isShown: !usesColumns)
+        .newEntryButton(isShown: !usesColumns, dropTargets: siteFrames, dropSite: $dropSite)
         // The iPad sidebar's toolbar has no room for it.
         .navigationTitle(usesColumns ? "" : "Quill")
         .task {
@@ -63,6 +66,9 @@ struct SidebarView: View {
                         Circle().fill(site.color.color).frame(width: 10, height: 10)
                     }
                 }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { siteFrames[site.id] = $0 }
+                .onDisappear { siteFrames[site.id] = nil }
+                .listRowBackground(dropSite == site.id ? Color.accentColor.opacity(0.25) : Color.card)
             }
             Button {
                 navigation.showingAddSite = true
