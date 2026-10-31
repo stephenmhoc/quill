@@ -7,6 +7,7 @@ isolation. See `README.md` for the layout.
 
 ```sh
 xcodegen generate                                # after changing project.yml or adding files
+scripts/test-all.sh                              # everything, before a commit: about 5 minutes
 scripts/test-app.sh                              # app tests, iPhone simulator
 SIM="iPad Pro 13-inch (M5)" scripts/test-app.sh  # app tests, iPad simulator
 scripts/test-app.sh -only-testing:QuillUITests   # one suite
@@ -22,9 +23,15 @@ The test scripts create a fresh Ghost on `docker-server` and delete it afterward
 - End-to-end only, against a real Ghost. Don't add unit tests or mocks.
 - Micro.blog tests use the user's real blog, which cross-posts. They must only create drafts,
   delete what they make, and never tap send in the UI. See `TESTING.md`.
-- Run both iPhone and iPad before committing UI changes; layout code differs between them.
+- Run `scripts/test-all.sh` before committing UI changes; layout code differs between iPhone
+  and iPad. It builds once, runs the live tests once, then the UI tests on both at the same time.
+  While iterating, use `scripts/test-app.sh` with `-only-testing:` for the test at hand.
+- Builds aren't the slow part (a clean build is about 11 seconds); the UI tests are.
+- On iPad, XCTest sometimes waits a minute per step for an animation signal that never comes,
+  with the app idle at 0% CPU. It's a test tool problem. Swizzling the wait crashes the runner.
 - Check the screenshots too, because a passing test can't see a visual regression:
-  `xcrun xcresulttool export attachments --path build/results.xcresult --output-path <dir>`
+  `xcrun xcresulttool export attachments --path build/results-iphone.xcresult --output-path <dir>`
+  (`results-ipad`, `results-live`; `test-app.sh` writes `build/results.xcresult`).
 - Look for `Modifying state during view update` and compiler warnings in the logs. Keep the
   build free of warnings.
 

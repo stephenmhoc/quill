@@ -12,7 +12,7 @@ final class PublishFlowUITests: XCTestCase {
         let key = try XCTUnwrap(env["GHOST_DEV_ADMIN_KEY"])
         continueAfterFailure = false
 
-        let app = XCUIApplication()
+        let app = quillApp()
         app.launch()
         allowFaceIDIfAsked()
 
@@ -114,7 +114,7 @@ final class PublishFlowUITests: XCTestCase {
         let created = try await client.createPost(OutgoingPost(title: title, html: "<p>Written <strong>elsewhere</strong></p>",
                                                                status: .published, tags: []))
 
-        let app = XCUIApplication()
+        let app = quillApp()
         app.launch()
         allowFaceIDIfAsked()
         let ghost = app.buttons["siteKind.ghost"]
@@ -228,7 +228,7 @@ final class PublishFlowUITests: XCTestCase {
     @MainActor
     func testLocalSite() async throws {
         continueAfterFailure = false
-        let app = XCUIApplication()
+        let app = quillApp()
         app.launch()
         allowFaceIDIfAsked()
         let name = "Notebook \(UUID().uuidString.prefix(4))"
@@ -356,7 +356,7 @@ final class PublishFlowUITests: XCTestCase {
         let token = try XCTUnwrap(ProcessInfo.processInfo.environment["MICROBLOG_TOKEN"].flatMap { $0.isEmpty ? nil : $0 },
                                   "needs .dev/microblog.env")
         continueAfterFailure = false
-        let app = XCUIApplication()
+        let app = quillApp()
         app.launch()
         allowFaceIDIfAsked()
         let kind = app.buttons["siteKind.microblog"]
@@ -414,6 +414,14 @@ final class PublishFlowUITests: XCTestCase {
     }
 
     /// Sending a new entry gives no message, it just moves on to a fresh page.
+    /// The app with animations off, which takes minutes off a run.
+    @MainActor
+    private func quillApp() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments.append("-disableAnimations")
+        return app
+    }
+
     @MainActor
     /// Either what's expected on this launch, or home, or iPad's page with the sidebar closed.
     private func waitForUnlock(_ expected: XCUIElement, _ app: XCUIApplication) {

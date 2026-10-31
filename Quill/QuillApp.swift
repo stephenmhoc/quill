@@ -10,6 +10,9 @@ struct QuillApp: App {
     @AppStorage(Appearance.key) private var appearance = Appearance.auto
 
     init() {
+        #if DEBUG
+        if CommandLine.arguments.contains("-disableAnimations") { UIView.setAnimationsEnabled(false) }
+        #endif
         Appearance.alignLargeTitles()
         let container = Self.makeContainer()
         let lock = AppLock()

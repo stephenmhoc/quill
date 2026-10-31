@@ -16,6 +16,7 @@ There are three parts:
 After the one-time setup below:
 
 ```sh
+scripts/test-all.sh                                  # everything, on iPhone and iPad at once
 scripts/test-app.sh                                  # everything, on the iPhone simulator
 SIM="iPad Pro 13-inch (M5)" scripts/test-app.sh      # and on iPad
 scripts/test-ghostkit.sh                             # the API client
