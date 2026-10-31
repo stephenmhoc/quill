@@ -76,7 +76,7 @@ struct EditorView: View {
                 }
                 .tint(.secondary)
                 .opacity(isTyping ? 0.25 : 1)
-                .animation(.easeInOut(duration: 0.4), value: isTyping)
+                .animation(.easeInOut(duration: 0.2), value: isTyping)
             }
         }
         .navigationTitle("")
@@ -107,7 +107,10 @@ struct EditorView: View {
         .task(id: "\(entry.title)\(entry.body)") {
             try? await Task.sleep(for: .seconds(1))
             await saveUntilItWorks()
-            try? await Task.sleep(for: .seconds(1))
+        }
+        // The bars come back as soon as the writing pauses, without waiting on the save.
+        .task(id: entry.body) {
+            try? await Task.sleep(for: .seconds(0.5))
             if !Task.isCancelled { isTyping = false }
         }
         .onChange(of: photoItem) { _, item in
