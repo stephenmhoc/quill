@@ -32,7 +32,7 @@ struct SidebarView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: usesColumns ? .topBarLeading : .topBarTrailing) {
                 Button { navigation.showingSettings = true } label: {
                     Label("Settings", systemImage: "gearshape")
                 }
