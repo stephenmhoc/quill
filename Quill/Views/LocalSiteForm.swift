@@ -9,7 +9,6 @@ struct LocalSiteForm: View {
 
     @Environment(Navigation.self) private var navigation
     @Environment(Publisher.self) private var publisher
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.modelContext) private var context
 
     @State private var name = ""
@@ -38,9 +37,9 @@ struct LocalSiteForm: View {
                 }
             }
         }
-        .safeAreaPadding(.horizontal, isCentered && sizeClass == .regular ? 180 : 0)
+        .siteFormStyle(isCentered: isCentered)
         .navigationTitle(site == nil ? "Local Site" : "Edit Site")
-        .navigationBarTitleDisplayMode(.inline)
+        .compactTitle()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save", action: save).disabled(trimmedName.isEmpty)

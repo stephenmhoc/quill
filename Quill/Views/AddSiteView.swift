@@ -27,9 +27,9 @@ struct AddSiteView: View {
                 .padding(20)
                 .frame(maxWidth: .infinity)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.groupedSurface)
             .navigationTitle(isRequired ? "Welcome to Quill" : "Add Site")
-            .navigationBarTitleDisplayMode(.inline)
+            .compactTitle()
             .toolbar {
                 if !isRequired {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -39,6 +39,7 @@ struct AddSiteView: View {
                 siteForm(kind: kind, site: nil, isCentered: isRequired) { dismiss() }
             }
         }
+        .sheetSize()
     }
 }
 
@@ -66,7 +67,7 @@ private struct SiteKindCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
+        .background(Color.groupedCard, in: RoundedRectangle(cornerRadius: 18))
         .contentShape(RoundedRectangle(cornerRadius: 18))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("siteKind.\(kind.rawValue)")
@@ -95,6 +96,7 @@ struct EditSiteView: View {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 }
         }
+        .sheetSize()
     }
 }
 

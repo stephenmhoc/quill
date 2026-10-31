@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.merimerimeri
   deploymentTarget:
     iOS: "18.0"
+    macOS: "26.0"
   createIntermediateGroups: true
 
 packages:
@@ -64,6 +65,79 @@ targets:
       testTargets:
         - QuillTests
         - QuillUITests
+
+  # Native, not Catalyst. Shares the models, services and site forms, with its own window and editor.
+  QuillMac:
+    type: application
+    platform: macOS
+    sources:
+      - QuillMac
+      - Quill/Models
+      - Quill/Vault
+      - path: Quill/Services
+        excludes:
+          - AppIconChoice.swift
+          - LinkBrowser.swift
+      - Quill/Views/AddSiteView.swift
+      - Quill/Views/EntryListView.swift
+      - Quill/Views/GhostSiteForm.swift
+      - Quill/Views/LocalSiteForm.swift
+      - Quill/Views/LockView.swift
+      - Quill/Views/MicroblogSiteForm.swift
+      - Quill/Views/PlatformStyle.swift
+      - Quill/Views/SitePostsView.swift
+      - Quill/Views/Editor/EditorPieces.swift
+      - Quill/Views/Editor/EntryPreview.swift
+      - Quill/Views/Editor/MarkdownFormat.swift
+      - Quill/Views/Editor/MarkdownStyler.swift
+    dependencies:
+      - package: GhostKit
+    entitlements:
+      path: QuillMac/QuillMac.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.files.user-selected.read-only: true
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.merimerimeri.Quill
+    info:
+      path: QuillMac/Info.plist
+      properties:
+        CFBundleDisplayName: Quill
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: ""
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          # Lets a dev build reach a Ghost on http://localhost; real sites use HTTPS.
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_NAME: Quill
+        PRODUCT_BUNDLE_IDENTIFIER: com.merimerimeri.Quill
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
+        ENABLE_HARDENED_RUNTIME: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+    scheme:
+      testTargets:
+        - QuillMacUITests
+
+  QuillMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - QuillMacUITests
+    dependencies:
+      - target: QuillMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.merimerimeri.QuillMacUITests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: QuillMac
 
   QuillTests:
     type: bundle.unit-test

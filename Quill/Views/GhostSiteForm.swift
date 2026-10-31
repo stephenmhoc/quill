@@ -11,7 +11,6 @@ struct GhostSiteForm: View {
     @Environment(AppLock.self) private var lock
     @Environment(Navigation.self) private var navigation
     @Environment(Publisher.self) private var publisher
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.modelContext) private var context
 
     @State private var name = ""
@@ -32,18 +31,18 @@ struct GhostSiteForm: View {
         Form {
             Section("Site") {
                 TextField("https://journal.example.com", text: $urlText)
-                    .keyboardType(.URL)
+                    .urlKeyboard()
+                    #if os(iOS)
                     .textContentType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    #endif
+                    .literalEntry()
                     .disabled(!isNew)
                     .foregroundStyle(isNew ? .primary : .secondary)
                 TextField("Name (uses the site title if empty)", text: $name)
             }
             Section {
                 SecureField(isNew ? "Staff Access Token or Admin API key" : "Leave blank to keep the current key", text: $key)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    .literalEntry()
                     .textContentType(.password)
             } header: {
                 Text("Key")
@@ -71,9 +70,9 @@ struct GhostSiteForm: View {
                 }
             }
         }
-        .safeAreaPadding(.horizontal, isCentered && sizeClass == .regular ? 180 : 0)
+        .siteFormStyle(isCentered: isCentered)
         .navigationTitle(isNew ? "Ghost Site" : "Edit Site")
-        .navigationBarTitleDisplayMode(.inline)
+        .compactTitle()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 if checking { ProgressView() } else {

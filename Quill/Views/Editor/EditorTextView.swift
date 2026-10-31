@@ -42,7 +42,7 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
         view.setHeader(UIHostingConfiguration { header() }.margins(.all, 0))
         if view.text != text {
             if view.isEditable, view.hasText { view.replaceChanges(with: text) } else { view.text = text }
-            MarkdownStyler.style(view)
+            view.applyMarkdownStyle()
             view.placeholder.isHidden = !text.isEmpty
         }
         // Only a new request from SwiftUI moves the cursor. An older value still on its way back
@@ -81,7 +81,7 @@ final class EditorCoordinator: NSObject, UITextViewDelegate {
         guard !isUpdating else { return }
         text.wrappedValue = view.text
         (view as? PageTextView)?.placeholder.isHidden = !view.text.isEmpty
-        if view.markedTextRange == nil { MarkdownStyler.style(view) }
+        if view.markedTextRange == nil { view.applyMarkdownStyle() }
     }
 
     func textViewDidChangeSelection(_ view: UITextView) {
@@ -100,6 +100,13 @@ final class EditorCoordinator: NSObject, UITextViewDelegate {
             return
         }
         DispatchQueue.main.async { self.isFocused.wrappedValue = focused }
+    }
+}
+
+private extension UITextView {
+    func applyMarkdownStyle() {
+        MarkdownStyler.style(textStorage)
+        typingAttributes = MarkdownStyler.base
     }
 }
 
@@ -182,61 +189,5 @@ final class PageTextView: UITextView {
         let insets = UIEdgeInsets(top: top, left: side, bottom: 40, right: side)
         if textContainerInset != insets { textContainerInset = insets }
         placeholder.frame = CGRect(x: side, y: top, width: width, height: placeholder.font.lineHeight)
-    }
-}
-
-/// Quiet live styling. It only sets attributes: the text is always plain Markdown.
-enum MarkdownStyler {
-    /// Monospaced, because it reads as a draft in progress rather than finished type.
-    static let bodyFont: UIFont = {
-        let size: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 18 : 16
-        return UIFontMetrics(forTextStyle: .body).scaledFont(for: .monospacedSystemFont(ofSize: size, weight: .regular))
-    }()
-
-    static var base: [NSAttributedString.Key: Any] {
-        let paragraph = NSMutableParagraphStyle()
-        // Line height of about 1.5: screens are read from further away than paper.
-        paragraph.lineSpacing = max(0, bodyFont.pointSize * 1.5 - bodyFont.lineHeight)
-        return [.font: bodyFont, .foregroundColor: UIColor.label, .paragraphStyle: paragraph]
-    }
-
-    private static func font(_ traits: UIFontDescriptor.SymbolicTraits) -> UIFont {
-        UIFont(descriptor: bodyFont.fontDescriptor.withSymbolicTraits(traits) ?? bodyFont.fontDescriptor, size: 0)
-    }
-
-    private static let heading = try! NSRegularExpression(pattern: "^#{1,6} .*$", options: .anchorsMatchLines)
-    private static let quote = try! NSRegularExpression(pattern: "^> .*$", options: .anchorsMatchLines)
-    private static let bold = try! NSRegularExpression(pattern: "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1")
-    private static let italic = try! NSRegularExpression(pattern: "(?<![*\\w])([*_])(?=[^\\s*_])(.+?)(?<=[^\\s*_])\\1(?![*\\w])")
-    private static let code = try! NSRegularExpression(pattern: "`[^`\\n]+`")
-    private static let marker = try! NSRegularExpression(pattern: "^(#{1,6} |> |[-+*] |\\d+\\. )", options: .anchorsMatchLines)
-    private static let linkTarget = try! NSRegularExpression(pattern: "(?<=\\])\\([^)\\n]*\\)")
-
-    static func style(_ view: UITextView) {
-        let storage = view.textStorage
-        let all = NSRange(location: 0, length: storage.length)
-        let quiet = UIColor.tertiaryLabel
-        func each(_ pattern: NSRegularExpression, _ body: (NSTextCheckingResult) -> Void) {
-            pattern.enumerateMatches(in: storage.string, range: all) { match, _, _ in if let match { body(match) } }
-        }
-        storage.beginEditing()
-        storage.setAttributes(base, range: all)
-        each(heading) { storage.addAttribute(.font, value: font(.traitBold), range: $0.range) }
-        each(quote) { storage.addAttribute(.foregroundColor, value: UIColor.secondaryLabel, range: $0.range) }
-        each(bold) { match in
-            storage.addAttribute(.font, value: font(.traitBold), range: match.range)
-            storage.addAttribute(.foregroundColor, value: quiet, range: match.range(at: 1))
-            storage.addAttribute(.foregroundColor, value: quiet, range: NSRange(location: NSMaxRange(match.range) - match.range(at: 1).length, length: match.range(at: 1).length))
-        }
-        each(italic) { match in
-            storage.addAttribute(.font, value: font(.traitItalic), range: match.range)
-            storage.addAttribute(.foregroundColor, value: quiet, range: match.range(at: 1))
-            storage.addAttribute(.foregroundColor, value: quiet, range: NSRange(location: NSMaxRange(match.range) - 1, length: 1))
-        }
-        each(code) { storage.addAttribute(.font, value: UIFont.monospacedSystemFont(ofSize: bodyFont.pointSize * 0.9, weight: .regular), range: $0.range) }
-        each(marker) { storage.addAttribute(.foregroundColor, value: quiet, range: $0.range) }
-        each(linkTarget) { storage.addAttribute(.foregroundColor, value: quiet, range: $0.range) }
-        storage.endEditing()
-        view.typingAttributes = base
     }
 }

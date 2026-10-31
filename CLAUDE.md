@@ -1,7 +1,7 @@
 # Quill
 
-SwiftUI and SwiftData app for iPhone and iPad: iOS 18+, Swift 6 with MainActor default
-isolation. See `README.md` for the layout.
+SwiftUI and SwiftData app for iPhone, iPad and Mac: iOS 18+ and macOS 26+, Swift 6 with MainActor
+default isolation. See `README.md` for the layout.
 
 ## Commands
 
@@ -12,6 +12,8 @@ scripts/test-app.sh                              # app tests, iPhone simulator
 SIM="iPad Pro 13-inch (M5)" scripts/test-app.sh  # app tests, iPad simulator
 scripts/test-app.sh -only-testing:QuillUITests   # one suite
 scripts/test-ghostkit.sh                         # API client, on the Mac
+xcodebuild test -project Quill.xcodeproj -scheme QuillMac -destination platform=macOS
+                                                 # Mac app: needs signing and automation mode
 ```
 
 The test scripts create a fresh Ghost on `docker-server` and delete it afterwards. See
@@ -48,6 +50,9 @@ The test scripts create a fresh Ghost on `docker-server` and delete it afterward
   view. Call `Navigation.leaveSite(_:)` before deleting a site's data.
 - **UIKit:** the editor is a `UITextView` because `TextEditor` can't scroll a title with the
   text. Everything else stays SwiftUI unless SwiftUI visibly limits the interface.
+- **Mac:** `QuillMac` is a native target, not Catalyst, listed file by file in `project.yml`. It
+  shares models, services, the vault and site forms, and has its own window, editor (`NSTextView`)
+  and menus. Don't reuse iOS layouts there. Put small differences in `PlatformStyle.swift`.
 - **Writing surface:** it uses the system monospace font. The iA fonts' terms forbid bundling
   them in a text editor.
 

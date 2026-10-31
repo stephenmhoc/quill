@@ -61,6 +61,8 @@ enum TokenStore {
             kSecAttrService as String: service,
             kSecAttrAccount as String: siteID.uuidString,
             kSecAttrSynchronizable as String: false,
+            // The Mac's other keychain ignores access control. iOS only has this one.
+            kSecUseDataProtectionKeychain as String: true,
         ]
     }
 

@@ -2,6 +2,7 @@ import GhostKit
 import SwiftUI
 import WebKit
 
+#if os(iOS)
 /// The entry rendered from its Markdown, before it goes anywhere.
 struct EntryPreview: View {
     let title: String
@@ -11,7 +12,7 @@ struct EntryPreview: View {
 
     var body: some View {
         NavigationStack {
-            PreviewPage(html: page)
+            PreviewPage(html: EntryPage.html(title: title, markdown: markdown, isDark: colorScheme == .dark))
                 .ignoresSafeArea(edges: .bottom)
                 .background(Color.paper.ignoresSafeArea())
                 .navigationTitle("Preview")
@@ -24,10 +25,14 @@ struct EntryPreview: View {
         }
         .opensLinksInChosenBrowser()
     }
+}
+#endif
 
-    private var page: String {
-        // From SwiftUI: the page's own dark mode query doesn't follow the app's Appearance setting.
-        let isDark = colorScheme == .dark
+/// The HTML behind a preview.
+enum EntryPage {
+    /// `isDark` comes from SwiftUI: the page's own dark mode query doesn't follow the app's
+    /// Appearance setting.
+    static func html(title: String, markdown: String, isDark: Bool) -> String {
         let heading = title.isEmpty ? "" : "<h1>\(escaped(title))</h1>"
         return """
         <!doctype html><meta charset="utf-8">
@@ -35,7 +40,7 @@ struct EntryPreview: View {
         <style>
         :root { color-scheme: \(isDark ? "dark" : "light"); --ink: \(isDark ? "#ececec" : "#1a1a1a");
                 --quiet: \(isDark ? "#9a9a9a" : "#6b6b6b"); --rule: \(isDark ? "#3a3a3a" : "#d9d9d4"); }
-        body { margin: 0 auto; padding: 24px 20px 64px; max-width: 680px; background: transparent; color: var(--ink);
+        body { margin: 0 auto; padding: 24px 20px 64px; max-width: 680px; background: \(isDark ? "#1a1a1a" : "#fafaf8"); color: var(--ink);
                font: -apple-system-body; font-family: ui-serif, Georgia, serif; line-height: 1.6; overflow-wrap: anywhere; }
         h1, h2, h3, h4 { line-height: 1.25; }
         a { color: inherit; }
@@ -50,41 +55,61 @@ struct EntryPreview: View {
         """
     }
 
-    private func escaped(_ text: String) -> String {
+    private static func escaped(_ text: String) -> String {
         text.replacing("&", with: "&amp;").replacing("<", with: "&lt;").replacing(">", with: "&gt;")
     }
 }
 
-private struct PreviewPage: UIViewRepresentable {
+#if os(macOS)
+struct PreviewPage: NSViewRepresentable {
     let html: String
 
-    func makeUIView(context: Context) -> WKWebView {
+    func makeNSView(context: Context) -> WKWebView { makeWebView(context.coordinator) }
+    func updateNSView(_ view: WKWebView, context: Context) { update(view, context.coordinator, context.environment) }
+}
+#else
+struct PreviewPage: UIViewRepresentable {
+    let html: String
+
+    func makeUIView(context: Context) -> WKWebView { makeWebView(context.coordinator) }
+    func updateUIView(_ view: WKWebView, context: Context) { update(view, context.coordinator, context.environment) }
+}
+#endif
+
+extension PreviewPage {
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    fileprivate func makeWebView(_ coordinator: Coordinator) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         // Markdown can carry raw HTML. Show it, but don't run it or let it keep anything.
         configuration.defaultWebpagePreferences.allowsContentJavaScript = false
         configuration.websiteDataStore = .nonPersistent()
         configuration.setURLSchemeHandler(LocalImages(), forURLScheme: LocalBackend.imageScheme)
         let view = WKWebView(frame: .zero, configuration: configuration)
-        view.isOpaque = false
-        view.backgroundColor = .clear
-        view.scrollView.backgroundColor = .clear
-        view.navigationDelegate = context.coordinator
+        view.navigationDelegate = coordinator
         return view
     }
 
-    func updateUIView(_ view: WKWebView, context: Context) {
-        context.coordinator.openURL = context.environment.openURL
-        if context.coordinator.html != html {
-            context.coordinator.html = html
+    /// Keeps its place when the page changes, so a live preview doesn't jump to the top.
+    fileprivate func update(_ view: WKWebView, _ coordinator: Coordinator, _ environment: EnvironmentValues) {
+        coordinator.openURL = environment.openURL
+        guard coordinator.html != html else { return }
+        let isFirstLoad = coordinator.html == nil
+        coordinator.html = html
+        if isFirstLoad {
+            view.loadHTMLString(html, baseURL: nil)
+            return
+        }
+        view.evaluateJavaScript("window.scrollY") { offset, _ in
+            coordinator.restoredOffset = offset as? Double
             view.loadHTMLString(html, baseURL: nil)
         }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
     final class Coordinator: NSObject, WKNavigationDelegate {
         var openURL: OpenURLAction?
         var html: String?
+        var restoredOffset: Double?
 
         /// The page stays the preview: links go to the browser.
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
@@ -95,6 +120,12 @@ private struct PreviewPage: UIViewRepresentable {
             }
             openURL?(url)
             decisionHandler(.cancel)
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            guard let offset = restoredOffset else { return }
+            restoredOffset = nil
+            webView.evaluateJavaScript("window.scrollTo(0, \(offset))", completionHandler: nil)
         }
     }
 }

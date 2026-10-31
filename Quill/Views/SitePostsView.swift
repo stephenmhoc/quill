@@ -22,11 +22,72 @@ struct SitePostsView: View {
     @State private var opening: String?
     @State private var pendingDelete: SitePost?
     @State private var unsupported: SitePost?
+    #if os(macOS)
+    @State private var selectedPost: String?
+    #endif
 
     private var site: Site? { sites.first { $0.id == siteID } }
 
     var body: some View {
-        List {
+        posted
+            .overlay {
+                if loading && posts.isEmpty { ProgressView() }
+                else if posts.isEmpty && error == nil && !loading {
+                    ContentUnavailableView("No posts yet", systemImage: "doc.richtext")
+                }
+            }
+            #if os(iOS)
+            .newEntryButton(site: siteID, tint: site?.color.color ?? .accentColor, isShown: !usesColumns)
+            #endif
+            .paperList()
+            .navigationTitle(site?.name ?? "Site")
+            .largeTitle()
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { editing = true } label: { Label("Edit Site", systemImage: "slider.horizontal.3") }
+                }
+            }
+            .sheet(isPresented: $editing) {
+                if let site { EditSiteView(site: site) }
+            }
+            .confirmationDialog(deleteQuestion, isPresented: isConfirmingDelete,
+                                titleVisibility: .visible, presenting: pendingDelete) { post in
+                Button("Delete from \(site?.name ?? "site")", role: .destructive) { Task { await delete(post) } }
+            } message: { _ in
+                Text("This permanently deletes the post. It can't be undone.")
+            }
+            .alert("Quill can't edit this post", isPresented: Binding(get: { unsupported != nil }, set: { if !$0 { unsupported = nil } }),
+                   presenting: unsupported) { post in
+                if let url = post.url { Button("Open in Browser") { openURL(url) } }
+                Button("OK", role: .cancel) {}
+            } message: { _ in
+                Text("It has layouts Markdown can't hold, like galleries or embeds, and saving it here would remove them.")
+            }
+            // Unstructured: SwiftUI cancels view tasks during column transitions and list refreshes.
+            .refreshable { await Task { await load() }.value }
+            .onAppear { if posts.isEmpty, let site { posts = site.cachedPostList } }
+            .task { await Task { await load() }.value }
+            .onChange(of: publisher.sentCount) { Task { await load() } }
+    }
+
+    @ViewBuilder private var posted: some View {
+        #if os(macOS)
+        List(selection: $selectedPost) { rows }
+            .onChange(of: selectedPost) { _, id in
+                if let post = posts.first(where: { $0.id == id }) { Task { await open(post) } }
+            }
+            // A new page isn't the post that's still highlighted.
+            .onChange(of: navigation.selectedEntry) { _, entry in
+                if let post = posts.first(where: { $0.id == selectedPost }), localEntry(for: post) != entry, opening == nil {
+                    selectedPost = nil
+                }
+            }
+        #else
+        List { rows }
+        #endif
+    }
+
+    @ViewBuilder private var rows: some View {
             if let error {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .font(.footnote)
@@ -39,14 +100,14 @@ struct SitePostsView: View {
             }
             Section {
                 ForEach(posts) { post in
-                    Button { Task { await open(post) } } label: { row(post) }
-                        .buttonStyle(.plain)
-                        .listRowBackground(Color.card)
-                        .disabled(opening != nil)
+                    postRow(post)
                         .swipeActions(edge: .trailing) {
                             Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
                         }
                         .contextMenu {
+                            #if os(macOS)
+                            if let url = post.url { Button("Open in Browser", systemImage: "safari") { openURL(url) } }
+                            #endif
                             Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
                         }
                 }
@@ -62,44 +123,18 @@ struct SitePostsView: View {
                     .frame(maxWidth: .infinity)
                     .task(id: page) { await Task { await loadMore() }.value }
             }
-        }
-        .overlay {
-            if loading && posts.isEmpty { ProgressView() }
-            else if posts.isEmpty && error == nil && !loading {
-                ContentUnavailableView("No posts yet", systemImage: "doc.richtext")
-            }
-        }
-        .newEntryButton(site: siteID, tint: site?.color.color ?? .accentColor, isShown: !usesColumns)
-        .scrollContentBackground(.hidden)
-        .background(Color.paper.ignoresSafeArea())
-        .navigationTitle(site?.name ?? "Site")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { editing = true } label: { Label("Edit Site", systemImage: "slider.horizontal.3") }
-            }
-        }
-        .sheet(isPresented: $editing) {
-            if let site { EditSiteView(site: site) }
-        }
-        .confirmationDialog(deleteQuestion, isPresented: isConfirmingDelete,
-                            titleVisibility: .visible, presenting: pendingDelete) { post in
-            Button("Delete from \(site?.name ?? "site")", role: .destructive) { Task { await delete(post) } }
-        } message: { _ in
-            Text("This permanently deletes the post. It can't be undone.")
-        }
-        .alert("Quill can't edit this post", isPresented: Binding(get: { unsupported != nil }, set: { if !$0 { unsupported = nil } }),
-               presenting: unsupported) { post in
-            if let url = post.url { Button("Open in Browser") { openURL(url) } }
-            Button("OK", role: .cancel) {}
-        } message: { _ in
-            Text("It has layouts Markdown can't hold, like galleries or embeds, and saving it here would remove them.")
-        }
-        // Unstructured: SwiftUI cancels view tasks during column transitions and list refreshes.
-        .refreshable { await Task { await load() }.value }
-        .onAppear { if posts.isEmpty, let site { posts = site.cachedPostList } }
-        .task { await Task { await load() }.value }
-        .onChange(of: publisher.sentCount) { Task { await load() } }
+    }
+
+    /// A Mac selects a row; iOS taps a button.
+    @ViewBuilder private func postRow(_ post: SitePost) -> some View {
+        #if os(macOS)
+        row(post).tag(post.id)
+        #else
+        Button { Task { await open(post) } } label: { row(post) }
+            .buttonStyle(.plain)
+            .cardRow()
+            .disabled(opening != nil)
+        #endif
     }
 
     private var deleteQuestion: String { "Delete “\(pendingDelete?.title ?? "")”?" }

@@ -7,6 +7,12 @@ import Observation
 @Observable
 final class AppLock {
     static let graceKey = "lockGraceSeconds"
+    #if os(macOS)
+    /// Switching apps is part of writing on a Mac, so leaving Quill is a gentler signal.
+    static let defaultGrace = 900.0
+    #else
+    static let defaultGrace = 30.0
+    #endif
 
     private(set) var isUnlocked = false
     private(set) var isAuthenticating = false
@@ -29,7 +35,12 @@ final class AppLock {
         case .faceID: return "Face ID"
         case .touchID: return "Touch ID"
         case .opticID: return "Optic ID"
-        default: return "Passcode"
+        default:
+            #if os(macOS)
+            return "Password"
+            #else
+            return "Passcode"
+            #endif
         }
     }()
 
@@ -47,7 +58,9 @@ final class AppLock {
         isAuthenticating = true
         defer { isAuthenticating = false }
         let ctx = LAContext()
+        #if os(iOS)
         ctx.localizedFallbackTitle = "Use Passcode"
+        #endif
         ctx.touchIDAuthenticationAllowableReuseDuration = 10
         do {
             // Biometrics with passcode fallback, so a failed Face ID never locks you out.
@@ -76,11 +89,16 @@ final class AppLock {
         isForeground = false
     }
 
+    /// Another app came forward. Quill keeps working behind it, unlike a backgrounded iPhone app.
+    func didResignActive() {
+        backgroundedAt = .now
+    }
+
     func didBecomeActive() {
         isForeground = true
         guard isUnlocked, let since = backgroundedAt else { return }
         backgroundedAt = nil
-        let grace = UserDefaults.standard.object(forKey: Self.graceKey) as? Double ?? 30
+        let grace = UserDefaults.standard.object(forKey: Self.graceKey) as? Double ?? Self.defaultGrace
         if Date.now.timeIntervalSince(since) > grace { lock() }
     }
 

@@ -12,7 +12,6 @@ struct MicroblogSiteForm: View {
     @Environment(AppLock.self) private var lock
     @Environment(Navigation.self) private var navigation
     @Environment(Publisher.self) private var publisher
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.modelContext) private var context
 
     @State private var name = ""
@@ -33,8 +32,7 @@ struct MicroblogSiteForm: View {
         Form {
             Section {
                 SecureField(isNew ? "App token" : "Leave blank to keep the current token", text: $token)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+                    .literalEntry()
                     .textContentType(.password)
                     .onChange(of: token) { blogs = []; chosenBlog = nil }
             } header: {
@@ -68,9 +66,9 @@ struct MicroblogSiteForm: View {
                 }
             }
         }
-        .safeAreaPadding(.horizontal, isCentered && sizeClass == .regular ? 180 : 0)
+        .siteFormStyle(isCentered: isCentered)
         .navigationTitle(isNew ? "Micro.blog" : "Edit Site")
-        .navigationBarTitleDisplayMode(.inline)
+        .compactTitle()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 if checking { ProgressView() } else {

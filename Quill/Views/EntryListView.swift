@@ -32,14 +32,41 @@ struct EntryListView: View {
     }
 
     var body: some View {
+        list
+            .overlay {
+                if visible.isEmpty { emptyState }
+            }
+            .paperList()
+            .navigationTitle(title)
+            .largeTitle()
+            .toolbar {
+                if section == .outbox, !visible.isEmpty {
+                    Button("Retry All") { Task { await publisher.retryAll() } }
+                }
+            }
+    }
+
+    @ViewBuilder private var list: some View {
+        #if os(macOS)
+        List(selection: Binding(get: { navigation.selectedEntry }, set: { if let entry = $0 { navigation.show(entry) } })) {
+            ForEach(visible) { entry in
+                EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID })
+                    .tag(entry)
+                    .contextMenu {
+                        if entry.state != .sending {
+                            Button("Delete", systemImage: "trash", role: .destructive) { delete(entry) }
+                        }
+                    }
+            }
+        }
+        #else
         List {
             ForEach(visible) { entry in
                 Button { navigation.show(entry) } label: {
                     EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID })
                 }
                 .buttonStyle(.plain)
-                .listRowBackground(entry == navigation.selectedEntry && usesColumns
-                                   ? Color.accentColor.opacity(0.15) : Color.card)
+                .cardRow(isSelected: entry == navigation.selectedEntry && usesColumns)
                 .swipeActions(edge: .trailing) {
                     if entry.state != .sending {
                         Button(role: .destructive) { delete(entry) } label: {
@@ -49,18 +76,7 @@ struct EntryListView: View {
                 }
             }
         }
-        .overlay {
-            if visible.isEmpty { emptyState }
-        }
-        .scrollContentBackground(.hidden)
-        .background(Color.paper.ignoresSafeArea())
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            if section == .outbox, !visible.isEmpty {
-                Button("Retry All") { Task { await publisher.retryAll() } }
-            }
-        }
+        #endif
     }
 
     @ViewBuilder private var emptyState: some View {
