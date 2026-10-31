@@ -25,7 +25,8 @@ struct SidebarView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.paper.ignoresSafeArea())
-        .newEntryButton(isShown: !usesColumns, dropTargets: siteFrames, dropSite: $dropSite)
+        .newEntryButton(isShown: !usesColumns, dropTargets: siteFrames.filter { frame in sites.contains { $0.id == frame.key } },
+                        dropSite: $dropSite)
         // The iPad sidebar's toolbar has no room for it.
         .navigationTitle(usesColumns ? "" : "Quill")
         .task {
@@ -67,7 +68,6 @@ struct SidebarView: View {
                     }
                 }
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { siteFrames[site.id] = $0 }
-                .onDisappear { siteFrames[site.id] = nil }
                 .listRowBackground(dropSite == site.id ? Color.accentColor.opacity(0.25) : Color.card)
             }
             Button {

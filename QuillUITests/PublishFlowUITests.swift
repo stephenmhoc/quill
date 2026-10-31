@@ -94,7 +94,11 @@ final class PublishFlowUITests: XCTestCase {
         app.terminate()
         app.launch()
         allowFaceIDIfAsked()
-        XCTAssertTrue(app.textViews["editor"].waitForExistence(timeout: 30), "didn't unlock on relaunch")
+        XCTAssertTrue(app.buttons["New Entry"].firstMatch.waitForExistence(timeout: 30), "didn't unlock on relaunch")
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            XCTAssertTrue(app.staticTexts["Sites"].exists, "iPhone should open on home")
+            XCTAssertFalse(app.textViews["editor"].exists, "iPhone should open on home")
+        }
         attach("relaunched", app)
     }
 
@@ -115,7 +119,7 @@ final class PublishFlowUITests: XCTestCase {
         allowFaceIDIfAsked()
         let ghost = app.buttons["siteKind.ghost"]
         let editorView = app.textViews["editor"]
-        XCTAssertTrue(ghost.waitForExistence(timeout: 30) || editorView.exists, "didn't unlock")
+        waitForUnlock(ghost, app)
         if ghost.exists {
             ghost.tap()
             let urlField = app.textFields["https://journal.example.com"]
@@ -201,7 +205,7 @@ final class PublishFlowUITests: XCTestCase {
         app.terminate()
         app.launch()
         allowFaceIDIfAsked()
-        XCTAssertTrue(app.textViews["editor"].waitForExistence(timeout: 30))
+        waitForUnlock(app.textViews["editor"], app)
         showSidebar(app)
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.buttons["Dark"].waitForExistence(timeout: 5))
@@ -228,7 +232,7 @@ final class PublishFlowUITests: XCTestCase {
         let name = "Notebook \(UUID().uuidString.prefix(4))"
         let local = app.buttons["siteKind.local"]
         let editor = app.textViews["editor"]
-        XCTAssertTrue(local.waitForExistence(timeout: 30) || editor.exists, "didn't unlock")
+        waitForUnlock(local, app)
         if !local.exists {
             showSidebar(app)
             app.buttons["Add Site"].tap()
@@ -250,6 +254,12 @@ final class PublishFlowUITests: XCTestCase {
         showSidebar(app)
         XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 10))
         if UIDevice.current.userInterfaceIdiom == .phone {
+            // Still draggable after visiting a site's list and coming back.
+            app.cells.containing(.staticText, identifier: name).firstMatch.tap()
+            XCTAssertTrue(app.buttons["Edit Site"].waitForExistence(timeout: 10))
+            showSidebar(app)
+            XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 10))
+
             // The button snaps back from anywhere but a site, and starts an entry on one.
             let button = app.buttons["New Entry"].firstMatch
             let corner = button.frame
@@ -325,7 +335,7 @@ final class PublishFlowUITests: XCTestCase {
         app.terminate()
         app.launch()
         allowFaceIDIfAsked()
-        XCTAssertTrue(editor.waitForExistence(timeout: 30))
+        waitForUnlock(editor, app)
         showSidebar(app)
         app.staticTexts["Drafts"].tap()
         let draft = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", kept)).firstMatch
@@ -349,7 +359,7 @@ final class PublishFlowUITests: XCTestCase {
         allowFaceIDIfAsked()
         let kind = app.buttons["siteKind.microblog"]
         let editor = app.textViews["editor"]
-        XCTAssertTrue(kind.waitForExistence(timeout: 30) || editor.exists, "didn't unlock")
+        waitForUnlock(kind, app)
         if !kind.exists {
             showSidebar(app)
             app.buttons["Add Site"].tap()
@@ -402,6 +412,14 @@ final class PublishFlowUITests: XCTestCase {
     }
 
     /// Sending a new entry gives no message, it just moves on to a fresh page.
+    @MainActor
+    /// Either what's expected on this launch, or home, or iPad's page with the sidebar closed.
+    private func waitForUnlock(_ expected: XCUIElement, _ app: XCUIApplication) {
+        let unlocked = NSPredicate { _, _ in expected.exists || app.buttons["Settings"].exists || app.textViews["editor"].exists }
+        let waited = XCTWaiter.wait(for: [expectation(for: unlocked, evaluatedWith: nil)], timeout: 30)
+        XCTAssertEqual(waited, .completed, "didn't unlock")
+    }
+
     private func waitForBlankPage(_ editor: XCUIElement) {
         let blank = expectation(for: NSPredicate(format: "value == ''"), evaluatedWith: editor)
         XCTAssertEqual(XCTWaiter.wait(for: [blank], timeout: 20), .completed, "no blank page after sending")

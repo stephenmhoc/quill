@@ -63,12 +63,16 @@ struct RootView: View {
                 }
                 .onAppear {
                     repairSidebar()
-                    // Also after setup, when the last site was removed and a new one added.
-                    if !sites.contains(where: { $0.id == navigation.selectedEntry?.siteID }) {
-                        navigation.openBlankEntry(in: context, focus: sizeClass != .regular)
+                    // iPhone opens on home. iPad's detail column always has a page in it.
+                    if sizeClass == .regular, !sites.contains(where: { $0.id == navigation.selectedEntry?.siteID }) {
+                        navigation.openBlankEntry(in: context, focus: false)
                     }
                 }
             }
+        }
+        // Setting up the first site goes straight to writing on it.
+        .onChange(of: sites.isEmpty) { _, isEmpty in
+            if !isEmpty { navigation.openBlankEntry(in: context, focus: sizeClass != .regular) }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
