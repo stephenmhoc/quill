@@ -65,4 +65,28 @@ final class MacWritingUITests: XCTestCase {
         sleep(1)
         attach("settings", app)
     }
+
+    /// A replacement key has to be pasteable into a site that already exists.
+    @MainActor func testPasteANewKeyIntoAnExistingSite() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-skipUnlock", "-seedGhostSite"]
+        app.launch()
+        app.activate()
+
+        let site = app.staticTexts.matching(NSPredicate(format: "value == 'Key Test' OR label == 'Key Test'")).firstMatch
+        XCTAssertTrue(site.waitForExistence(timeout: 10))
+        site.click()
+        let edit = app.buttons["Edit Site"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        edit.click()
+
+        let key = app.secureTextFields.firstMatch
+        XCTAssertTrue(key.waitForExistence(timeout: 5), "no key field")
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("abc123:def456\n", forType: .string)
+        app.buttons["Paste"].click()
+        sleep(1)
+        attach("edit-site", app)
+        XCTAssertEqual((key.value as? String)?.count, "abc123:def456".count, "paste didn't reach the key field")
+    }
 }

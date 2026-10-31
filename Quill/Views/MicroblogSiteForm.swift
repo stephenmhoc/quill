@@ -24,6 +24,7 @@ struct MicroblogSiteForm: View {
     @State private var confirmingDelete = false
 
     private var isNew: Bool { site == nil }
+    private var tokenPrompt: String { isNew ? "App token" : "New token, or leave blank to keep the current one" }
     private var canSave: Bool {
         (!isNew || !token.isEmpty) && !checking && (blogs.count < 2 || chosenBlog != nil)
     }
@@ -31,9 +32,7 @@ struct MicroblogSiteForm: View {
     var body: some View {
         Form {
             Section {
-                SecureField(isNew ? "App token" : "Leave blank to keep the current token", text: $token)
-                    .literalEntry()
-                    .textContentType(.password)
+                SecretField(prompt: tokenPrompt, text: $token)
                     .onChange(of: token) { blogs = []; chosenBlog = nil }
             } header: {
                 Text("Token")
@@ -50,7 +49,8 @@ struct MicroblogSiteForm: View {
                 }
             }
             Section {
-                TextField("Name (uses the blog's title if empty)", text: $name)
+                TextField("Name (uses the blog's title if empty)", text: $name, prompt: fieldPrompt("Name (uses the blog's title if empty)"))
+                    .promptedField()
             } footer: {
                 Text("Micro.blog sites are public, so publishing always asks for confirmation. Published posts also go to anywhere your blog cross-posts to.")
             }

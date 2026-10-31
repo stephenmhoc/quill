@@ -31,6 +31,8 @@ The test scripts create a fresh Ghost on `docker-server` and delete it afterward
 - Builds aren't the slow part (a clean build is about 11 seconds); the UI tests are.
 - On iPad, XCTest sometimes waits a minute per step for an animation signal that never comes,
   with the app idle at 0% CPU. It's a test tool problem. Swizzling the wait crashes the runner.
+  Once it starts it can repeat every run: `xcrun simctl shutdown` the simulator and rerun, twice
+  if the first run fails to unlock, because Face ID enrolment races a fresh boot.
 - Check the screenshots too, because a passing test can't see a visual regression:
   `xcrun xcresulttool export attachments --path build/results-iphone.xcresult --output-path <dir>`
   (`results-ipad`, `results-live`; `test-app.sh` writes `build/results.xcresult`).

@@ -23,6 +23,7 @@ struct GhostSiteForm: View {
     @State private var confirmingDelete = false
 
     private var isNew: Bool { site == nil }
+    private var keyPrompt: String { isNew ? "Staff Access Token or Admin API key" : "New key, or leave blank to keep the current one" }
     private var canSave: Bool {
         !urlText.trimmingCharacters(in: .whitespaces).isEmpty && (!isNew || !key.isEmpty) && !checking
     }
@@ -30,7 +31,8 @@ struct GhostSiteForm: View {
     var body: some View {
         Form {
             Section("Site") {
-                TextField("https://journal.example.com", text: $urlText)
+                TextField("https://journal.example.com", text: $urlText, prompt: fieldPrompt("https://journal.example.com"))
+                    .promptedField()
                     .urlKeyboard()
                     #if os(iOS)
                     .textContentType(.URL)
@@ -38,12 +40,11 @@ struct GhostSiteForm: View {
                     .literalEntry()
                     .disabled(!isNew)
                     .foregroundStyle(isNew ? .primary : .secondary)
-                TextField("Name (uses the site title if empty)", text: $name)
+                TextField("Name (uses the site title if empty)", text: $name, prompt: fieldPrompt("Name (uses the site title if empty)"))
+                    .promptedField()
             }
             Section {
-                SecureField(isNew ? "Staff Access Token or Admin API key" : "Leave blank to keep the current key", text: $key)
-                    .literalEntry()
-                    .textContentType(.password)
+                SecretField(prompt: keyPrompt, text: $key)
             } header: {
                 Text("Key")
             } footer: {

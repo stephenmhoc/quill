@@ -21,7 +21,8 @@ struct LocalSiteForm: View {
     var body: some View {
         Form {
             Section {
-                TextField("Name", text: $name)
+                TextField("Name", text: $name, prompt: fieldPrompt("Name"))
+                    .promptedField()
             } footer: {
                 Text("Entries on a local site stay on this device and are never sent anywhere.")
             }

@@ -152,6 +152,21 @@ final class PublishFlowUITests: XCTestCase {
         // Totals arrive in the background, with a list already showing.
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'WORDS'")).firstMatch.waitForExistence(timeout: 15), "no stats")
         attach("site-posts", app)
+
+        // A new key can be pasted over a site's saved one, and it saves.
+        UIPasteboard.general.string = key
+        app.buttons["Edit Site"].firstMatch.tap()
+        let newKey = app.secureTextFields.firstMatch
+        XCTAssertTrue(newKey.waitForExistence(timeout: 5), "no key field on an existing site")
+        XCTAssertTrue(app.buttons["Paste"].waitForExistence(timeout: 5), "no Paste button")
+        app.buttons["Paste"].tap()
+        XCTAssertEqual((newKey.value as? String)?.count, key.count, "paste didn't reach the key field")
+        attach("edit-site-key", app)
+        app.buttons["Save"].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "saving a pasted key failed")
+        XCTAssertFalse(XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Save"].waitForExistence(timeout: 2),
+                       "iOS offered to save the key to Passwords")
+        XCTAssertFalse(app.secureTextFields.firstMatch.exists, "edit form stayed open")
         row.tap()
         let editor = app.textViews["editor"]
         XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 15), "post didn't open")

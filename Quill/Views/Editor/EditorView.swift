@@ -3,15 +3,6 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 
-/// The word doesn't fit beside everything else in the iPhone's publish bar.
-private struct PublicLabelStyle: LabelStyle {
-    let showsTitle: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        if showsTitle { Label { configuration.title } icon: { configuration.icon } } else { configuration.icon }
-    }
-}
-
 struct EditorView: View {
     @Bindable var entry: Entry
 
@@ -210,14 +201,6 @@ struct EditorView: View {
             .accessibilityAddTraits(showsTitle ? .isSelected : [])
 
             Spacer()
-
-            if site?.isPublic == true {
-                Label("PUBLIC", systemImage: "globe")
-                    .labelStyle(PublicLabelStyle(showsTitle: usesColumns))
-                    .accessibilityLabel("Public")
-                    .font(.system(.caption2, design: .monospaced).weight(.bold))
-                    .foregroundStyle(.secondary)
-            }
 
             Button("Preview") { showingPreview = true }
                 .disabled(entry.isBlank)
