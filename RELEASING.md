@@ -45,3 +45,13 @@ The tag sets the version and the run number sets the build number.
 
 GitHub only builds and publishes. All testing is local, so run the suites from `TESTING.md` on
 iPhone and iPad before tagging.
+
+## Mac
+
+The Mac app ships outside the App Store: a notarized DMG on GitHub, then updates through Sparkle.
+
+Push a `v<version>-mac` tag, for example `v0.1.2-mac`. `release-mac.yml` builds and notarizes the app, publishes the DMG and the update ZIP, and finally replaces the feed on the `appcast` release. iOS tags are unaffected. To write the update dialog's notes, run the workflow by hand with `release_notes` instead.
+
+The update key's public half is `SUPublicEDKey` in `project.yml`. The private half is the `SPARKLE_PRIVATE_KEY` secret, and in the login Keychain under the account `quill`. Losing it means installed copies can't update.
+
+The Developer ID profile is created once, as "Quill Developer ID", and reused. Replacing the Developer ID certificate means deleting that profile so the next release makes a new one.
