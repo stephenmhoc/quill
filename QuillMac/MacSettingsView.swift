@@ -26,6 +26,9 @@ private struct GeneralPane: View {
                 Text("Last used").tag("")
                 ForEach(sites) { Text($0.name).tag($0.id.uuidString) }
             }
+            Toggle("Check for updates automatically", isOn: Binding(
+                get: { Updates.checksAutomatically }, set: { Updates.checksAutomatically = $0 }
+            ))
         }
         .padding(20)
     }

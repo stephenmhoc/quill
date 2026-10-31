@@ -73,6 +73,10 @@ struct MacCommands: Commands {
     @FocusedValue(\.editorActions) private var editor
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") { Updates.check() }
+                .disabled(!Updates.canCheck)
+        }
         SidebarCommands()
         TextEditingCommands()
         // Nothing to print, and Page Setup would take ⇧⌘P from the preview.

@@ -258,6 +258,49 @@ def prepare
   )
 end
 
+# The Mac app's Keychain access group needs a profile even outside the App Store. Unlike the iOS
+# assets this one stays: it's tied to the long-lived Developer ID certificate.
+def developer_id_profile
+  client = AppStoreConnectClient.new
+  temp_dir = env_fetch("RUNNER_TEMP")
+  name = "Quill Developer ID"
+  output_path = File.join(temp_dir, "mac.provisionprofile")
+
+  query = URI.encode_www_form("filter[name]" => name, "filter[profileState]" => "ACTIVE", "limit" => 200)
+  profile = client.get("/v1/profiles?#{query}").fetch("data").find do |candidate|
+    candidate.fetch("attributes").fetch("name") == name
+  end
+
+  unless profile
+    bundle_id = find_or_create_bundle_id(client, identifier: env_fetch("IOS_BUNDLE_ID"), name: "Quill")
+    serial = OpenSSL::PKCS12.new(
+      File.binread(env_fetch("DEVELOPER_ID_CERT_PATH")), env_fetch("DEVELOPER_ID_CERT_PASSWORD")
+    ).certificate.serial.to_s(16).upcase
+    query = URI.encode_www_form("filter[certificateType]" => "DEVELOPER_ID_APPLICATION", "limit" => 200)
+    certificate = client.get("/v1/certificates?#{query}").fetch("data").find do |candidate|
+      candidate.fetch("attributes").fetch("serialNumber").upcase.sub(/\A0+/, "") == serial.sub(/\A0+/, "")
+    end
+    abort "The Developer ID certificate isn't visible to this API key." unless certificate
+
+    profile = client.post(
+      "/v1/profiles",
+      {
+        data: {
+          type: "profiles",
+          attributes: { name: name, profileType: "MAC_APP_DIRECT" },
+          relationships: {
+            bundleId: { data: { type: "bundleIds", id: bundle_id } },
+            certificates: { data: [{ type: "certificates", id: certificate.fetch("id") }] }
+          }
+        }
+      }
+    ).fetch("data")
+  end
+
+  File.binwrite(output_path, Base64.decode64(profile.fetch("attributes").fetch("profileContent")))
+  append_env("MAC_PROVISIONING_PROFILE_PATH" => output_path)
+end
+
 # Apple checks the signature while processing, so the certificate has to outlive this.
 def wait_for_processing
   bundle_identifier = env_fetch("IOS_BUNDLE_ID")
@@ -317,11 +360,13 @@ end
 case ARGV.fetch(0, "prepare")
 when "prepare"
   prepare
+when "developer-id-profile"
+  developer_id_profile
 when "wait"
   wait_for_processing
 when "cleanup"
   cleanup
 else
-  warn "Usage: #{File.basename($PROGRAM_NAME)} [prepare|wait|cleanup]"
+  warn "Usage: #{File.basename($PROGRAM_NAME)} [prepare|developer-id-profile|wait|cleanup]"
   exit 1
 end

@@ -1,0 +1,209 @@
+name: Release Mac App
+
+on:
+  push:
+    tags:
+      - 'v*-mac'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (for example, 1.0.0)'
+        required: true
+      release_notes:
+        description: 'HTML shown in the update dialog'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-mac-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SCHEME: QuillMac
+  CONFIGURATION: Release
+  ARCHIVE_PATH: build/Quill.xcarchive
+  EXPORT_PATH: build/export
+  KEYCHAIN_NAME: build.keychain-db
+  KEYCHAIN_PASSWORD: temporary-ci-password
+  APPLE_TEAM_ID: 8G4H6268W7
+  IOS_BUNDLE_ID: com.merimerimeri.Quill
+  MINIMUM_MACOS: '26.0'
+
+jobs:
+  release:
+    name: Build, Notarize, and Publish
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute Version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          VERSION="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"
+          VERSION="${VERSION%-mac}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      - name: Install App Store Connect API Key
+        env:
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo "$ASC_API_KEY_P8_BASE64" | base64 --decode -o ~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
+          echo "ASC_API_KEY_PATH=$HOME/.private_keys/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
+
+      - name: Install Developer ID Certificate
+        env:
+          DEVELOPER_ID_CERT_BASE64: ${{ secrets.DEVELOPER_ID_CERT_BASE64 }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          CERT="$RUNNER_TEMP/developer-id.p12"
+          echo "$DEVELOPER_ID_CERT_BASE64" | base64 --decode -o "$CERT"
+          echo "DEVELOPER_ID_CERT_PATH=$CERT" >> "$GITHUB_ENV"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_NAME"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          security import "$CERT" -P "$DEVELOPER_ID_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_NAME"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          security list-keychains -d user -s "$KEYCHAIN_NAME" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$KEYCHAIN_NAME"
+          security find-identity -v -p codesigning "$KEYCHAIN_NAME"
+
+      - name: Install Developer ID Provisioning Profile
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          ruby Tools/app_store_connect_signing.rb developer-id-profile
+          PROFILE="$RUNNER_TEMP/mac.provisionprofile"
+          PLIST=$(security cms -D -i "$PROFILE")
+          UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< "$PLIST")
+          NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< "$PLIST")
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.provisionprofile"
+          echo "MAC_PROFILE_NAME=$NAME" >> "$GITHUB_ENV"
+
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project Quill.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -destination 'generic/platform=macOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/packages" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$MAC_PROFILE_NAME" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+
+      - name: Export
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>developer-id</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Developer ID Application</string>
+            <key>provisioningProfiles</key>
+            <dict><key>$IOS_BUNDLE_ID</key><string>$MAC_PROFILE_NAME</string></dict>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$EXPORT_PATH"
+
+      - name: Notarize App
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          ditto -c -k --keepParent "$EXPORT_PATH/Quill.app" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --key "$ASC_API_KEY_PATH" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --wait
+          xcrun stapler staple "$EXPORT_PATH/Quill.app"
+
+      - name: Create and Notarize DMG
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/dmg"
+          cp -R "$EXPORT_PATH/Quill.app" "$RUNNER_TEMP/dmg/Quill.app"
+          ln -s /Applications "$RUNNER_TEMP/dmg/Applications"
+          hdiutil create -volname Quill -srcfolder "$RUNNER_TEMP/dmg" -ov -format UDZO build/Quill.dmg
+          codesign --sign "Developer ID Application" --timestamp build/Quill.dmg
+          xcrun notarytool submit build/Quill.dmg \
+            --key "$ASC_API_KEY_PATH" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --wait
+          xcrun stapler staple build/Quill.dmg
+
+      - name: Sign Update and Write Appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          RELEASE_NOTES_HTML: ${{ github.event.inputs.release_notes }}
+          REPO: ${{ github.repository }}
+        run: |
+          ZIP="build/Quill-$VERSION.zip"
+          ditto -c -k --keepParent "$EXPORT_PATH/Quill.app" "$ZIP"
+          SIGN_UPDATE=$(find "$RUNNER_TEMP/packages" -name sign_update -type f | head -1)
+          SIGNATURE=$(echo "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" --ed-key-file - -p "$ZIP")
+          NOTES="${RELEASE_NOTES_HTML:-<p>Bug fixes and improvements.</p>}"
+          cat > build/appcast.xml <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+            <channel>
+              <title>Quill</title>
+              <item>
+                <title>Version $VERSION</title>
+                <sparkle:version>$BUILD_NUMBER</sparkle:version>
+                <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>$MINIMUM_MACOS</sparkle:minimumSystemVersion>
+                <description><![CDATA[$NOTES]]></description>
+                <pubDate>$(date -u +"%a, %d %b %Y %H:%M:%S +0000")</pubDate>
+                <enclosure url="https://github.com/$REPO/releases/download/v$VERSION-mac/Quill-$VERSION.zip"
+                           sparkle:edSignature="$SIGNATURE" length="$(stat -f%z "$ZIP")"
+                           type="application/octet-stream" />
+              </item>
+            </channel>
+          </rss>
+          EOF
+          xmllint --noout build/appcast.xml
+
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "v$VERSION-mac" >/dev/null 2>&1 || gh release create "v$VERSION-mac" \
+            --title "Quill for Mac $VERSION" --notes "Download Quill.dmg and drag Quill to Applications." --latest=false
+          gh release upload "v$VERSION-mac" build/Quill.dmg "build/Quill-$VERSION.zip" --clobber
+
+      # Last, so the feed never points at files that aren't there. A release of its own, so that
+      # the iOS releases can't take the feed's URL over.
+      - name: Publish Appcast
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view appcast >/dev/null 2>&1 || gh release create appcast \
+            --title "Update feed" --notes "Quill for Mac's update feed. Not a version of Quill." --prerelease --latest=false
+          gh release upload appcast build/appcast.xml --clobber
+
+      - name: Cleanup
+        if: always()
+        run: |
+          security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/developer-id.p12" ~/.private_keys/AuthKey_*.p8

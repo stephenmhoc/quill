@@ -9,6 +9,9 @@ options:
 packages:
   GhostKit:
     path: Packages/GhostKit
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.7.0
 
 settings:
   base:
@@ -92,12 +95,17 @@ targets:
       - Quill/Views/Editor/MarkdownStyler.swift
     dependencies:
       - package: GhostKit
+      - package: Sparkle
     entitlements:
       path: QuillMac/QuillMac.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
         com.apple.security.files.user-selected.read-only: true
+        # Lets Sparkle's installer run from inside the sandbox.
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spks
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
         keychain-access-groups:
           - $(AppIdentifierPrefix)com.merimerimeri.Quill
     info:
@@ -107,6 +115,10 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.productivity
+        SUFeedURL: https://github.com/stephenmhoc/quill/releases/download/appcast/appcast.xml
+        SUPublicEDKey: SPARKLE_PUBLIC_KEY_PLACEHOLDER
+        SUEnableInstallerLauncherService: true
+        SUEnableAutomaticChecks: true
         NSHumanReadableCopyright: ""
         ITSAppUsesNonExemptEncryption: false
         NSAppTransportSecurity:
