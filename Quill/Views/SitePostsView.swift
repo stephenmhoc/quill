@@ -10,6 +10,7 @@ struct SitePostsView: View {
     @Environment(Publisher.self) private var publisher
     @Environment(\.openURL) private var openURL
     @Environment(\.modelContext) private var context
+    @Environment(\.usesColumns) private var usesColumns
     @Query private var sites: [Site]
     @Query private var entries: [Entry]
     @State private var posts: [SitePost] = []
@@ -68,7 +69,7 @@ struct SitePostsView: View {
                 ContentUnavailableView("No posts yet", systemImage: "doc.richtext")
             }
         }
-        .newEntryButton(site: siteID, tint: site?.color.color ?? .accentColor)
+        .newEntryButton(site: siteID, tint: site?.color.color ?? .accentColor, isShown: !usesColumns)
         .scrollContentBackground(.hidden)
         .background(Color.paper.ignoresSafeArea())
         .navigationTitle(site?.name ?? "Site")

@@ -35,6 +35,7 @@ private struct NewEntryButton: ViewModifier {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("New Entry")
+                    .accessibilityIdentifier("floatingNewEntry")
                     .scaleEffect(offset == .zero ? 1 : 1.12)
                     .offset(offset)
                     .highPriorityGesture(dropTargets.isEmpty ? nil : drag)

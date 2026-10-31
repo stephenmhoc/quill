@@ -79,7 +79,7 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Kept draft"].waitForExistence(timeout: 5))
         attach("drafts", app)
         showSidebar(app)
-        XCTAssertTrue(app.buttons["New Entry"].waitForExistence(timeout: 5), "back didn't return home")
+        XCTAssertTrue(app.buttons["Settings"].waitForExistence(timeout: 5), "back didn't return home")
         app.buttons["New Entry"].firstMatch.tap()
         XCTAssertTrue(app.textViews["editor"].waitForExistence(timeout: 5))
 
@@ -94,7 +94,7 @@ final class PublishFlowUITests: XCTestCase {
         app.terminate()
         app.launch()
         allowFaceIDIfAsked()
-        XCTAssertTrue(app.buttons["New Entry"].firstMatch.waitForExistence(timeout: 30), "didn't unlock on relaunch")
+        waitForUnlock(app.textViews["editor"], app)
         if UIDevice.current.userInterfaceIdiom == .phone {
             XCTAssertTrue(app.staticTexts["homeDate"].exists, "iPhone should open on home")
             XCTAssertFalse(app.textViews["editor"].exists, "iPhone should open on home")
@@ -316,7 +316,7 @@ final class PublishFlowUITests: XCTestCase {
 
         // Formatting can be undone, and an unticked title survives a relaunch.
         showSidebar(app)
-        app.buttons["New Entry"].firstMatch.tap() // iPad's empty detail column has one too
+        app.buttons["New Entry"].firstMatch.tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 10))
         let kept = "Kept across a relaunch \(UUID().uuidString.prefix(8))"
         editor.tap()
@@ -390,10 +390,20 @@ final class PublishFlowUITests: XCTestCase {
 
         // New Entry on a site's list writes to that site.
         // Writing here publishes on one tap, so stop short of sending.
-        app.buttons.matching(NSPredicate(format: "label == 'New Entry'")).allElementsBoundByIndex.last?.tap()
-        XCTAssertTrue(editor.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Site:' AND label CONTAINS %@", name)).firstMatch.exists,
-                      "new entry isn't on the site whose list it came from")
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            app.buttons["New Entry"].firstMatch.tap()
+            XCTAssertTrue(editor.waitForExistence(timeout: 10))
+            XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Site:' AND label CONTAINS %@", name)).firstMatch.exists,
+                          "new entry isn't on the site whose list it came from")
+        } else {
+            // The page is always open on iPad, so the list has no button.
+            XCTAssertFalse(app.buttons["floatingNewEntry"].exists, "iPad shouldn't float a button")
+            showSidebar(app)
+            app.buttons["New Entry"].firstMatch.tap()
+            XCTAssertTrue(editor.waitForExistence(timeout: 10))
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Site:'")).firstMatch.tap()
+            app.buttons[name].firstMatch.tap()
+        }
         editor.tap()
         editor.typeText("Never sent")
         XCTAssertEqual(app.buttons["sendButton"].label, "Publish")

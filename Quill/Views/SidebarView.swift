@@ -3,8 +3,8 @@ import SwiftUI
 
 struct SidebarView: View {
     @Environment(Navigation.self) private var navigation
-    @Environment(\.modelContext) private var context
     @Environment(\.usesColumns) private var usesColumns
+    @Environment(\.modelContext) private var context
     @Query(sort: \Site.createdAt) private var sites: [Site]
     @Query private var entries: [Entry]
     /// Ticks so a slow send shows up without anything else changing.
@@ -35,8 +35,18 @@ struct SidebarView: View {
                 now = .now
             }
         }
+        // The system's toggle sits on the right of an open sidebar, where Settings goes. It's still
+        // the way back once the sidebar is closed.
+        .toolbar(removing: navigation.columnVisibility == .all ? .sidebarToggle : nil)
         .toolbar {
-            ToolbarItem(placement: usesColumns ? .topBarLeading : .topBarTrailing) {
+            if usesColumns {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { withAnimation { navigation.columnVisibility = .doubleColumn } } label: {
+                        Label("Hide Sidebar", systemImage: "sidebar.left")
+                    }
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button { navigation.showingSettings = true } label: {
                     Label("Settings", systemImage: "gearshape")
                 }
