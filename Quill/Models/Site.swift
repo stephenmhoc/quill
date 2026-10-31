@@ -28,7 +28,7 @@ enum SiteKind: String, CaseIterable, Identifiable {
         switch self {
         case .ghost: "network"
         case .microblog: "at"
-        case .local: "iphone"
+        case .local: localDeviceIcon
         }
     }
     /// The send button for a new entry, and for an update.
@@ -107,7 +107,15 @@ final class Site {
 
     /// Who can read this site, in words and as a symbol.
     var accessLabel: String { kind == .local ? "On this device" : isPublic ? "Public" : "Private" }
-    var accessIcon: String { kind == .local ? "iphone" : isPublic ? "globe" : "lock" }
+    var accessIcon: String { kind == .local ? localDeviceIcon : isPublic ? "globe" : "lock" }
+}
+
+nonisolated private var localDeviceIcon: String {
+    #if os(macOS)
+    "desktopcomputer"
+    #else
+    "iphone"
+    #endif
 }
 
 enum SiteColor: String, CaseIterable, Identifiable {

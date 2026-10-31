@@ -71,6 +71,8 @@ struct MacCommands: Commands {
     var body: some Commands {
         SidebarCommands()
         TextEditingCommands()
+        // Nothing to print, and Page Setup would take ⇧⌘P from the preview.
+        CommandGroup(replacing: .printItem) {}
         CommandGroup(replacing: .newItem) {
             Button("New Entry") { navigation.openBlankEntry(in: context) }
                 .keyboardShortcut("n")

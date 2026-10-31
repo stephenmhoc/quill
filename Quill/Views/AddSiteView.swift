@@ -36,7 +36,8 @@ struct AddSiteView: View {
                 }
             }
             .navigationDestination(for: SiteKind.self) { kind in
-                siteForm(kind: kind, site: nil, isCentered: isRequired) { dismiss() }
+                // First run replaces this view by itself. On a Mac, dismissing would close the window.
+                siteForm(kind: kind, site: nil, isCentered: isRequired) { if !isRequired { dismiss() } }
             }
         }
         .sheetSize()

@@ -77,10 +77,17 @@ final class MacEditorCoordinator: NSObject, NSTextViewDelegate {
     func textDidChange(_ notification: Notification) {
         guard !isUpdating, let view = notification.object as? NSTextView else { return }
         text.wrappedValue = view.string
-        if !view.hasMarkedText() {
-            MarkdownStyler.style(view.textStorage!)
-            view.typingAttributes = MarkdownStyler.base
+        if view.undoManager?.isUndoing == true || view.undoManager?.isRedoing == true {
+            // AppKit puts the old attributes back after this, so style once it's finished.
+            DispatchQueue.main.async { self.style(view) }
+        } else if !view.hasMarkedText() {
+            style(view)
         }
+    }
+
+    private func style(_ view: NSTextView) {
+        MarkdownStyler.style(view.textStorage!)
+        view.typingAttributes = MarkdownStyler.base
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
