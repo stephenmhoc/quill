@@ -148,7 +148,7 @@ struct MicroblogLiveTests {
 
     @Test func imagesUploadAndCanBeRemoved() async throws {
         let (publisher, site, client) = try await harness()
-        let jpeg = try #require(UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).jpegData(withCompressionQuality: 0.5) { $0.fill(.init(x: 0, y: 0, width: 8, height: 8)) })
+        let jpeg = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).jpegData(withCompressionQuality: 0.5) { $0.fill(.init(x: 0, y: 0, width: 8, height: 8)) }
         let url = try await publisher.backend(for: site).uploadImage(jpeg, filename: "quill-test-\(UUID().uuidString).jpg")
         #expect(url.path().contains("quill-test-"))
         try await client.deleteImage(url: url)

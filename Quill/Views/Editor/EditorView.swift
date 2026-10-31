@@ -13,7 +13,6 @@ struct EditorView: View {
     @Query(sort: \Site.createdAt) private var sites: [Site]
 
     @State private var selection: TextSelection?
-    @State private var confirmingPublic = false
     @State private var showingTags = false
     @State private var photoItem: PhotosPickerItem?
     @State private var uploading = false
@@ -74,11 +73,6 @@ struct EditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
         .sheet(isPresented: $showingTags) { TagEditor(entry: entry, site: site) }
-        .confirmationDialog("Publish to \(site?.name ?? "")?", isPresented: $confirmingPublic, titleVisibility: .visible) {
-            Button("Publish publicly") { send() }
-        } message: {
-            Text("\(site?.host ?? "This site") is a public site.")
-        }
         .confirmationDialog("Upload image to \(site?.name ?? "")?", isPresented: Binding(
             get: { pendingPublicPhoto != nil }, set: { if !$0 { pendingPublicPhoto = nil; photoItem = nil } }
         ), titleVisibility: .visible) {
@@ -209,7 +203,7 @@ struct EditorView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Button(action: requestSend) {
+            Button(action: send) {
                 if publisher.sending.contains(entry.id) {
                     ProgressView().tint(Color.paper)
                 } else {
@@ -231,7 +225,7 @@ struct EditorView: View {
     private var sendLabel: String {
         let kind = site?.kind ?? .ghost
         if entry.remotePostID != nil, entry.remoteStatus != .draft { return kind.updateLabel }
-        return site?.isPublic == true ? "Publish publicly" : kind.publishLabel
+        return kind.publishLabel
     }
 
     private func toggleTitle() {
@@ -246,12 +240,8 @@ struct EditorView: View {
         }
     }
 
-    private func requestSend() {
-        guard canSend, let site else { return }
-        if site.isPublic { confirmingPublic = true } else { send() }
-    }
-
     private func send() {
+        guard canSend else { return }
         hideKeyboard()
         let sent = entry
         let isNew = sent.remotePostID == nil

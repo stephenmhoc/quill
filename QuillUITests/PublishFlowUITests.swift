@@ -212,7 +212,8 @@ final class PublishFlowUITests: XCTestCase {
         app.buttons["Done"].tap()
     }
 
-    override func setUp() {
+    @MainActor
+    override func setUp() async throws {
         XCUIDevice.shared.orientation = .portrait
     }
 
@@ -361,7 +362,7 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(post.waitForExistence(timeout: 15), "real posts didn't load")
         attach("microblog-posts", app)
 
-        // Writing here asks before going public. Stop short of sending.
+        // Writing here publishes on one tap, so stop short of sending.
         showSidebar(app)
         app.buttons["New Entry"].firstMatch.tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 10))
@@ -369,7 +370,7 @@ final class PublishFlowUITests: XCTestCase {
         app.buttons[name].firstMatch.tap()
         editor.tap()
         editor.typeText("Never sent")
-        XCTAssertEqual(app.buttons["sendButton"].label, "Publish publicly")
+        XCTAssertEqual(app.buttons["sendButton"].label, "Publish")
         attach("microblog-writing", app)
         editor.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10))
 
@@ -392,6 +393,7 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [blank], timeout: 20), .completed, "no blank page after sending")
     }
 
+    @MainActor
     private func showSidebar(_ app: XCUIApplication) {
         for _ in 0..<3 where !app.buttons["Settings"].isHittable {
             let back = app.buttons["BackButton"]
@@ -400,6 +402,7 @@ final class PublishFlowUITests: XCTestCase {
         }
     }
 
+    @MainActor
     private func chooseIcon(_ name: String, _ app: XCUIApplication) {
         let button = app.buttons["\(name) icon"]
         button.tap()
@@ -411,11 +414,13 @@ final class PublishFlowUITests: XCTestCase {
                        "\(name) icon wasn't selected")
     }
 
+    @MainActor
     private func allowFaceIDIfAsked() {
         let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Allow"]
         if allow.waitForExistence(timeout: 4) { allow.tap() }
     }
 
+    @MainActor
     private func attach(_ name: String, _ app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name
