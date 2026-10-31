@@ -45,6 +45,7 @@ struct RootView: View {
                     }
                 }
                 .environment(\.usesColumns, sizeClass == .regular)
+                .opensLinksInChosenBrowser()
                 .sheet(isPresented: $navigation.showingSettings) { SettingsView() }
                 .sheet(isPresented: $navigation.showingAddSite) { AddSiteView() }
                 .task(id: lock.isUnlocked) { await runOutbox() }

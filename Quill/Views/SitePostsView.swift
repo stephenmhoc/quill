@@ -204,19 +204,11 @@ private struct SiteStatsRow: View {
     let stats: PostStats
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .firstTextBaseline, spacing: 32) {
             figure(stats.posts.formatted(), "Posts")
-            Spacer()
             figure(stats.words.formatted(), "Words")
             Spacer()
-            figure(readingTime, "To read")
         }
-    }
-
-    /// At 200 words a minute.
-    private var readingTime: String {
-        let minutes = max(stats.words / 200, stats.words > 0 ? 1 : 0)
-        return minutes < 60 ? "\(minutes) min" : "\(minutes / 60)h \(minutes % 60)m"
     }
 
     private func figure(_ value: String, _ label: String) -> some View {

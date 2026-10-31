@@ -138,6 +138,7 @@ final class PublishFlowUITests: XCTestCase {
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.buttons["Dark"].waitForExistence(timeout: 5))
         app.buttons["Dark"].tap()
+        XCTAssertTrue(app.buttons["Open links in, In App"].exists, "links should default to in-app")
         attach("settings-dark", app)
         chooseIcon("Ink", app)
         attach("settings-icon", app)
@@ -173,8 +174,24 @@ final class PublishFlowUITests: XCTestCase {
         editor.tap()
         editor.typeText(" and edited")
         attach("editing-past-post", app)
+
+        // Preview renders the Markdown instead of showing it.
+        app.buttons["previewButton"].tap()
+        let rendered = app.webViews.staticTexts["Written elsewhere and edited"]
+        XCTAssertTrue(rendered.waitForExistence(timeout: 10), "preview didn't render the Markdown")
+        attach("preview", app)
+        app.buttons["Done"].tap()
+
         app.buttons["sendButton"].tap()
         XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 20), "an update returns to the entry")
+
+        // Links stay in the app unless Settings says otherwise.
+        app.buttons["View"].tap()
+        let closeBrowser = app.buttons["Close"]
+        XCTAssertTrue(closeBrowser.waitForExistence(timeout: 10), "in-app browser didn't open")
+        XCTAssertEqual(app.state, .runningForeground)
+        attach("in-app-browser", app)
+        closeBrowser.tap()
         let edited = try await client.post(id: created.id)
         XCTAssertTrue(edited.html?.contains("edited") == true, "edit didn't reach Ghost")
 

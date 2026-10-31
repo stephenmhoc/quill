@@ -3,6 +3,15 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 
+/// The word doesn't fit beside everything else in the iPhone's publish bar.
+private struct PublicLabelStyle: LabelStyle {
+    let showsTitle: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        if showsTitle { Label { configuration.title } icon: { configuration.icon } } else { configuration.icon }
+    }
+}
+
 struct EditorView: View {
     @Bindable var entry: Entry
 
@@ -14,6 +23,7 @@ struct EditorView: View {
 
     @State private var selection: TextSelection?
     @State private var showingTags = false
+    @State private var showingPreview = false
     @State private var photoItem: PhotosPickerItem?
     @State private var uploading = false
     @State private var uploadError: String?
@@ -73,6 +83,7 @@ struct EditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
         .sheet(isPresented: $showingTags) { TagEditor(entry: entry, site: site) }
+        .sheet(isPresented: $showingPreview) { EntryPreview(title: entry.title, markdown: entry.body) }
         .confirmationDialog("Upload image to \(site?.name ?? "")?", isPresented: Binding(
             get: { pendingPublicPhoto != nil }, set: { if !$0 { pendingPublicPhoto = nil; photoItem = nil } }
         ), titleVisibility: .visible) {
@@ -199,15 +210,21 @@ struct EditorView: View {
 
             if site?.isPublic == true {
                 Label("PUBLIC", systemImage: "globe")
+                    .labelStyle(PublicLabelStyle(showsTitle: usesColumns))
+                    .accessibilityLabel("Public")
                     .font(.system(.caption2, design: .monospaced).weight(.bold))
                     .foregroundStyle(.secondary)
             }
+
+            Button("Preview") { showingPreview = true }
+                .disabled(entry.isBlank)
+                .accessibilityIdentifier("previewButton")
 
             Button(action: send) {
                 if publisher.sending.contains(entry.id) {
                     ProgressView().tint(Color.paper)
                 } else {
-                    Text(sendLabel).fontWeight(.semibold)
+                    Text(sendLabel).fontWeight(.semibold).fixedSize()
                 }
             }
             .buttonStyle(.borderedProminent)

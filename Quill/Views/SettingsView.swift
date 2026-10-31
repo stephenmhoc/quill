@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage(AppLock.graceKey) private var grace: Double = 30
     @AppStorage(Navigation.defaultSiteKey) private var defaultSite = ""
     @AppStorage(Appearance.key) private var appearance = Appearance.auto
+    @AppStorage(LinkBrowser.key) private var linkBrowser = LinkBrowser.inApp
     @State private var icon = AppIconChoice.current
     @State private var iconError: String?
 
@@ -40,6 +41,11 @@ struct SettingsView: View {
                     Picker("Default site", selection: $defaultSite) {
                         Text("Last used").tag("")
                         ForEach(sites) { Text($0.name).tag($0.id.uuidString) }
+                    }
+                }
+                Section("Links") {
+                    Picker("Open links in", selection: $linkBrowser) {
+                        ForEach(LinkBrowser.allCases) { Text($0.label).tag($0) }
                     }
                 }
                 Section {

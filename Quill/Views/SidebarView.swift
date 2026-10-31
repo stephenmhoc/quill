@@ -21,6 +21,7 @@ struct SidebarView: View {
                 List(selection: $navigation.sidebar) { rows }
             } else {
                 List { rows.listRowBackground(Color.card) }
+                    .listSectionSpacing(12)
             }
         }
         .scrollContentBackground(.hidden)
@@ -82,17 +83,19 @@ struct SidebarView: View {
                 addSite
             }
         } else {
-            Section {
-                ForEach(sites) { site in
+            ForEach(sites) { site in
+                Section {
                     link(.site(site.id)) { SiteCard(site: site) }
                         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { siteFrames[site.id] = $0 }
                         .listRowBackground(cardBackground(site))
+                } header: {
+                    if site.id == sites.first?.id {
+                        Text(now.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                            .font(.system(.subheadline, design: .monospaced))
+                            .textCase(nil)
+                            .accessibilityIdentifier("homeDate")
+                    }
                 }
-            } header: {
-                Text(now.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-                    .font(.system(.subheadline, design: .monospaced))
-                    .textCase(nil)
-                    .accessibilityIdentifier("homeDate")
             }
             Section { addSite }
         }

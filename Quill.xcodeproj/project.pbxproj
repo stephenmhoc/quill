@@ -15,7 +15,9 @@
 		22085D4C3562398CCEF206C1 /* MicroblogSiteForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 874F94F3CF6520EE05693513 /* MicroblogSiteForm.swift */; };
 		2BFD621207C24D0D45BF7932 /* LockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4829D02BAD5836F8776B8F8F /* LockView.swift */; };
 		2DECFDE235C863317DFF34BF /* Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD30CED7B199FBAC661EA02 /* Entry.swift */; };
+		41B77222AA0F25535C86C173 /* EntryPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B776FA072E3EEF65311D230 /* EntryPreview.swift */; };
 		42387E640DDEC9B914B85410 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF31C8EE91FDE72C86EE086E /* SettingsView.swift */; };
+		456B60126BF7D86DED1712DC /* LinkBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8345D33355EE4D50276AC56F /* LinkBrowser.swift */; };
 		4D3B3EE692DDC20217F87624 /* AppIconChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C75A0693926536929AB2478 /* AppIconChoice.swift */; };
 		4F4277A061E03758D884F159 /* NewEntryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9908E6604B2E633C1858956 /* NewEntryButton.swift */; };
 		53DF4771D36D398595051B04 /* SiteBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4C7A3CBF2CA60807133F56 /* SiteBackend.swift */; };
@@ -76,7 +78,9 @@
 		5A8EE99F1C2FDC7AC5F379E9 /* AddSiteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSiteView.swift; sourceTree = "<group>"; };
 		64CF96E4FEB2C5D36281BB0D /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		652A2E7C67C2F9335547BBB9 /* Site.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Site.swift; sourceTree = "<group>"; };
+		7B776FA072E3EEF65311D230 /* EntryPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryPreview.swift; sourceTree = "<group>"; };
 		7ECB4E88FFB544CBB3212EA2 /* EditorTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTextView.swift; sourceTree = "<group>"; };
+		8345D33355EE4D50276AC56F /* LinkBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkBrowser.swift; sourceTree = "<group>"; };
 		874F94F3CF6520EE05693513 /* MicroblogSiteForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicroblogSiteForm.swift; sourceTree = "<group>"; };
 		8E4C7A3CBF2CA60807133F56 /* SiteBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteBackend.swift; sourceTree = "<group>"; };
 		9234120738BBF6CBF48467A3 /* PublishFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishFlowUITests.swift; sourceTree = "<group>"; };
@@ -150,6 +154,7 @@
 			children = (
 				7ECB4E88FFB544CBB3212EA2 /* EditorTextView.swift */,
 				1641461940ABADF3553A64FE /* EditorView.swift */,
+				7B776FA072E3EEF65311D230 /* EntryPreview.swift */,
 				E38D052F3FD1038D28BD2E47 /* MarkdownFormat.swift */,
 				37E75D2A90726438075942B1 /* TagEditor.swift */,
 			);
@@ -245,6 +250,7 @@
 				64CF96E4FEB2C5D36281BB0D /* Appearance.swift */,
 				9C75A0693926536929AB2478 /* AppIconChoice.swift */,
 				B7F24F49FE29A3A98B5E6680 /* GhostBackend.swift */,
+				8345D33355EE4D50276AC56F /* LinkBrowser.swift */,
 				FE560BD846C9515352C0A7B2 /* LocalBackend.swift */,
 				A95758EBD292D01EBDCDB5F3 /* MicroblogBackend.swift */,
 				9A601AE5954D328F6E161E61 /* Navigation.swift */,
@@ -397,8 +403,10 @@
 				AFB5235167ECFC2E9294CE68 /* EditorView.swift in Sources */,
 				2DECFDE235C863317DFF34BF /* Entry.swift in Sources */,
 				A45A30C56D3270D2493CEFFD /* EntryListView.swift in Sources */,
+				41B77222AA0F25535C86C173 /* EntryPreview.swift in Sources */,
 				B2E6FF19908D96DDAD354767 /* GhostBackend.swift in Sources */,
 				760C5A038A9ACBF3229EAEB7 /* GhostSiteForm.swift in Sources */,
+				456B60126BF7D86DED1712DC /* LinkBrowser.swift in Sources */,
 				20EBC6E5E44C65F0921126E5 /* LocalBackend.swift in Sources */,
 				0B7D80E42855F6324227E08E /* LocalSiteForm.swift in Sources */,
 				2BFD621207C24D0D45BF7932 /* LockView.swift in Sources */,

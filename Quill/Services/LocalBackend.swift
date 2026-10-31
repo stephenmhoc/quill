@@ -78,6 +78,11 @@ struct LocalBackend: SiteBackend {
         markdown.matches(of: /quill-local:\/\/images\/([^)\s]+)/).map { String($0.1) }
     }
 
+    /// The bytes behind a `quill-local` image, for showing it outside the editor.
+    static func image(named name: String) throws -> Data {
+        try Data(contentsOf: imageFolder().appending(path: name))
+    }
+
     /// Kept out of backups, like the rest of the writing.
     private static func imageFolder() throws -> URL {
         var folder = URL.applicationSupportDirectory.appending(path: "LocalImages")
