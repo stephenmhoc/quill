@@ -17,9 +17,11 @@ struct SidebarView: View {
             if usesColumns {
                 List(selection: $navigation.sidebar) { rows }
             } else {
-                List { rows }
+                List { rows.listRowBackground(Color.card) }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.paper.ignoresSafeArea())
         // The iPad sidebar's toolbar has no room for it.
         .navigationTitle(usesColumns ? "" : "Quill")
         .task {

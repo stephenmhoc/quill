@@ -10,6 +10,7 @@ struct QuillApp: App {
     @AppStorage(Appearance.key) private var appearance = Appearance.auto
 
     init() {
+        Appearance.alignLargeTitles()
         let container = Self.makeContainer()
         let lock = AppLock()
         self.container = container

@@ -34,6 +34,7 @@ struct SitePostsView: View {
                 ForEach(posts) { post in
                     Button { Task { await open(post) } } label: { row(post) }
                         .buttonStyle(.plain)
+                        .listRowBackground(Color.card)
                         .disabled(opening != nil)
                         .swipeActions(edge: .trailing) {
                             Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }

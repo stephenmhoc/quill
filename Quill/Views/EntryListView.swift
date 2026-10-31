@@ -39,7 +39,7 @@ struct EntryListView: View {
                 }
                 .buttonStyle(.plain)
                 .listRowBackground(entry == navigation.selectedEntry && usesColumns
-                                   ? Color.accentColor.opacity(0.15) : nil)
+                                   ? Color.accentColor.opacity(0.15) : Color.card)
                 .swipeActions(edge: .trailing) {
                     if entry.state != .sending {
                         Button(role: .destructive) { delete(entry) } label: {
