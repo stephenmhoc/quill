@@ -116,7 +116,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.productivity
         SUFeedURL: https://github.com/stephenmhoc/quill/releases/download/appcast/appcast.xml
-        SUPublicEDKey: SPARKLE_PUBLIC_KEY_PLACEHOLDER
+        SUPublicEDKey: YNe2V/xce3HQJv4cZ8+d5tLFFIwEP7OiVUkXDgz+wo8=
         SUEnableInstallerLauncherService: true
         SUEnableAutomaticChecks: true
         NSHumanReadableCopyright: ""
