@@ -56,25 +56,27 @@ final class Navigation {
     }
 
     /// Reuse an empty draft if there is one, so the app opens to a blank page without piling up blanks.
-    func openBlankEntry(in context: ModelContext, focus: Bool = true) {
+    /// Given a site, the entry goes there and back returns to that site's list.
+    func openBlankEntry(in context: ModelContext, focus: Bool = true, site: UUID? = nil) {
         let editing = Entry.State.editing.rawValue
         let drafts = (try? context.fetch(FetchDescriptor<Entry>(
             predicate: #Predicate { $0.stateRaw == editing && $0.remotePostID == nil },
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]))) ?? []
+        let siteID = site ?? defaultSiteID(in: context)
         let entry: Entry
         if let blank = drafts.first(where: \.isBlank) {
             entry = blank
             entry.createdAt = .now
-            entry.siteID = defaultSiteID(in: context)
+            entry.siteID = siteID
             entry.hiddenTitle = nil
         } else {
-            entry = Entry(siteID: defaultSiteID(in: context))
+            entry = Entry(siteID: siteID)
             context.insert(entry)
         }
         try? context.save()
         focusNextEntry = focus
         selectedEntry = entry
-        path = [.editor]
+        path = (site.map { [.list(.site($0))] } ?? []) + [.editor]
         closeSidebarOverlay()
     }
 

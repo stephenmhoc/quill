@@ -62,6 +62,7 @@ struct SitePostsView: View {
                 ContentUnavailableView("No posts yet", systemImage: "doc.richtext")
             }
         }
+        .newEntryButton(site: siteID)
         .scrollContentBackground(.hidden)
         .background(Color.paper.ignoresSafeArea())
         .navigationTitle(site?.name ?? "Site")

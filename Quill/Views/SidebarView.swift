@@ -22,6 +22,7 @@ struct SidebarView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.paper.ignoresSafeArea())
+        .newEntryButton(isShown: !usesColumns)
         // The iPad sidebar's toolbar has no room for it.
         .navigationTitle(usesColumns ? "" : "Quill")
         .task {
@@ -36,9 +37,11 @@ struct SidebarView: View {
                     Label("Settings", systemImage: "gearshape")
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { navigation.openBlankEntry(in: context) } label: {
-                    Label("New Entry", systemImage: "square.and.pencil")
+            if usesColumns {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { navigation.openBlankEntry(in: context) } label: {
+                        Label("New Entry", systemImage: "square.and.pencil")
+                    }
                 }
             }
         }

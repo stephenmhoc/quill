@@ -80,7 +80,7 @@ final class PublishFlowUITests: XCTestCase {
         attach("drafts", app)
         showSidebar(app)
         XCTAssertTrue(app.buttons["New Entry"].waitForExistence(timeout: 5), "back didn't return home")
-        app.buttons["New Entry"].tap()
+        app.buttons["New Entry"].firstMatch.tap()
         XCTAssertTrue(app.textViews["editor"].waitForExistence(timeout: 5))
 
         // Really in Ghost, as an untitled entry?
@@ -249,7 +249,7 @@ final class PublishFlowUITests: XCTestCase {
         // Write on it. Saved stands in for Publish, and it's listed under the site.
         showSidebar(app)
         XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 10))
-        app.buttons["New Entry"].tap()
+        app.buttons["New Entry"].firstMatch.tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 10))
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Site:'")).firstMatch.tap()
         app.buttons[name].firstMatch.tap()
@@ -362,12 +362,12 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(post.waitForExistence(timeout: 15), "real posts didn't load")
         attach("microblog-posts", app)
 
+        // New Entry on a site's list writes to that site.
         // Writing here publishes on one tap, so stop short of sending.
-        showSidebar(app)
-        app.buttons["New Entry"].firstMatch.tap()
+        app.buttons.matching(NSPredicate(format: "label == 'New Entry'")).allElementsBoundByIndex.last?.tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 10))
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Site:'")).firstMatch.tap()
-        app.buttons[name].firstMatch.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Site:' AND label CONTAINS %@", name)).firstMatch.exists,
+                      "new entry isn't on the site whose list it came from")
         editor.tap()
         editor.typeText("Never sent")
         XCTAssertEqual(app.buttons["sendButton"].label, "Publish")

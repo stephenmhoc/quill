@@ -17,6 +17,7 @@
 		2DECFDE235C863317DFF34BF /* Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD30CED7B199FBAC661EA02 /* Entry.swift */; };
 		42387E640DDEC9B914B85410 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF31C8EE91FDE72C86EE086E /* SettingsView.swift */; };
 		4D3B3EE692DDC20217F87624 /* AppIconChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C75A0693926536929AB2478 /* AppIconChoice.swift */; };
+		4F4277A061E03758D884F159 /* NewEntryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9908E6604B2E633C1858956 /* NewEntryButton.swift */; };
 		53DF4771D36D398595051B04 /* SiteBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4C7A3CBF2CA60807133F56 /* SiteBackend.swift */; };
 		6DA99894461AF26112196137 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB8425B76428A097BB6A89 /* SidebarView.swift */; };
 		760C5A038A9ACBF3229EAEB7 /* GhostSiteForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC2A3CC27E227D11249E64A /* GhostSiteForm.swift */; };
@@ -91,6 +92,7 @@
 		B7F24F49FE29A3A98B5E6680 /* GhostBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostBackend.swift; sourceTree = "<group>"; };
 		BBBB8425B76428A097BB6A89 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		BBC2A3CC27E227D11249E64A /* GhostSiteForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostSiteForm.swift; sourceTree = "<group>"; };
+		C9908E6604B2E633C1858956 /* NewEntryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewEntryButton.swift; sourceTree = "<group>"; };
 		D1F21B3D2ECEA6CDF2B70A82 /* Publisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Publisher.swift; sourceTree = "<group>"; };
 		E38D052F3FD1038D28BD2E47 /* MarkdownFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownFormat.swift; sourceTree = "<group>"; };
 		EAD63CF72CB662598A5A279F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -219,6 +221,7 @@
 				2D36D7CE15ACC63A9361E466 /* LocalSiteForm.swift */,
 				4829D02BAD5836F8776B8F8F /* LockView.swift */,
 				874F94F3CF6520EE05693513 /* MicroblogSiteForm.swift */,
+				C9908E6604B2E633C1858956 /* NewEntryButton.swift */,
 				F9D0E9058F0132B412E20176 /* RootView.swift */,
 				AF31C8EE91FDE72C86EE086E /* SettingsView.swift */,
 				BBBB8425B76428A097BB6A89 /* SidebarView.swift */,
@@ -403,6 +406,7 @@
 				89ED104166F51DB445F0056E /* MicroblogBackend.swift in Sources */,
 				22085D4C3562398CCEF206C1 /* MicroblogSiteForm.swift in Sources */,
 				B0E281DA3517CFFD44162CBE /* Navigation.swift in Sources */,
+				4F4277A061E03758D884F159 /* NewEntryButton.swift in Sources */,
 				E113677E2C88F72B38258BFF /* Publisher.swift in Sources */,
 				D4A4486ECDF96AE03E6D8076 /* QuillApp.swift in Sources */,
 				B20BDEC9EBC1444779B839AB /* RootView.swift in Sources */,
