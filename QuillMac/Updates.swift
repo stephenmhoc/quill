@@ -15,6 +15,9 @@ enum Updates {
         #endif
     }
 
+    /// `controller` is lazy, and the scheduled checks only run once it exists.
+    static func start() { _ = controller }
+
     static var canCheck: Bool { isReleaseBuild }
     static func check() { controller.checkForUpdates(nil) }
 
