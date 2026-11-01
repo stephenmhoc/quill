@@ -15,7 +15,7 @@ struct GhostBackend: SiteBackend {
         try await client.recentPosts(limit: limit, page: page, tagSlug: tag?.id).map { post in
             let untitled = post.title == "(Untitled)" || post.tags?.contains { $0.name == EntryBuilder.untitledTag } == true
             return SitePost(id: post.id, title: untitled ? (post.excerpt ?? post.title) : post.title, isUntitled: untitled,
-                            date: post.publishedAt, badge: post.status == .published ? nil : post.status.rawValue.uppercased(),
+                            date: post.publishedAt, updatedAt: post.updatedDate, badge: post.status == .published ? nil : post.status.rawValue.uppercased(),
                             url: post.url, tags: post.tags?.compactMap(\.slug))
         }
     }

@@ -150,12 +150,12 @@ struct SidebarView: View {
         Color.card.overlay(site.color.color.opacity(dropSite == site.id ? 0.4 : 0.12))
     }
 
-    /// The latest across every site, as last seen. Drafts and scheduled posts aren't out yet.
+    /// The last to change across every site, as last seen. Drafts and scheduled posts aren't out yet.
     private var recentPosts: [RecentPost] {
         let posts = sites.flatMap { site in
             site.cachedPostList.filter { $0.badge == nil }.map { RecentPost(post: $0, site: site) }
         }
-        return Array(posts.sorted { ($0.post.date ?? .distantPast) > ($1.post.date ?? .distantPast) }.prefix(5))
+        return Array(posts.sorted { ($0.post.lastChanged ?? .distantPast) > ($1.post.lastChanged ?? .distantPast) }.prefix(5))
     }
 
     private func refreshPosts() async {
@@ -230,7 +230,7 @@ private struct SiteCard: View {
                     .font(.system(.subheadline, design: .serif))
                     .italic(latest.isUntitled)
                     .lineLimit(2)
-                if let date = latest.date {
+                if let date = latest.lastChanged {
                     Text(date.formatted(.relative(presentation: .named)).uppercased())
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
@@ -289,7 +289,7 @@ private struct RecentPostRow: View {
                 Spacer()
                 if opening {
                     ProgressView().controlSize(.mini)
-                } else if let date = post.date {
+                } else if let date = post.lastChanged {
                     Text(date.formatted(.relative(presentation: .named)).uppercased())
                         .lineLimit(1)
                         .layoutPriority(1)

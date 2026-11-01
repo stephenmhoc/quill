@@ -61,7 +61,6 @@ struct EditorHeader: View {
     let focusesTitle: Bool
     let onTags: () -> Void
     let onSubmit: () -> Void
-    var onEdit: () -> Void = {}
     @FocusState private var titleFocused: Bool
 
     var body: some View {
@@ -71,7 +70,7 @@ struct EditorHeader: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
-            StatusBanner(entry: entry, site: site, onEdit: onEdit)
+            StatusBanner(entry: entry, site: site)
                 .padding(.bottom, 16)
             if showsTitle {
                 TextField("Title", text: $entry.title, axis: .vertical)
@@ -114,30 +113,17 @@ struct TagStrip: View {
     }
 }
 
-/// Explains non-editable states and offers the way forward. A Mac shows the calm ones in its status
-/// bar and toolbar instead, so only what needs a decision sits above the text.
+/// Only what needs a decision sits above the text. The calm states are in a bar below the page.
 struct StatusBanner: View {
     @Bindable var entry: Entry
     let site: Site?
-    let onEdit: () -> Void
     @Environment(Publisher.self) private var publisher
-    @Environment(\.openURL) private var openURL
 
     var body: some View {
         switch entry.state {
-        case .editing:
-            #if !os(macOS)
-            if entry.remotePostID != nil {
-                note("Editing. Going back cancels.", "pencil", .secondary)
-            }
-            #endif
-        case .sending:
-            #if !os(macOS)
-            note("Sending to \(site?.name ?? "the site")…", "arrow.up.circle", .secondary)
-            #endif
         case .queued:
             VStack(alignment: .leading, spacing: 8) {
-                note(entry.lastError ?? "Waiting to send to \(site?.name ?? "the site").", "clock", .orange)
+                StatusNote(text: entry.lastError ?? "Waiting to send to \(site?.name ?? "the site").", icon: "clock", color: .orange)
                 HStack {
                     Button("Retry now") { Task { await publisher.publish(entry) } }
                     // A post that may already be on the site has to be found again before it can change.
@@ -150,7 +136,7 @@ struct StatusBanner: View {
             }
         case .failed:
             VStack(alignment: .leading, spacing: 8) {
-                note(entry.lastError ?? "Couldn't send.", "exclamationmark.triangle", .red)
+                StatusNote(text: entry.lastError ?? "Couldn't send.", icon: "exclamationmark.triangle", color: .red)
                 HStack {
                     if entry.isConflict {
                         Button("Overwrite \(site?.kind.title ?? "the site")'s version") { Task { await publisher.overwrite(entry) } }
@@ -166,26 +152,18 @@ struct StatusBanner: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
-        case .sent:
-            #if !os(macOS)
-            HStack {
-                note(entry.remoteStatus == .draft ? "Draft" : site?.kind.doneLabel ?? "Published", "checkmark.circle", .green)
-                Spacer()
-                if let url = entry.remoteURL, entry.remoteStatus != .draft {
-                    Button("View") { openURL(url) }
-                }
-                Button("Edit") {
-                    entry.beginEdit()
-                    onEdit()
-                }
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            #endif
+        default:
+            EmptyView()
         }
     }
+}
 
-    private func note(_ text: String, _ icon: String, _ color: Color) -> some View {
+struct StatusNote: View {
+    let text: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
         Label(text, systemImage: icon)
             .font(.system(.footnote, design: .monospaced))
             .foregroundStyle(color)

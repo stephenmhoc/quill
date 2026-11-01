@@ -25,9 +25,11 @@ struct MicroblogBackend: SiteBackend {
         }
     }
 
+    /// Micropub has no update date, so the only edits it can know about are the ones sent from here.
     private func sitePost(_ post: MicropubPost) -> SitePost {
         SitePost(id: post.url, title: post.title.isEmpty ? Self.excerpt(of: post.content) : post.title,
                  isUntitled: post.title.isEmpty, date: post.published,
+                 updatedAt: (try? Entry.copy(of: post.url, on: site.id, in: context))??.sentAt,
                  badge: post.status == .draft ? "DRAFT" : nil, url: URL(string: post.url), tags: post.categories)
     }
 

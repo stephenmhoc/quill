@@ -63,6 +63,12 @@ public struct GhostPost: Decodable, Sendable, Equatable, Identifiable {
         case createdAt = "created_at"
         case publishedAt = "published_at"
     }
+
+    /// `updatedAt` as a date, for showing and sorting.
+    public var updatedDate: Date? {
+        (try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(updatedAt))
+            ?? (try? Date(updatedAt, strategy: .iso8601))
+    }
 }
 
 /// What Quill sends to Ghost.

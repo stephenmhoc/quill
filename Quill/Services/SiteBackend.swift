@@ -10,11 +10,16 @@ struct SitePost: Identifiable, Equatable, Codable {
     let title: String
     let isUntitled: Bool
     let date: Date?
+    /// When it last changed, if the site or this device knows.
+    var updatedAt: Date? = nil
     /// Shown beside the date, e.g. "DRAFT". Nil for an ordinary published post.
     let badge: String?
     let url: URL?
     /// `SiteTag` ids, so a filter can show what's already here before the site answers.
     var tags: [String]?
+
+    /// When something last happened to it, for putting what's freshest first.
+    var lastChanged: Date? { [date, updatedAt].compactMap(\.self).max() }
 }
 
 /// A tag that posts can be filtered by. `id` is whatever the site filters on.

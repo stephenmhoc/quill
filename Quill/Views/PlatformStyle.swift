@@ -87,8 +87,13 @@ private struct CardRow: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         #if os(iOS)
         if usesColumns {
-            content.listRowBackground(
-                RoundedRectangle(cornerRadius: 12).fill(isSelected ? Color.accentColor.opacity(0.15) : .clear))
+            // Taller rows, so the mark clears the dividers either side of it.
+            content
+                .padding(.vertical, 6)
+                .listRowBackground(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isSelected ? Color.accentColor.opacity(0.15) : .clear)
+                        .padding(.vertical, 5))
         } else {
             content.listRowBackground(isSelected ? Color.accentColor.opacity(0.15) : Color.card)
         }

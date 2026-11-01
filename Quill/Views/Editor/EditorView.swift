@@ -9,6 +9,7 @@ struct EditorView: View {
     @Environment(Navigation.self) private var navigation
     @Environment(Publisher.self) private var publisher
     @Environment(\.modelContext) private var context
+    @Environment(\.openURL) private var openURL
     @Environment(\.usesColumns) private var usesColumns
     @Query(sort: \Site.createdAt) private var sites: [Site]
 
@@ -41,11 +42,7 @@ struct EditorView: View {
                        margin: usesColumns ? 48 : 20) {
             // Hosted inside UIKit, so the environment has to be passed along.
             EditorHeader(entry: entry, site: site, isEditable: isEditable, showsTitle: showsTitle,
-                         focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 },
-                         onEdit: {
-                             selection = TextSelection(insertionPoint: entry.body.endIndex)
-                             focusRequest += 1
-                         })
+                         focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 })
                 .environment(navigation)
                 .environment(publisher)
         }
@@ -63,6 +60,7 @@ struct EditorView: View {
                         .background(Color.paper)
                 }
                 VStack(spacing: 0) {
+                    if !isFocused { statusBar }
                     if bodyFocused && isEditable && !isFocused { formatBar }
                     if isEditable && !isFocused { publishBar }
                 }
@@ -199,6 +197,48 @@ struct EditorView: View {
             if isUploading { ProgressView() } else { Image(systemName: "photo") }
         }
         .disabled(site == nil || uploading)
+    }
+
+    // MARK: Status bar
+
+    /// Where the entry stands, down here so the page above is only the writing. Problems that need
+    /// a decision stay above the text, in `StatusBanner`.
+    @ViewBuilder private var statusBar: some View {
+        switch entry.state {
+        case .editing where entry.remotePostID != nil:
+            statusRow { StatusNote(text: "Editing. Going back cancels.", icon: "pencil", color: .secondary) }
+        case .sending:
+            statusRow { StatusNote(text: "Sending to \(site?.name ?? "the site")…", icon: "arrow.up.circle", color: .secondary) }
+        case .sent:
+            statusRow {
+                StatusNote(text: entry.remoteStatus == .draft ? "Draft" : site?.kind.doneLabel ?? "Published",
+                           icon: "checkmark.circle", color: .green)
+                Spacer()
+                if let url = entry.remoteURL, entry.remoteStatus != .draft {
+                    Button("View") { openURL(url) }
+                }
+                // Where Publish goes, so the main action never moves.
+                Button("Edit", action: beginEditing)
+                    .buttonStyle(.bordered)
+                    .foregroundStyle(.primary)
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    private func statusRow(@ViewBuilder content: () -> some View) -> some View {
+        HStack(spacing: 12, content: content)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, usesColumns ? 48 : 16)
+            .padding(.vertical, 10)
+            .background(Color.paper)
+    }
+
+    private func beginEditing() {
+        entry.beginEdit()
+        selection = TextSelection(insertionPoint: entry.body.endIndex)
+        focusRequest += 1
     }
 
     // MARK: Publish bar
