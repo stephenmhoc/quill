@@ -57,18 +57,10 @@ struct SitePicker: View {
                 Button {
                     entry.siteID = s.id
                 } label: {
-                    Label { Text(s.name) } icon: { dot(s.color.color) }
+                    Label(s.name, systemImage: s.accessIcon)
                 }
             }
         } label: { label }
-    }
-
-    /// Drawn as an image, because a menu turns symbols the colour of its text.
-    private func dot(_ color: Color) -> Image {
-        let renderer = ImageRenderer(content: Circle().fill(color).frame(width: 10, height: 10))
-        renderer.scale = 2
-        guard let image = renderer.cgImage else { return Image(systemName: "circle.fill") }
-        return Image(decorative: image, scale: 2).renderingMode(.original)
     }
     #endif
 

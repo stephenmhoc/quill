@@ -135,7 +135,10 @@ extension PreviewPage {
                 decisionHandler(.allow)
                 return
             }
-            if action.navigationType == .linkActivated { openURL?(url) }
+            // Imported posts can hold anything, and other schemes open other apps.
+            if action.navigationType == .linkActivated, ["http", "https", "mailto"].contains(url.scheme?.lowercased()) {
+                openURL?(url)
+            }
             decisionHandler(.cancel)
         }
 

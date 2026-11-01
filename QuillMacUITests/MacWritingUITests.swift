@@ -105,8 +105,19 @@ final class MacWritingUITests: XCTestCase {
 
         let key = app.secureTextFields.firstMatch
         XCTAssertTrue(key.waitForExistence(timeout: 5), "no key field")
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("abc123:def456\n", forType: .string)
+        // The real clipboard, so put back what was on it.
+        let board = NSPasteboard.general
+        let copied = (board.pasteboardItems ?? []).map { item in
+            let copy = NSPasteboardItem()
+            for type in item.types { if let data = item.data(forType: type) { copy.setData(data, forType: type) } }
+            return copy
+        }
+        addTeardownBlock {
+            board.clearContents()
+            board.writeObjects(copied)
+        }
+        board.clearContents()
+        board.setString("abc123:def456\n", forType: .string)
         app.buttons["Paste"].click()
         sleep(1)
         attach("edit-site", app)

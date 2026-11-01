@@ -149,6 +149,8 @@ struct SitePostsView: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
+            .background(.bar)
+            .overlay(alignment: .top) { Divider() }
         }
     }
     #endif

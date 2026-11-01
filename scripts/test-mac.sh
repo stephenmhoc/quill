@@ -4,15 +4,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 readonly DEV_ID=com.merimerimeri.Quill.dev
+[[ " $* " != *" -configuration "* ]] || { echo "Tests only run the Debug build." >&2; exit 1; }
 xcodegen generate >/dev/null
 built=$(xcodebuild -showBuildSettings -project Quill.xcodeproj -target QuillMac -configuration Debug 2>/dev/null |
   awk '$1 == "PRODUCT_BUNDLE_IDENTIFIER" { print $3 }')
 [[ $built == "$DEV_ID" ]] || { echo "Debug builds are $built, not $DEV_ID: refusing to run." >&2; exit 1; }
 
-data="$HOME/Library/Containers/$DEV_ID/Data/Library/Application Support/Quill"
-trap 'rm -rf "$data"' EXIT
-rm -rf "$data" build/results-mac.xcresult
-xcodebuild test -project Quill.xcodeproj -scheme QuillMac -destination platform=macOS \
+data="$HOME/Library/Containers/$DEV_ID/Data/Library/Application Support"
+stores=("$data/Quill" "$data/LocalImages")
+trap 'rm -rf "${stores[@]}"' EXIT
+rm -rf "${stores[@]}" build/results-mac.xcresult
+xcodebuild test -project Quill.xcodeproj -scheme QuillMac -configuration Debug -destination platform=macOS \
   -derivedDataPath build/mac-adhoc -resultBundlePath build/results-mac.xcresult \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= \
   CODE_SIGN_ENTITLEMENTS="$PWD/scripts/macdev.entitlements" "$@" > build/mac.log 2>&1 || {

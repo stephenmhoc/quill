@@ -52,7 +52,7 @@ struct MicroblogSiteForm: View {
                 TextField("Name (uses the blog's title if empty)", text: $name, prompt: fieldPrompt("Name (uses the blog's title if empty)"))
                     .promptedField()
             } footer: {
-                Text("Micro.blog sites are public, so publishing always asks for confirmation. Published posts also go to anywhere your blog cross-posts to.")
+                Text("Micro.blog sites are public, so uploading an image always asks first. Published posts also go to anywhere your blog cross-posts to.")
             }
             SiteColorSection(color: $color)
             if let error {

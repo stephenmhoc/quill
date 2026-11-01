@@ -15,7 +15,8 @@ struct MacRootView: View {
         @Bindable var navigation = navigation
         Group {
             if !lock.isUnlocked {
-                LockView()
+                // Replaces the entry's title, which is otherwise left in the title bar.
+                LockView().navigationTitle("Quill")
             } else if sites.isEmpty {
                 AddSiteView(isRequired: true)
             } else {

@@ -57,7 +57,7 @@ struct GhostSiteForm: View {
                 }
                 .pickerStyle(.segmented)
             } footer: {
-                Text("Publishing to a public site always asks for confirmation. To change a site's address, remove it and add it again.")
+                Text("Uploading an image to a public site always asks first. To change a site's address, remove it and add it again.")
             }
             SiteColorSection(color: $color)
             if let error {
