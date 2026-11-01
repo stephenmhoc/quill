@@ -130,7 +130,8 @@ Only run one test script at a time, because they share the same Ghost.
 
 ## Adding a test
 
-Keep the suite small: end-to-end tests that protect a real behavior, not unit tests.
+Less is more. A test earns its place by covering a journey that would really hurt if it broke, not a
+control, a layout or a setting. Check those by eye, and prove a one-off fix once without keeping the test.
 
 - Publishing behavior goes in `QuillTests/PublisherLiveTests.swift`. Use `harness()` and give
   posts a unique title with `UUID()`.

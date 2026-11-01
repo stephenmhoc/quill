@@ -17,11 +17,6 @@ struct QuillMacApp: App {
         let lock = AppLock()
         #if DEBUG
         if CommandLine.arguments.contains("-skipUnlock") { lock.unlockForTesting(keys: [:]) }
-        // A site to edit, because saving one for real needs the signed build's Keychain.
-        if CommandLine.arguments.contains("-seedGhostSite"), let url = URL(string: "https://key-test.example.com"),
-           ((try? container.mainContext.fetch(FetchDescriptor<Site>())) ?? []).allSatisfy({ $0.name != "Key Test" }) {
-            container.mainContext.insert(Site(name: "Key Test", url: url, isPublic: false, color: .ocean))
-        }
         #endif
         self.container = container
         _lock = State(initialValue: lock)

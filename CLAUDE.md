@@ -22,6 +22,8 @@ The test scripts create a fresh Ghost on `docker-server` and delete it afterward
 
 - Tests run locally only. GitHub Actions just builds and publishes, so don't add CI there.
 - End-to-end only, against a real Ghost. Don't add unit tests or mocks.
+- Keep them as light as they can be: a few journeys through what would really hurt if it broke.
+  Don't add a check for a control, a layout or a setting. Prove a fix once and don't keep the test.
 - Micro.blog tests use the user's real blog, which cross-posts. They must only create drafts,
   delete what they make, and never tap send in the UI. See `TESTING.md`.
 - Run `scripts/test-all.sh` before committing UI changes; layout code differs between iPhone
