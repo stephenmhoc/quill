@@ -9,6 +9,7 @@ struct MacEditorView: View {
     @Environment(Navigation.self) private var navigation
     @Environment(Publisher.self) private var publisher
     @Environment(\.modelContext) private var context
+    @Environment(\.openURL) private var openURL
     @Query(sort: \Site.createdAt) private var sites: [Site]
     @AppStorage("showsPreview") private var showsPreview = false
 
@@ -113,11 +114,7 @@ struct MacEditorView: View {
                       isCentered: navigation.isFocused, onImages: receive, onFocus: { bodyHasFocus = $0 }) {
             // Hosted inside AppKit, so the environment has to be passed along.
             EditorHeader(entry: entry, site: site, isEditable: isEditable, showsTitle: showsTitle,
-                         focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 },
-                         onEdit: {
-                             selection = TextSelection(insertionPoint: entry.body.endIndex)
-                             focusRequest += 1
-                         })
+                         focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 })
                 .environment(navigation)
                 .environment(publisher)
         }
@@ -133,6 +130,8 @@ struct MacEditorView: View {
                 Label("Couldn't save to this Mac. Keep this page open and free up some space.",
                       systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
+            } else {
+                entryStatus
             }
             if uploading { ProgressView().controlSize(.small) }
             Spacer()
@@ -141,8 +140,39 @@ struct MacEditorView: View {
         .font(.system(.caption, design: .monospaced))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 14)
-        .padding(.vertical, 6)
+        // Fixed, or the page would shift when a button comes and goes.
+        .frame(height: 26)
     }
+
+    /// Where the entry stands, down here so the page above is only the writing. Problems that need
+    /// a decision stay above the text, in `StatusBanner`.
+    @ViewBuilder private var entryStatus: some View {
+        switch entry.state {
+        case .editing where entry.remotePostID != nil:
+            Text("Editing")
+                .help("Keeps until you publish or discard it.")
+            Button("Discard Changes", action: discardChanges)
+                .buttonStyle(.accessoryBar)
+                .controlSize(.small)
+        case .sending:
+            Text("Sending to \(site?.name ?? "the site")…")
+        case .sent:
+            Text(sentLabel)
+            if viewURL != nil {
+                Button("View on Site", action: viewOnSite)
+                    .buttonStyle(.accessoryBar)
+                    .controlSize(.small)
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    private var sentLabel: String {
+        entry.remoteStatus == .draft ? "Draft" : site?.kind.doneLabel ?? "Published"
+    }
+
+    private var viewURL: URL? { entry.remoteStatus == .draft ? nil : entry.remoteURL }
 
     private var wordCount: Int { entry.body.split(whereSeparator: \.isWhitespace).count }
 
@@ -170,6 +200,14 @@ struct MacEditorView: View {
             Button { navigation.toggleFocus() } label: { Label("Focus", systemImage: "arrow.up.left.and.arrow.down.right") }
                 .help("Focus Mode (⇧⌘F)")
         }
+        // Edit takes Publish's place, so the window's main action never moves.
+        if entry.state == .sent {
+            ToolbarItem(placement: .automatic) {
+                Button(action: beginEditing) { Text("Edit").padding(.horizontal, 14) }
+                    .controlSize(.large)
+                    .help("Edit This Entry (⌘E)")
+            }
+        }
         if isEditable {
             ToolbarItem(placement: .automatic) {
                 Button(action: send) {
@@ -193,7 +231,10 @@ struct MacEditorView: View {
                       canFormat: isEditable && bodyHasFocus, hasTitle: showsTitle, isPreviewing: isPreviewing,
                       publishLabel: sendLabel, publish: send, format: apply, togglePreview: { showsPreview.toggle() },
                       print: { EntryPrinter.print(title: entry.title, markdown: entry.body, site: site) },
-                      toggleTitle: toggleTitle, chooseImage: { showingImagePicker = true })
+                      toggleTitle: toggleTitle, chooseImage: { showingImagePicker = true },
+                      canBeginEditing: entry.state == .sent, canDiscard: isEditable && entry.remotePostID != nil,
+                      canViewOnSite: viewURL != nil, beginEditing: beginEditing, discardChanges: discardChanges,
+                      viewOnSite: viewOnSite)
     }
 
     private var sendLabel: String {
@@ -215,6 +256,20 @@ struct MacEditorView: View {
                 try? await Task.sleep(for: .seconds(10))
             }
         }
+    }
+
+    private func beginEditing() {
+        entry.beginEdit()
+        selection = TextSelection(insertionPoint: entry.body.endIndex)
+        focusRequest += 1
+    }
+
+    private func viewOnSite() {
+        if let viewURL { openURL(viewURL) }
+    }
+
+    private func discardChanges() {
+        entry.cancelEdit()
     }
 
     private func touchIfStale() {

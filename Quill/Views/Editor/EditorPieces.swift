@@ -61,7 +61,7 @@ struct EditorHeader: View {
     let focusesTitle: Bool
     let onTags: () -> Void
     let onSubmit: () -> Void
-    let onEdit: () -> Void
+    var onEdit: () -> Void = {}
     @FocusState private var titleFocused: Bool
 
     var body: some View {
@@ -114,7 +114,8 @@ struct TagStrip: View {
     }
 }
 
-/// Explains non-editable states and offers the way forward.
+/// Explains non-editable states and offers the way forward. A Mac shows the calm ones in its status
+/// bar and toolbar instead, so only what needs a decision sits above the text.
 struct StatusBanner: View {
     @Bindable var entry: Entry
     let site: Site?
@@ -125,21 +126,15 @@ struct StatusBanner: View {
     var body: some View {
         switch entry.state {
         case .editing:
+            #if !os(macOS)
             if entry.remotePostID != nil {
-                #if os(macOS)
-                HStack {
-                    note("Editing. Keeps until you publish or discard it.", "pencil", .secondary)
-                    Spacer()
-                    Button("Discard Changes") { entry.cancelEdit() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                }
-                #else
                 note("Editing. Going back cancels.", "pencil", .secondary)
-                #endif
             }
+            #endif
         case .sending:
+            #if !os(macOS)
             note("Sending to \(site?.name ?? "the site")…", "arrow.up.circle", .secondary)
+            #endif
         case .queued:
             VStack(alignment: .leading, spacing: 8) {
                 note(entry.lastError ?? "Waiting to send to \(site?.name ?? "the site").", "clock", .orange)
@@ -172,6 +167,7 @@ struct StatusBanner: View {
                 .controlSize(.small)
             }
         case .sent:
+            #if !os(macOS)
             HStack {
                 note(entry.remoteStatus == .draft ? "Draft" : site?.kind.doneLabel ?? "Published", "checkmark.circle", .green)
                 Spacer()
@@ -185,6 +181,7 @@ struct StatusBanner: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            #endif
         }
     }
 

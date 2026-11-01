@@ -85,6 +85,12 @@ struct EditorActions {
     let print: () -> Void
     let toggleTitle: () -> Void
     let chooseImage: () -> Void
+    let canBeginEditing: Bool
+    let canDiscard: Bool
+    let canViewOnSite: Bool
+    let beginEditing: () -> Void
+    let discardChanges: () -> Void
+    let viewOnSite: () -> Void
 }
 
 extension FocusedValues {
@@ -123,6 +129,13 @@ struct MacCommands: Commands {
             Button(editor?.publishLabel ?? "Publish") { editor?.publish() }
                 .keyboardShortcut(.return)
                 .disabled(editor?.canPublish != true)
+            Button("Edit Entry") { editor?.beginEditing() }
+                .keyboardShortcut("e")
+                .disabled(editor?.canBeginEditing != true)
+            Button("Discard Changes") { editor?.discardChanges() }
+                .disabled(editor?.canDiscard != true)
+            Button("View on Site") { editor?.viewOnSite() }
+                .disabled(editor?.canViewOnSite != true)
         }
         CommandMenu("Format") {
             Group {
