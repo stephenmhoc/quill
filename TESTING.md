@@ -1,15 +1,16 @@
 # Testing Quill
 
-Quill is tested end to end against a **real Ghost**, not mocks. The Ghost definition lives in
+Quill is tested end to end against a **real Ghost**, not mocks, with as few journeys as will do. The Ghost definition lives in
 this repo (`testenv/docker-compose.yml`), so anyone with Docker on a reachable host can run it.
 
-There are three parts:
+There are four parts:
 
 | Suite | Where it runs | What it proves |
 |---|---|---|
-| `QuillUITests` | Simulator | The whole app: first-run setup, writing and publishing, then finding, editing and deleting past posts, appearance and app icon |
+| `QuillUITests` | Simulator | Four journeys: first run through publishing, editing and deleting a post, a local site keeping its writing, and connecting Micro.blog |
 | `QuillTests` | Simulator | The real Publisher: publishing, the offline outbox, conflicts, double taps, lost responses, importing and deleting posts, paging |
 | `GhostKitTests` | Mac | The API client on its own (`scripts/test-ghostkit.sh`) |
+| `QuillMacUITests` | Mac | One journey on a local site: add it, write, save, see it listed (`scripts/test-mac.sh`) |
 
 ## Quick start
 
@@ -20,6 +21,7 @@ scripts/test-all.sh                                  # everything, on iPhone and
 scripts/test-app.sh                                  # everything, on the iPhone simulator
 SIM="iPad Pro 13-inch (M5)" scripts/test-app.sh      # and on iPad
 scripts/test-ghostkit.sh                             # the API client
+scripts/test-mac.sh                                  # the Mac app
 ```
 
 You don't need to start anything first. Each run creates a fresh Ghost and deletes it when it ends, whether the tests pass, fail or you press Ctrl-C.
@@ -68,7 +70,8 @@ That account has real followers and cross-posts, so these tests:
 
 - **Only create drafts.** A published post can reach followers before it could be deleted.
 - **Delete what they make**, posts and images, and check it's gone.
-- **Never tap the send button** in the UI test.
+- **Never write anything in the UI test**, which only connects the account, lists its posts and
+  removes the site.
 
 This means publishing a new post, and publishing an existing draft, can't be tested here.
 
@@ -80,14 +83,19 @@ SIM="iPad Pro 13-inch (M5)" scripts/test-app.sh       # all app tests, iPad
 scripts/test-app.sh -only-testing:QuillUITests        # just the full UI flow
 scripts/test-app.sh -only-testing:QuillTests          # just the Publisher tests
 scripts/test-ghostkit.sh                              # API client, on the Mac
+scripts/test-mac.sh                                   # Mac app
 ```
 
 `test-app.sh` regenerates the Xcode project, boots the simulator, uninstalls any previous Quill
 for a clean first run, enrols simulated Face ID, and keeps sending simulated face matches while
 the tests run. Builds use ad-hoc signing, so no Apple account is needed.
 
-Results land in `build/results.xcresult`. To see the screenshots the UI test captures at each
-step, run `open build/results.xcresult`.
+Results land in `build/results.xcresult`. To see the screenshots the UI test captures, run
+`open build/results.xcresult`.
+
+`test-mac.sh` needs no Ghost. It builds the `com.merimerimeri.Quill.dev` identity, ad-hoc signed,
+and clears only that identity's data, so it can't touch the Quill in `/Applications`. Its log is
+`build/mac.log`. `-skipUnlock` stands in for Touch ID, so the Mac's unlock prompt isn't tested.
 
 ## Managing the test Ghost
 
@@ -117,6 +125,8 @@ Only run one test script at a time, because they share the same Ghost.
 - Tests only use `GHOST_DEV_URL` and `GHOST_DEV_ADMIN_KEY`, so they can't touch a real site
   unless you point those at one. Don't.
 - `.dev/` holds test credentials only and must stay gitignored.
+- Every local Mac build uses the `.dev` identity, with its own data and Keychain items. Only the
+  release workflow builds the real one.
 
 ## Troubleshooting
 
@@ -124,7 +134,8 @@ Only run one test script at a time, because they share the same Ghost.
 |---|---|
 | A run was killed and left Ghost running | The next run clears it, or run `scripts/testenv.sh destroy` |
 | `bind: address already in use` on 2369 | Something else has the port. Find it with `lsof -i :2369` |
-| UI test stops at "Face ID unlock / Add Site didn't appear" | Open the Simulator and use Features → Face ID → Enrolled, then rerun |
+| UI test stops at "Face ID unlock / Add Site didn't appear", or "didn't unlock" | Face ID enrolment races a fresh boot. Leave the simulator booted for a minute and rerun without shutting it down |
+| A Mac test can't click something, or an app's prompt covers its window | Dismiss the prompt. Tests share the real screen with real apps |
 | `Unable to find a device matching` | The `SIM` name doesn't exist; list them with `xcrun simctl list devices available` |
 | Ghost won't start | `ssh $QUILL_TEST_HOST 'cd /opt/ghost-dev && docker compose logs --tail 50'` |
 
@@ -135,6 +146,6 @@ control, a layout or a setting. Check those by eye, and prove a one-off fix once
 
 - Publishing behavior goes in `QuillTests/PublisherLiveTests.swift`. Use `harness()` and give
   posts a unique title with `UUID()`.
-- Anything the user sees goes in `QuillUITests/PublishFlowUITests.swift`.
+- A journey the user depends on goes in `QuillUITests/PublishFlowUITests.swift`.
 - Ghost's `updated_at` has one-second precision, so wait over a second between two edits when
   testing conflicts.

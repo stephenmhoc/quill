@@ -1,10 +1,12 @@
-# Releasing to TestFlight
+# Releasing
+
+## TestFlight
 
 `.github/workflows/release.yml` archives Quill, signs it with a temporary certificate and
 profile, uploads it to App Store Connect, waits for Apple to finish processing it, then revokes
 the temporary signing assets. Revoking any earlier fails processing with `ITMS-90721`.
 
-## One-time setup
+### One-time setup
 
 1. In App Store Connect, create an app with the bundle ID `com.merimerimeri.Quill`. The API
    can't create app records, so this has to be done by hand. The name must be unique across the
@@ -32,7 +34,7 @@ the temporary signing assets. Revoking any earlier fails processing with `ITMS-9
    base64 -i AuthKey_XXXXXXXXXX.p8 | gh secret set ASC_API_KEY_P8_BASE64 -R stephenmhoc/quill
    ```
 
-## Shipping a build
+### Shipping a build
 
 Push a version tag, or run the workflow by hand with a version:
 
@@ -44,7 +46,7 @@ gh workflow run release.yml -R stephenmhoc/quill -f version=0.2.0
 The tag sets the version and the run number sets the build number.
 
 GitHub only builds and publishes. All testing is local, so run the suites from `TESTING.md` on
-iPhone and iPad before tagging.
+iPhone, iPad and Mac before tagging.
 
 ## Mac
 
@@ -55,5 +57,7 @@ Push a `v<version>-mac` tag, for example `v0.1.2-mac`. `release-mac.yml` builds 
 The workflow needs the `ASC_*` secrets above, plus `DEVELOPER_ID_CERT_BASE64` (the Developer ID Application certificate and its private key, exported from Keychain Access as a `.p12` and Base64 encoded), `DEVELOPER_ID_CERT_PASSWORD` (that export's password) and `SPARKLE_PRIVATE_KEY`.
 
 The update key's public half is `SUPublicEDKey` in `project.yml`. The private half is the `SPARKLE_PRIVATE_KEY` secret, and in the login Keychain under the account `quill`. Losing it means installed copies can't update.
+
+Local builds in every configuration are `com.merimerimeri.Quill.dev` with the Dev icon. The workflow alone sets the real identity, through `QUILL_BUNDLE_ID` and `QUILL_APP_ICON`, and fails if the archive comes out as anything else.
 
 The Developer ID profile is created once, as "Quill Developer ID", and reused. Replacing the Developer ID certificate means deleting that profile so the next release makes a new one.

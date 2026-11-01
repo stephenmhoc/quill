@@ -33,7 +33,8 @@ The test scripts create a fresh Ghost on `docker-server` and delete it afterward
 - On iPad, XCTest sometimes waits a minute per step for an animation signal that never comes,
   with the app idle at 0% CPU. It's a test tool problem. Swizzling the wait crashes the runner.
   Once it starts it can repeat every run: `xcrun simctl shutdown` the simulator and rerun, twice
-  if the first run fails to unlock, because Face ID enrolment races a fresh boot.
+  if the first run fails to unlock, because Face ID enrolment races a fresh boot. Don't shut it down
+  between those runs: wait a minute and rerun.
 - Check the screenshots too, because a passing test can't see a visual regression:
   `xcrun xcresulttool export attachments --path build/results-iphone.xcresult --output-path <dir>`
   (`results-ipad`, `results-live`; `test-app.sh` writes `build/results.xcresult`).
@@ -63,9 +64,16 @@ The test scripts create a fresh Ghost on `docker-server` and delete it afterward
 
 - There's no draft step. Writing saves itself, and going back from a new entry keeps it in
   Drafts. Never add a Save Draft action.
-- Going back from an edit of a published post cancels the edit.
+- Going back from an edit of a published post cancels the edit on iOS. A Mac has no back button, so
+  real changes stay in Drafts until they're published or discarded.
+- Focus mode hides everything but the page. On a Mac it's ⇧⌘F, not ⌘\, which 1Password takes.
 - Sent and the Outbox stay out of the way: the Outbox only appears on an error or a slow send.
 - Titles are optional. A site must exist before any writing is possible.
+
+## Releases
+
+Each version's release notes say what changed and, where possible, why. See `RELEASING.md` for how
+they're passed to the workflow.
 
 ## Secrets
 
