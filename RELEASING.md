@@ -61,6 +61,11 @@ days. `refresh-testflight.yml` checks weekly and, if the last iOS build is 30 da
 next patch version from `main`. If the distribution certificate has expired, that build fails: run
 `create-distribution-cert` above again.
 
+After upload, every release goes to all external TestFlight groups and to Beta App Review, with its
+`release_notes` as the test notes, or a generic line if there are none. Monthly rebuilds go too, so
+public testers' builds don't expire. A failed submission leaves the release in place: fix the cause,
+then retry with `gh workflow run send-to-external-testers.yml -f build_number=<n> -f test_notes=<notes>`.
+
 GitHub only builds and publishes. All testing is local, so run the suites from `TESTING.md` on
 iPhone, iPad and Mac before tagging.
 
