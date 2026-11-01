@@ -72,6 +72,15 @@ extension View {
         #endif
     }
 
+    /// A sheet's main button on a Mac needs more room than its word.
+    @ViewBuilder func sheetButtonLabel() -> some View {
+        #if os(macOS)
+        padding(.horizontal, 12)
+        #else
+        self
+        #endif
+    }
+
     func siteFormStyle(isCentered: Bool) -> some View { modifier(SiteFormStyle(isCentered: isCentered)) }
 }
 

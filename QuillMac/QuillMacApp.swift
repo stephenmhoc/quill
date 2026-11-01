@@ -33,7 +33,7 @@ struct QuillMacApp: App {
                 .environment(lock)
                 .environment(navigation)
                 .environment(publisher)
-                .frame(minWidth: 760, minHeight: 480)
+                .frame(minWidth: 920, minHeight: 480)
                 .onChange(of: appearance, initial: true) { _, choice in
                     NSApp.appearance = choice.colorScheme.map { NSAppearance(named: $0 == .dark ? .darkAqua : .aqua) } ?? nil
                 }

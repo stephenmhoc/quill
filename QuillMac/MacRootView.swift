@@ -21,11 +21,13 @@ struct MacRootView: View {
             } else {
                 NavigationSplitView(columnVisibility: $navigation.columnVisibility) {
                     MacSidebar()
-                        .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
+                        .frame(minWidth: 230)
+                        .navigationSplitViewColumnWidth(min: 230, ideal: 250, max: 340)
                         .toolbar(removing: .sidebarToggle)
                 } content: {
                     MacContentColumn()
-                        .navigationSplitViewColumnWidth(min: 280, ideal: 360, max: 480)
+                        .frame(minWidth: 320)
+                        .navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 480)
                 } detail: {
                     MacDetailColumn()
                 }

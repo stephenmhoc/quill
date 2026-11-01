@@ -9,41 +9,85 @@ struct SitePicker: View {
     let sites: [Site]
     let locked: Bool
 
+    #if os(macOS)
+    @State private var choosing = false
+    #endif
+
     private var site: Site? { sites.first { $0.id == entry.siteID } }
 
     var body: some View {
+        chooser
+            .disabled(locked)
+            .accessibilityLabel("Site: \(site?.name ?? "none")")
+    }
+
+    #if os(macOS)
+    /// A popover, because a Mac menu won't draw a coloured dot beside its items.
+    private var chooser: some View {
+        Button { choosing = true } label: { label }
+            .buttonStyle(.plain)
+            .popover(isPresented: $choosing, arrowEdge: .bottom) {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(sites) { s in
+                        Button {
+                            entry.siteID = s.id
+                            choosing = false
+                        } label: {
+                            HStack(spacing: 8) {
+                                Circle().fill(s.color.color).frame(width: 9, height: 9)
+                                Text(s.name)
+                                Spacer(minLength: 16)
+                                if s.id == entry.siteID { Image(systemName: "checkmark").font(.caption.weight(.semibold)) }
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(8)
+                .frame(minWidth: 180)
+            }
+    }
+    #else
+    private var chooser: some View {
         Menu {
             ForEach(sites) { s in
                 Button {
                     entry.siteID = s.id
                 } label: {
-                    Label(s.name, systemImage: s.accessIcon)
+                    Label { Text(s.name) } icon: { dot(s.color.color) }
                 }
             }
-        } label: {
-            HStack(spacing: 6) {
-                Circle().fill(site?.color.color ?? .gray).frame(width: 8, height: 8)
-                Text(site?.name ?? "Choose site").fontWeight(.semibold)
-                if let site { Image(systemName: site.accessIcon).font(.caption2) }
-                if !locked { Image(systemName: "chevron.down").font(.caption2.weight(.bold)) }
-            }
-            .font(.system(.subheadline, design: .monospaced))
-            .padding(.horizontal, 12)
-            #if os(macOS)
-            .frame(height: 36)
-            #else
-            .padding(.vertical, 6)
-            #endif
-            .background((site?.color.color ?? .gray).opacity(0.15), in: Capsule())
-            .foregroundStyle(site?.color.color ?? .secondary)
+        } label: { label }
+    }
+
+    /// Drawn as an image, because a menu turns symbols the colour of its text.
+    private func dot(_ color: Color) -> Image {
+        let renderer = ImageRenderer(content: Circle().fill(color).frame(width: 10, height: 10))
+        renderer.scale = 2
+        guard let image = renderer.cgImage else { return Image(systemName: "circle.fill") }
+        return Image(decorative: image, scale: 2).renderingMode(.original)
+    }
+    #endif
+
+    private var label: some View {
+        HStack(spacing: 6) {
+            Circle().fill(site?.color.color ?? .gray).frame(width: 8, height: 8)
+            Text(site?.name ?? "Choose site").fontWeight(.semibold)
+            if let site { Image(systemName: site.accessIcon).font(.caption2) }
+            if !locked { Image(systemName: "chevron.down").font(.caption2.weight(.bold)) }
         }
+        .font(.system(.subheadline, design: .monospaced))
+        .padding(.horizontal, 12)
         #if os(macOS)
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
+        .frame(height: 36)
+        #else
+        .padding(.vertical, 6)
         #endif
-        .disabled(locked)
-        .accessibilityLabel("Site: \(site?.name ?? "none")")
+        .background((site?.color.color ?? .gray).opacity(0.15), in: Capsule())
+        .foregroundStyle(site?.color.color ?? .secondary)
     }
 }
 

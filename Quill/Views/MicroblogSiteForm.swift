@@ -58,6 +58,7 @@ struct MicroblogSiteForm: View {
             if let error {
                 Section { Text(error).font(.footnote).foregroundStyle(.red) }
             }
+            #if os(iOS)
             if !isNew {
                 Section {
                     Button("Remove Site", role: .destructive) { confirmingDelete = true }
@@ -65,14 +66,25 @@ struct MicroblogSiteForm: View {
                     Text("Removes the site and its token from this device. Nothing changes on Micro.blog.")
                 }
             }
+            #endif
         }
         .siteFormStyle(isCentered: isCentered)
         .navigationTitle(isNew ? "Micro.blog" : "Edit Site")
         .compactTitle()
         .toolbar {
+            #if os(macOS)
+            if !isNew {
+                ToolbarItem(placement: .destructiveAction) {
+                    Button("Remove Site…", role: .destructive) { confirmingDelete = true }
+                        .help("Removes the site and its token from this device. Nothing changes on Micro.blog.")
+                }
+            }
+            #endif
             ToolbarItem(placement: .confirmationAction) {
                 if checking { ProgressView() } else {
-                    Button("Save") { Task { await save() } }.disabled(!canSave)
+                    Button { Task { await save() } } label: { Text("Save").sheetButtonLabel() }
+                        .accessibilityIdentifier("saveSite")
+                        .disabled(!canSave)
                 }
             }
         }

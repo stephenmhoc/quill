@@ -28,7 +28,7 @@ final class MacWritingUITests: XCTestCase {
             name.click()
             name.typeText("Notebook")
             attach("site-form", app)
-            app.buttons["Save"].click()
+            app.buttons["saveSite"].click()
         }
 
         let editor = app.textViews["editor"]

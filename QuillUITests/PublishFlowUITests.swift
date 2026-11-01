@@ -32,7 +32,7 @@ final class PublishFlowUITests: XCTestCase {
         keyField.tap()
         keyField.typeText(key)
         XCTAssertTrue(app.buttons["Private"].isSelected, "new sites default to private")
-        app.buttons["Save"].tap()
+        app.buttons["saveSite"].tap()
 
         // Then the blank page, on the new site.
         let editor = app.textViews["editor"]
@@ -129,7 +129,7 @@ final class PublishFlowUITests: XCTestCase {
             let keyField = app.secureTextFields.firstMatch
             keyField.tap()
             keyField.typeText(key)
-            app.buttons["Save"].tap()
+            app.buttons["saveSite"].tap()
             XCTAssertTrue(editorView.waitForExistence(timeout: 15))
         }
 
@@ -162,7 +162,7 @@ final class PublishFlowUITests: XCTestCase {
         app.buttons["Paste"].tap()
         XCTAssertEqual((newKey.value as? String)?.count, key.count, "paste didn't reach the key field")
         attach("edit-site-key", app)
-        app.buttons["Save"].tap()
+        app.buttons["saveSite"].tap()
         XCTAssertTrue(row.waitForExistence(timeout: 15), "saving a pasted key failed")
         XCTAssertFalse(XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Save"].waitForExistence(timeout: 2),
                        "iOS offered to save the key to Passwords")
@@ -282,7 +282,7 @@ final class PublishFlowUITests: XCTestCase {
         nameField.typeText(name)
         app.buttons["Plum"].tap()
         attach("local-form", app)
-        app.buttons["Save"].tap()
+        app.buttons["saveSite"].tap()
 
         // Write on it. Saved stands in for Publish, and it's listed under the site.
         showSidebar(app)
@@ -409,7 +409,7 @@ final class PublishFlowUITests: XCTestCase {
         nameField.tap()
         nameField.typeText(name)
         attach("microblog-form", app)
-        app.buttons["Save"].tap()
+        app.buttons["saveSite"].tap()
 
         // Listed with its real posts, and marked public.
         XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 20), "site wasn't added")

@@ -718,7 +718,7 @@
 		525D8016F05A48469C6DEA03 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-Dev";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = QuillMac/QuillMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -729,7 +729,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.merimerimeri.Quill;
+				PRODUCT_BUNDLE_IDENTIFIER = com.merimerimeri.Quill.dev;
 				PRODUCT_NAME = Quill;
 				SDKROOT = macosx;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;

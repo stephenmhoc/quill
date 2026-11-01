@@ -117,7 +117,6 @@ final class MacPageTextView: NSTextView {
         let storage = NSTextStorage()
         let layout = NSLayoutManager()
         let container = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
-        container.widthTracksTextView = true
         container.lineFragmentPadding = 0
         storage.addLayoutManager(layout)
         layout.addTextContainer(container)
@@ -174,9 +173,11 @@ final class MacPageTextView: NSTextView {
     override var textContainerOrigin: NSPoint { NSPoint(x: textContainerInset.width, y: top) }
 
     private func layOutPage() {
-        let side = max(Self.margin, (bounds.width - Self.maxWidth) / 2)
-        let width = bounds.width - side * 2
+        // A constant margin, not a centred column, so the text stays put when the panes change.
+        let side = Self.margin
+        let width = min(Self.maxWidth, bounds.width - side * 2)
         guard width > 0 else { return }
+        textContainer?.size.width = width
         var height: CGFloat = 0
         if let headerController {
             height = headerController.sizeThatFits(in: NSSize(width: width, height: .greatestFiniteMagnitude)).height

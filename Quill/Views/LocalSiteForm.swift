@@ -30,6 +30,7 @@ struct LocalSiteForm: View {
             if let error {
                 Section { Text(error).font(.footnote).foregroundStyle(.red) }
             }
+            #if os(iOS)
             if site != nil {
                 Section {
                     Button("Remove Site", role: .destructive) { confirmingDelete = true }
@@ -37,13 +38,24 @@ struct LocalSiteForm: View {
                     Text("Permanently deletes this site and every entry on it.")
                 }
             }
+            #endif
         }
         .siteFormStyle(isCentered: isCentered)
         .navigationTitle(site == nil ? "Local Site" : "Edit Site")
         .compactTitle()
         .toolbar {
+            #if os(macOS)
+            if site != nil {
+                ToolbarItem(placement: .destructiveAction) {
+                    Button("Remove Site…", role: .destructive) { confirmingDelete = true }
+                        .help("Permanently deletes this site and every entry on it.")
+                }
+            }
+            #endif
             ToolbarItem(placement: .confirmationAction) {
-                Button("Save", action: save).disabled(trimmedName.isEmpty)
+                Button(action: save) { Text("Save").sheetButtonLabel() }
+                    .accessibilityIdentifier("saveSite")
+                    .disabled(trimmedName.isEmpty)
             }
         }
         .confirmationDialog("Remove \(site?.name ?? "site") and all its entries?", isPresented: $confirmingDelete, titleVisibility: .visible) {

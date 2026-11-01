@@ -12,8 +12,7 @@ scripts/test-app.sh                              # app tests, iPhone simulator
 SIM="iPad Pro 13-inch (M5)" scripts/test-app.sh  # app tests, iPad simulator
 scripts/test-app.sh -only-testing:QuillUITests   # one suite
 scripts/test-ghostkit.sh                         # API client, on the Mac
-xcodebuild test -project Quill.xcodeproj -scheme QuillMac -destination platform=macOS
-                                                 # Mac app: needs signing and automation mode
+scripts/test-mac.sh                              # Mac app, on its own .dev identity
 ```
 
 The test scripts create a fresh Ghost on `docker-server` and delete it afterwards. See

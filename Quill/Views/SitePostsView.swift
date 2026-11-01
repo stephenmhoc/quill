@@ -119,11 +119,13 @@ struct SitePostsView: View {
                         }
                 }
             } header: {
+                #if os(iOS)
                 if let site {
                     Label(site.accessLabel, systemImage: site.accessIcon)
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
+                #endif
             }
             if hasMore {
                 ProgressView()
@@ -133,15 +135,20 @@ struct SitePostsView: View {
     }
 
     #if os(macOS)
-    /// Totals are a footnote on a Mac, where the list is what you came for.
+    /// Who can read it and the totals are a footnote on a Mac, where the list is what you came for.
     @ViewBuilder private var statsFooter: some View {
-        if let stats = site?.stats {
-            Text("\(stats.posts.formatted()) \(stats.posts == 1 ? "post" : "posts") · \(stats.words.formatted()) \(stats.words == 1 ? "word" : "words")")
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
+        if let site {
+            HStack {
+                Label(site.accessLabel, systemImage: site.accessIcon)
+                Spacer()
+                if let stats = site.stats {
+                    Text("\(stats.posts.formatted()) \(stats.posts == 1 ? "post" : "posts") · \(stats.words.formatted()) \(stats.words == 1 ? "word" : "words")")
+                }
+            }
+            .font(.system(.caption, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
         }
     }
     #endif

@@ -108,7 +108,7 @@ targets:
           - $(PRODUCT_BUNDLE_IDENTIFIER)-spks
           - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
         keychain-access-groups:
-          - $(AppIdentifierPrefix)com.merimerimeri.Quill
+          - $(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)
     info:
       path: QuillMac/Info.plist
       properties:
@@ -126,9 +126,16 @@ targets:
           # Lets a dev build reach a Ghost on http://localhost; real sites use HTTPS.
           NSAllowsLocalNetworking: true
     settings:
+      configs:
+        # Development builds and tests get their own data and Keychain items, so they can never
+        # touch the copy of Quill in /Applications.
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.merimerimeri.Quill.dev
+          ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon-Dev
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: com.merimerimeri.Quill
       base:
         PRODUCT_NAME: Quill
-        PRODUCT_BUNDLE_IDENTIFIER: com.merimerimeri.Quill
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         SWIFT_APPROACHABLE_CONCURRENCY: YES
         ENABLE_HARDENED_RUNTIME: YES
