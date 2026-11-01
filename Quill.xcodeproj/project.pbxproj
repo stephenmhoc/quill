@@ -26,6 +26,7 @@
 		41B77222AA0F25535C86C173 /* EntryPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B776FA072E3EEF65311D230 /* EntryPreview.swift */; };
 		42387E640DDEC9B914B85410 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF31C8EE91FDE72C86EE086E /* SettingsView.swift */; };
 		456B60126BF7D86DED1712DC /* LinkBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8345D33355EE4D50276AC56F /* LinkBrowser.swift */; };
+		461A0A77BCBEA4E46AE0CA9C /* Telemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38CF009D20F8F56A4E5A9CD8 /* Telemetry.swift */; };
 		4D3B3EE692DDC20217F87624 /* AppIconChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C75A0693926536929AB2478 /* AppIconChoice.swift */; };
 		4F4277A061E03758D884F159 /* NewEntryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9908E6604B2E633C1858956 /* NewEntryButton.swift */; };
 		51DF2F09CE5EB5D5B4DBE1A9 /* Entry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD30CED7B199FBAC661EA02 /* Entry.swift */; };
@@ -36,6 +37,7 @@
 		728239642AFD23D314D465F0 /* Navigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A601AE5954D328F6E161E61 /* Navigation.swift */; };
 		7394364E99E07ED8DEBED287 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = D129A90B0F4AEE93CA5BA2F5 /* Sparkle */; };
 		760C5A038A9ACBF3229EAEB7 /* GhostSiteForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC2A3CC27E227D11249E64A /* GhostSiteForm.swift */; };
+		78AE83136276C023E376AF5E /* Telemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38CF009D20F8F56A4E5A9CD8 /* Telemetry.swift */; };
 		78BAC39BF5FF5FA2372F77B5 /* MacSitePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69B66DA2B54F91EA4487F5CB /* MacSitePicker.swift */; };
 		7943BCA4B2F3B299FA08702A /* QuillStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C0502ECC5CD16D03EEE45D /* QuillStore.swift */; };
 		7E146DC24D130D44E61F2CB0 /* PublishFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9234120738BBF6CBF48467A3 /* PublishFlowUITests.swift */; };
@@ -49,6 +51,7 @@
 		94DAE2697E72826219D9F01E /* AddSiteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8EE99F1C2FDC7AC5F379E9 /* AddSiteView.swift */; };
 		95A4F49D30F1411095B10E8A /* MacRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4B1C33DC311E92AFFB155E /* MacRootView.swift */; };
 		9A17C942B6A0E268D6AAC3C6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AF8430782BE47927308B3295 /* Assets.xcassets */; };
+		9AA64A0251A4F3BFABFB5016 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 2D0D3EEA4E574911CC4DB104 /* Sentry */; };
 		9E5EAC10972D08394331100A /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64CF96E4FEB2C5D36281BB0D /* Appearance.swift */; };
 		A3A285F674E7BD9454D959C5 /* EditorPieces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2512AEC549E7B9706302AB28 /* EditorPieces.swift */; };
 		A45A30C56D3270D2493CEFFD /* EntryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4433B57A9D396E73486DFF7A /* EntryListView.swift */; };
@@ -74,6 +77,7 @@
 		D4A4486ECDF96AE03E6D8076 /* QuillApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2BDDEC6FBD3F6622BF7272 /* QuillApp.swift */; };
 		D5B68511950210FC239A6B90 /* EntryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4433B57A9D396E73486DFF7A /* EntryListView.swift */; };
 		D6A3327F5586CB8BFA2DA93D /* EditorTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECB4E88FFB544CBB3212EA2 /* EditorTextView.swift */; };
+		D7DD73EE480A9DE9EF4D4D8D /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 7F63EFD9F5F0992863DAB52F /* Sentry */; };
 		D9E030FF2AD8B6209A8E4B2A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 51AB582489BC0691928C32E0 /* Assets.xcassets */; };
 		DA1BF4E8A0A1653A8F9AEC81 /* LockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4829D02BAD5836F8776B8F8F /* LockView.swift */; };
 		DA3769B4FADBCB4DBBCF6E29 /* TagEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E75D2A90726438075942B1 /* TagEditor.swift */; };
@@ -122,6 +126,7 @@
 		2D36D7CE15ACC63A9361E466 /* LocalSiteForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSiteForm.swift; sourceTree = "<group>"; };
 		325987E418B375BC9BEDA7D2 /* MicroblogLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicroblogLiveTests.swift; sourceTree = "<group>"; };
 		37E75D2A90726438075942B1 /* TagEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagEditor.swift; sourceTree = "<group>"; };
+		38CF009D20F8F56A4E5A9CD8 /* Telemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry.swift; sourceTree = "<group>"; };
 		4433B57A9D396E73486DFF7A /* EntryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryListView.swift; sourceTree = "<group>"; };
 		4829D02BAD5836F8776B8F8F /* LockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockView.swift; sourceTree = "<group>"; };
 		4851296535464A92DA36EA6C /* MacSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSidebar.swift; sourceTree = "<group>"; };
@@ -188,6 +193,7 @@
 			files = (
 				CE0ABD8E6006E65120026C59 /* GhostKit in Frameworks */,
 				7394364E99E07ED8DEBED287 /* Sparkle in Frameworks */,
+				D7DD73EE480A9DE9EF4D4D8D /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -204,6 +210,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B0EA2C8C38D7EC013DF55067 /* GhostKit in Frameworks */,
+				9AA64A0251A4F3BFABFB5016 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -367,6 +374,7 @@
 				D1F21B3D2ECEA6CDF2B70A82 /* Publisher.swift */,
 				C0C0502ECC5CD16D03EEE45D /* QuillStore.swift */,
 				8E4C7A3CBF2CA60807133F56 /* SiteBackend.swift */,
+				38CF009D20F8F56A4E5A9CD8 /* Telemetry.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -429,6 +437,7 @@
 			name = Quill;
 			packageProductDependencies = (
 				174CF080ABAE96B044CF48E7 /* GhostKit */,
+				2D0D3EEA4E574911CC4DB104 /* Sentry */,
 			);
 			productName = Quill;
 			productReference = 0DBE22D21ADC2F0225DF0411 /* Quill.app */;
@@ -450,6 +459,7 @@
 			packageProductDependencies = (
 				BC432E7AC749D83740D74B9F /* GhostKit */,
 				D129A90B0F4AEE93CA5BA2F5 /* Sparkle */,
+				7F63EFD9F5F0992863DAB52F /* Sentry */,
 			);
 			productName = QuillMac;
 			productReference = 5367C3690A0CD578ACAC7C35 /* QuillMac.app */;
@@ -516,6 +526,7 @@
 			mainGroup = 577859B0867F82EBE76535CA;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A94AF17CFA307311D8597D66 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 				C32F8627B4A6285B4C1538AF /* XCRemoteSwiftPackageReference "Sparkle" */,
 				E6D4375A24199F5433D4B9C6 /* XCLocalSwiftPackageReference "Packages/GhostKit" */,
 			);
@@ -588,6 +599,7 @@
 				F0A50691C9BF7B33331CA1AE /* Site.swift in Sources */,
 				DC02ACA75D6D6C5DBBF8F6C4 /* SiteBackend.swift in Sources */,
 				C869697575CD3C2B51991580 /* SitePostsView.swift in Sources */,
+				78AE83136276C023E376AF5E /* Telemetry.swift in Sources */,
 				8C6E5F605D90A307937385B8 /* TokenStore.swift in Sources */,
 				261E2D416DA26F84FB7C3C86 /* Updates.swift in Sources */,
 			);
@@ -638,6 +650,7 @@
 				53DF4771D36D398595051B04 /* SiteBackend.swift in Sources */,
 				A75BEC526CC5C446F5B1F14A /* SitePostsView.swift in Sources */,
 				DA3769B4FADBCB4DBBCF6E29 /* TagEditor.swift in Sources */,
+				461A0A77BCBEA4E46AE0CA9C /* Telemetry.swift in Sources */,
 				CCB62736FA629BAFBDE21593 /* TokenStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1070,6 +1083,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A94AF17CFA307311D8597D66 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.32.0;
+			};
+		};
 		C32F8627B4A6285B4C1538AF /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -1085,6 +1106,11 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = GhostKit;
 		};
+		2D0D3EEA4E574911CC4DB104 /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A94AF17CFA307311D8597D66 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
+		};
 		50AA175CB5E00ABE45A6F873 /* GhostKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GhostKit;
@@ -1092,6 +1118,11 @@
 		65D9C7189A68C5BF5AC6F620 /* GhostKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GhostKit;
+		};
+		7F63EFD9F5F0992863DAB52F /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A94AF17CFA307311D8597D66 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
 		};
 		BC432E7AC749D83740D74B9F /* GhostKit */ = {
 			isa = XCSwiftPackageProductDependency;

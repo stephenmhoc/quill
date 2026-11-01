@@ -115,7 +115,7 @@ final class Publisher {
         let stuck = Entry.State.sending.rawValue
         let descriptor = FetchDescriptor<Entry>(predicate: #Predicate { $0.stateRaw == stuck })
         for entry in (try? context.fetch(descriptor)) ?? [] { entry.state = .queued }
-        try? context.save()
+        save()
     }
 
     private func send(_ entry: Entry) async {
@@ -124,19 +124,23 @@ final class Publisher {
         guard let site = site(for: entry) else {
             entry.state = .failed
             entry.lastError = "Choose a site for this entry."
-            try? context.save()
+            save()
             return
         }
         // An earlier attempt whose outcome is unknown must survive later network failures.
         let unresolvedAttempt = entry.createAttemptedAt != nil
         sending.insert(entry.id)
         entry.state = .sending
+        let timing = Telemetry.Timing("publish", siteKind: site.kind.rawValue)
+        var succeeded = false
         defer {
+            timing.finish(succeeded: succeeded)
             sending.remove(entry.id)
-            try? context.save()
+            save()
         }
         do {
             let post = try await backend(for: site).send(entry)
+            succeeded = true
             // Deleted while the request was out, along with its site or on its own.
             guard entry.modelContext != nil, !entry.isDeleted else { return }
             entry.remotePostID = post.id
@@ -166,7 +170,17 @@ final class Publisher {
         entry.state = .failed
         entry.lastError = error.localizedDescription
         if case GhostError.conflict = error { entry.failureReason = "conflict" }
-        try? context.save()
+        Telemetry.report(error, while: "publish")
+        save()
+    }
+
+    /// A lost save here can send a post twice, or lose track of one that's sent.
+    private func save() {
+        do {
+            try context.save()
+        } catch {
+            Telemetry.report(error, while: "save")
+        }
     }
 
     private func site(for entry: Entry) -> Site? {

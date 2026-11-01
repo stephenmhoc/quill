@@ -75,6 +75,7 @@ final class AppLock {
             lastError = nil
         } catch {
             lastError = error.localizedDescription
+            Telemetry.report(error, while: "unlock")
         }
     }
 

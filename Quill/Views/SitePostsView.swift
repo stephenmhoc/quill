@@ -249,6 +249,7 @@ struct SitePostsView: View {
             error = nil
         } catch {
             self.error = error.localizedDescription
+            Telemetry.report(error, while: "delete post")
         }
     }
 

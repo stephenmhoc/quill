@@ -134,6 +134,7 @@ struct EditorView: View {
                 saveFailed = false
                 return
             } catch {
+                if !saveFailed { Telemetry.report(error, while: "save") }
                 saveFailed = true
                 try? await Task.sleep(for: .seconds(10))
             }
@@ -306,6 +307,7 @@ struct EditorView: View {
             selection = newSelection
         } catch {
             uploadError = error.localizedDescription
+            Telemetry.report(error, while: "image upload")
         }
     }
 }

@@ -109,6 +109,21 @@ jobs:
           built=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$ARCHIVE_PATH/Products/Applications/Quill.app/Contents/Info.plist")
           [ "$built" = "$IOS_BUNDLE_ID" ] || { echo "Archived $built, not $IOS_BUNDLE_ID" >&2; exit 1; }
 
+      # Without these a crash can't be read. Not fatal: an unreadable report is better than no release,
+      # and the workflow warns. The weekly TestFlight refresh runs unattended, so it mustn't stop here.
+      - name: Upload Debug Symbols to Sentry
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: merimerimeri-software
+          SENTRY_PROJECT: quill
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ]; then
+            echo "::warning::SENTRY_AUTH_TOKEN isn't set, so this build's crashes can't be symbolicated."
+            exit 1
+          fi
+          npx --yes @sentry/cli@3.8.2 debug-files upload --include-sources "$ARCHIVE_PATH/dSYMs"
+
       - name: Export
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF

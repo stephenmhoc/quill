@@ -66,6 +66,12 @@ After upload, every release goes to all external TestFlight groups and to Beta A
 public testers' builds don't expire. A failed submission leaves the release in place: fix the cause,
 then retry with `gh workflow run send-to-external-testers.yml -f build_number=<n> -f test_notes=<notes>`.
 
+Both release workflows upload the archive's dSYMs to the `quill` project in Sentry, so crash reports are readable. They need a `SENTRY_AUTH_TOKEN` secret: an organization token from Settings → Auth Tokens in Sentry, which has `project:releases` and `org:read` by default. A failed upload warns and doesn't stop the release.
+
+```sh
+gh secret set SENTRY_AUTH_TOKEN -R stephenmhoc/quill
+```
+
 GitHub only builds and publishes. All testing is local, so run the suites from `TESTING.md` on
 iPhone, iPad and Mac before tagging.
 

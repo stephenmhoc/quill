@@ -12,6 +12,9 @@ packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: 2.7.0
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: 9.32.0
 
 settings:
   base:
@@ -29,6 +32,7 @@ targets:
       - Quill
     dependencies:
       - package: GhostKit
+      - package: Sentry
     entitlements:
       path: Quill/Quill.entitlements
       properties:
@@ -96,6 +100,7 @@ targets:
     dependencies:
       - package: GhostKit
       - package: Sparkle
+      - package: Sentry
     entitlements:
       path: QuillMac/QuillMac.entitlements
       properties:

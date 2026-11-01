@@ -12,6 +12,7 @@ struct QuillMacApp: App {
     @AppStorage(Appearance.key) private var appearance = Appearance.auto
 
     init() {
+        Telemetry.start()
         Updates.start()
         let container = QuillStore.makeContainer()
         let lock = AppLock()

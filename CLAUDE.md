@@ -59,6 +59,9 @@ The test scripts create a fresh Ghost on `docker-server` and delete it afterward
   and menus. Don't reuse iOS layouts there. Put small differences in `PlatformStyle.swift`.
 - **Writing surface:** it uses the system monospace font. The iA fonts' terms forbid bundling
   them in a text editor.
+- **Telemetry:** only `Telemetry.swift` imports Sentry. Reports must never carry writing, titles,
+  site names or addresses, keys or server messages, so don't turn on screenshots, the view
+  hierarchy, session replay or the SDK's network, file or Core Data capture.
 
 ## Product rules
 

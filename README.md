@@ -9,7 +9,8 @@ Markdown and tap Publish, with no draft step and no extra screens.
   unsent writing saves itself to Drafts on this device.
 - **Past posts:** browse, edit and delete what's already published.
 - **Outbox:** anything that can't send waits and retries by itself.
-- **Privacy:** Face ID or Touch ID locks the app, and site keys stay in the Keychain.
+- **Privacy:** Face ID or Touch ID locks the app, and site keys stay in the Keychain. Crash and
+  error reports go to Sentry, and never contain your writing, site names or addresses, or keys.
 - **Focus mode:** hides everything but the page, on every platform.
 - **iPad and Mac:** three columns. The Mac app is native, not Catalyst, with its own menus and
   shortcuts, and it updates itself through Sparkle.
