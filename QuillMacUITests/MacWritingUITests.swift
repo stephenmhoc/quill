@@ -76,6 +76,14 @@ final class MacWritingUITests: XCTestCase {
         app.typeKey(.return, modifierFlags: .command)
         attach("after-publish", app)
 
+        // A new entry is one click away, whatever's open.
+        editor.click()
+        editor.typeText("Not finished")
+        app.descendants(matching: .any)["newEntryButton"].click()
+        sleep(1)
+        XCTAssertEqual(editor.value as? String ?? "", "", "the button didn't open a new entry")
+        attach("new-entry", app)
+
         app.typeKey(",", modifierFlags: .command)
         sleep(1)
         attach("settings", app)

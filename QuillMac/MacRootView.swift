@@ -29,7 +29,9 @@ struct MacRootView: View {
                 } detail: {
                     MacDetailColumn()
                 }
-                .background { SidebarToggleAccessory(toggle: toggleSidebar) }
+                .background {
+                    TitlebarButtons(toggleSidebar: toggleSidebar) { navigation.openBlankEntry(in: context) }
+                }
                 .sheet(isPresented: $navigation.showingAddSite) { AddSiteView() }
                 .task(id: lock.isUnlocked) { await runOutbox() }
                 .task(id: lock.isUnlocked, priority: .utility) { await publisher.preloadPosts() }
@@ -105,17 +107,19 @@ struct MacRootView: View {
     }
 }
 
-/// The sidebar button, in the title bar beside the traffic lights: a toolbar item would follow
-/// the sidebar's edge, and move when it closes.
-private struct SidebarToggleAccessory: NSViewRepresentable {
-    let toggle: () -> Void
+/// The sidebar and new entry buttons, in the title bar beside the traffic lights: a toolbar item
+/// would follow the sidebar's edge, and move when it closes.
+private struct TitlebarButtons: NSViewRepresentable {
+    let toggleSidebar: () -> Void
+    let newEntry: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeNSView(context: Context) -> NSView { NSView() }
 
     func updateNSView(_ view: NSView, context: Context) {
         let coordinator = context.coordinator
-        coordinator.toggle = toggle
+        coordinator.toggleSidebar = toggleSidebar
+        coordinator.newEntry = newEntry
         DispatchQueue.main.async { [weak view] in
             if let window = view?.window { coordinator.install(in: window) }
         }
@@ -124,29 +128,43 @@ private struct SidebarToggleAccessory: NSViewRepresentable {
     static func dismantleNSView(_ view: NSView, coordinator: Coordinator) { coordinator.remove() }
 
     final class Coordinator {
-        var toggle: () -> Void = {}
+        var toggleSidebar: () -> Void = {}
+        var newEntry: () -> Void = {}
         private var accessory: NSTitlebarAccessoryViewController?
 
         func install(in window: NSWindow) {
             guard accessory == nil else { return }
-            let button = Button { [weak self] in self?.toggle() } label: {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.primary)
-                    .frame(width: 28, height: 28)
+            let buttons = HStack(spacing: 8) {
+                button("sidebar.left", label: "Toggle Sidebar", help: "Show or hide the sidebar", id: "sidebarToggle") { [weak self] in
+                    self?.toggleSidebar()
+                }
+                button("square.and.pencil", label: "New Entry", help: "New Entry (⌘N)", id: "newEntryButton") { [weak self] in
+                    self?.newEntry()
+                }
             }
-            .buttonStyle(.borderless)
-            .help("Show or hide the sidebar")
-            .accessibilityLabel("Toggle Sidebar")
-            .accessibilityIdentifier("sidebarToggle")
             .padding(.horizontal, 6)
             let controller = NSTitlebarAccessoryViewController()
-            let host = NSHostingView(rootView: button)
+            let host = NSHostingView(rootView: buttons)
             host.frame.size = host.fittingSize
             controller.view = host
             controller.layoutAttribute = .leading
             window.addTitlebarAccessoryViewController(controller)
             accessory = controller
+        }
+
+        private func button(_ icon: String, label: String, help: String, id: String, action: @escaping () -> Void) -> some View {
+            Button(action: action) {
+                Image(systemName: icon)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.primary)
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .controlSize(.large)
+            .help(help)
+            .accessibilityLabel(label)
+            .accessibilityIdentifier(id)
         }
 
         func remove() {

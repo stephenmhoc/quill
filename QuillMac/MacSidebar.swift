@@ -17,7 +17,14 @@ struct MacSidebar: View {
             Section("Sites") {
                 ForEach(sites) { site in
                     Label {
-                        Text(site.name)
+                        HStack {
+                            Text(site.name)
+                            Spacer()
+                            Image(systemName: site.accessIcon)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .accessibilityLabel(site.accessLabel)
+                        }
                     } icon: {
                         Circle().fill(site.color.color).frame(width: 10, height: 10)
                     }
