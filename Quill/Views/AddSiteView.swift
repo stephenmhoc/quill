@@ -69,6 +69,9 @@ private struct SiteKindCard: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.groupedCard, in: RoundedRectangle(cornerRadius: 18))
+        #if os(macOS)
+        .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(.separator) }
+        #endif
         .contentShape(RoundedRectangle(cornerRadius: 18))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("siteKind.\(kind.rawValue)")

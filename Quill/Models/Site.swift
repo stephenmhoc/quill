@@ -35,13 +35,13 @@ enum SiteKind: String, CaseIterable, Identifiable {
     var publishLabel: String {
         switch self {
         case .ghost, .microblog: "Publish"
-        case .local: "Saved"
+        case .local: "Save"
         }
     }
     var updateLabel: String {
         switch self {
         case .ghost, .microblog: "Update"
-        case .local: "Saved"
+        case .local: "Save"
         }
     }
     /// How a finished entry describes itself.

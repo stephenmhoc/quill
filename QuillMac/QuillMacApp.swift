@@ -39,7 +39,7 @@ struct QuillMacApp: App {
                 }
         }
         .modelContainer(container)
-        .defaultSize(width: 1240, height: 800)
+        .defaultSize(width: 1320, height: 820)
         .commands { MacCommands(navigation: navigation, lock: lock, context: container.mainContext) }
 
         Settings {

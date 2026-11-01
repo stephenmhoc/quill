@@ -29,7 +29,11 @@ struct SitePicker: View {
             }
             .font(.system(.subheadline, design: .monospaced))
             .padding(.horizontal, 12)
+            #if os(macOS)
+            .frame(height: 36)
+            #else
             .padding(.vertical, 6)
+            #endif
             .background((site?.color.color ?? .gray).opacity(0.15), in: Capsule())
             .foregroundStyle(site?.color.color ?? .secondary)
         }

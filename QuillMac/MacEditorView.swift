@@ -124,6 +124,8 @@ struct MacEditorView: View {
         ToolbarItem(placement: .automatic) {
             SitePicker(entry: entry, sites: sites, locked: entry.remotePostID != nil || entry.uploadedToSiteID != nil || uploading || !isEditable)
         }
+        // The pill is its own background: the toolbar's would ring it in grey.
+        .sharedBackgroundVisibility(.hidden)
         ToolbarSpacer(.flexible)
         ToolbarItemGroup(placement: .automatic) {
             Button { showingTags = true } label: { Label("Tags", systemImage: "tag") }
@@ -137,18 +139,20 @@ struct MacEditorView: View {
             .help("Show the rendered Markdown beside the text")
             .disabled(entry.isBlank)
         }
-        ToolbarItem(placement: .automatic) {
-            Button(action: send) {
-                if publisher.sending.contains(entry.id) {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Text(sendLabel)
+        if isEditable {
+            ToolbarItem(placement: .automatic) {
+                Button(action: send) {
+                    if publisher.sending.contains(entry.id) {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text(sendLabel).padding(.horizontal, 14)
+                    }
                 }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(!canSend)
+                .accessibilityIdentifier("sendButton")
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(!canSend)
-            .accessibilityIdentifier("sendButton")
-            .opacity(isEditable ? 1 : 0)
         }
     }
 

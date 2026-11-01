@@ -22,12 +22,14 @@ struct MacRootView: View {
                 NavigationSplitView(columnVisibility: $navigation.columnVisibility) {
                     MacSidebar()
                         .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
+                        .toolbar(removing: .sidebarToggle)
                 } content: {
                     MacContentColumn()
-                        .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 420)
+                        .navigationSplitViewColumnWidth(min: 280, ideal: 360, max: 480)
                 } detail: {
                     MacDetailColumn()
                 }
+                .background { SidebarToggleAccessory(toggle: toggleSidebar) }
                 .sheet(isPresented: $navigation.showingAddSite) { AddSiteView() }
                 .task(id: lock.isUnlocked) { await runOutbox() }
                 .task(id: lock.isUnlocked, priority: .utility) { await publisher.preloadPosts() }
@@ -72,6 +74,10 @@ struct MacRootView: View {
         }
     }
 
+    private func toggleSidebar() {
+        withAnimation { navigation.columnVisibility = navigation.columnVisibility == .all ? .doubleColumn : .all }
+    }
+
     private func lockNow() {
         try? context.save()
         lock.lock()
@@ -95,6 +101,57 @@ struct MacRootView: View {
         while lock.isUnlocked && !Task.isCancelled {
             await publisher.flushOutbox()
             try? await Task.sleep(for: .seconds(60))
+        }
+    }
+}
+
+/// The sidebar button, in the title bar beside the traffic lights: a toolbar item would follow
+/// the sidebar's edge, and move when it closes.
+private struct SidebarToggleAccessory: NSViewRepresentable {
+    let toggle: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        let coordinator = context.coordinator
+        coordinator.toggle = toggle
+        DispatchQueue.main.async { [weak view] in
+            if let window = view?.window { coordinator.install(in: window) }
+        }
+    }
+
+    static func dismantleNSView(_ view: NSView, coordinator: Coordinator) { coordinator.remove() }
+
+    final class Coordinator {
+        var toggle: () -> Void = {}
+        private var accessory: NSTitlebarAccessoryViewController?
+
+        func install(in window: NSWindow) {
+            guard accessory == nil else { return }
+            let button = Button { [weak self] in self?.toggle() } label: {
+                Image(systemName: "sidebar.left")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.primary)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.borderless)
+            .help("Show or hide the sidebar")
+            .accessibilityLabel("Toggle Sidebar")
+            .accessibilityIdentifier("sidebarToggle")
+            .padding(.horizontal, 6)
+            let controller = NSTitlebarAccessoryViewController()
+            let host = NSHostingView(rootView: button)
+            host.frame.size = host.fittingSize
+            controller.view = host
+            controller.layoutAttribute = .leading
+            window.addTitlebarAccessoryViewController(controller)
+            accessory = controller
+        }
+
+        func remove() {
+            accessory?.removeFromParent()
+            accessory = nil
         }
     }
 }

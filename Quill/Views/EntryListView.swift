@@ -43,8 +43,16 @@ struct EntryListView: View {
             .navigationTitle(title)
             .largeTitle()
             .toolbar {
+                #if os(macOS)
+                // Also what keeps the editor's toolbar laid out as it is beside a site's posts.
+                ToolbarItem(placement: .primaryAction) {
+                    Button { navigation.openBlankEntry(in: context) } label: { Label("New Entry", systemImage: "square.and.pencil") }
+                }
+                #endif
                 if section == .outbox, !visible.isEmpty {
-                    Button("Retry All") { Task { await publisher.retryAll() } }
+                    ToolbarItem(placement: .automatic) {
+                        Button("Retry All") { Task { await publisher.retryAll() } }
+                    }
                 }
             }
     }

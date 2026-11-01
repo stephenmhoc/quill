@@ -49,6 +49,21 @@ final class MacWritingUITests: XCTestCase {
         app.typeKey(.rightArrow, modifierFlags: [])
         attach("writing", app)
 
+        // The sidebar button stays put, and so does the toolbar, whichever list is showing.
+        app.staticTexts["Drafts"].click()
+        sleep(1)
+        attach("drafts", app)
+        let toggle = app.descendants(matching: .any)["sidebarToggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 2), "no sidebar button")
+        let toggleSpot = toggle.frame
+        toggle.click()
+        sleep(1)
+        attach("sidebar-closed", app)
+        XCTAssertEqual(toggle.frame, toggleSpot, "the sidebar button moved")
+        toggle.click()
+        sleep(1)
+        editor.click()
+
         // The live preview renders beside the text.
         app.typeKey("p", modifierFlags: [.command, .option])
         sleep(1)

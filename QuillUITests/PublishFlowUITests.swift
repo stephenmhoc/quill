@@ -315,7 +315,7 @@ final class PublishFlowUITests: XCTestCase {
         editor.tap()
         editor.typeText(text)
         let saved = app.buttons["sendButton"]
-        XCTAssertEqual(saved.label, "Saved")
+        XCTAssertEqual(saved.label, "Save")
         attach("local-writing", app)
         saved.tap()
         waitForBlankPage(editor)

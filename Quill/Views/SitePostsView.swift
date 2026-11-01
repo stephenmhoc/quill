@@ -32,6 +32,9 @@ struct SitePostsView: View {
 
     var body: some View {
         posted
+            #if os(macOS)
+            .safeAreaInset(edge: .bottom, spacing: 0) { statsFooter }
+            #endif
             .overlay {
                 if loading && posts.isEmpty { ProgressView() }
                 else if posts.isEmpty && error == nil && !loading {
@@ -95,11 +98,13 @@ struct SitePostsView: View {
                     .font(.footnote)
                     .foregroundStyle(.red)
             }
+            #if os(iOS)
             if let stats = site?.stats {
                 SiteStatsRow(stats: stats)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
+            #endif
             Section {
                 ForEach(posts) { post in
                     postRow(post)
@@ -126,6 +131,20 @@ struct SitePostsView: View {
                     .task(id: page) { await Task { await loadMore() }.value }
             }
     }
+
+    #if os(macOS)
+    /// Totals are a footnote on a Mac, where the list is what you came for.
+    @ViewBuilder private var statsFooter: some View {
+        if let stats = site?.stats {
+            Text("\(stats.posts.formatted()) \(stats.posts == 1 ? "post" : "posts") · \(stats.words.formatted()) \(stats.words == 1 ? "word" : "words")")
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+        }
+    }
+    #endif
 
     /// A Mac selects a row; iOS taps a button.
     @ViewBuilder private func postRow(_ post: SitePost) -> some View {

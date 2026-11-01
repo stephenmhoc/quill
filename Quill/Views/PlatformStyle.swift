@@ -103,7 +103,7 @@ extension Color {
         #if os(iOS)
         Color(.secondarySystemGroupedBackground)
         #else
-        Color(.controlBackgroundColor)
+        Color.primary.opacity(0.06)
         #endif
     }
 }
