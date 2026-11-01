@@ -13,6 +13,8 @@ struct SitePost: Identifiable, Equatable, Codable {
     /// Shown beside the date, e.g. "DRAFT". Nil for an ordinary published post.
     let badge: String?
     let url: URL?
+    /// `SiteTag` ids, so a filter can show what's already here before the site answers.
+    var tags: [String]?
 }
 
 /// A tag that posts can be filtered by. `id` is whatever the site filters on.

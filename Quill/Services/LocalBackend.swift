@@ -14,7 +14,7 @@ struct LocalBackend: SiteBackend {
     func posts(limit: Int, page: Int, tag: SiteTag?) async throws -> [SitePost] {
         try saved().filter { tag == nil || $0.tags.contains(tag?.name ?? "") }.dropFirst(limit * (page - 1)).prefix(limit).map { entry in
             SitePost(id: entry.remotePostID ?? entry.id.uuidString, title: entry.displayTitle,
-                     isUntitled: entry.title.isEmpty, date: entry.createdAt, badge: nil, url: nil)
+                     isUntitled: entry.title.isEmpty, date: entry.createdAt, badge: nil, url: nil, tags: entry.tags)
         }
     }
 

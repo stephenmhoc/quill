@@ -28,7 +28,7 @@ struct MicroblogBackend: SiteBackend {
     private func sitePost(_ post: MicropubPost) -> SitePost {
         SitePost(id: post.url, title: post.title.isEmpty ? Self.excerpt(of: post.content) : post.title,
                  isUntitled: post.title.isEmpty, date: post.published,
-                 badge: post.status == .draft ? "DRAFT" : nil, url: URL(string: post.url))
+                 badge: post.status == .draft ? "DRAFT" : nil, url: URL(string: post.url), tags: post.categories)
     }
 
     func stats() async throws -> PostStats {

@@ -25,6 +25,8 @@ struct SitePostsView: View {
     @State private var pendingDelete: SitePost?
     @State private var unsupported: SitePost?
     @State private var filter: SiteTag?
+    /// Each tag's posts from this visit, so going back to one doesn't wait for the site.
+    @State private var tagged: [SiteTag: [SitePost]] = [:]
     #if os(macOS)
     @State private var selectedPost: String?
     #endif
@@ -79,7 +81,7 @@ struct SitePostsView: View {
             .task { await Task { await load() }.value }
             .onChange(of: publisher.sentCount) { Task { await load() } }
             .onChange(of: navigation.reloadRequest) { Task { await load() } }
-            .onChange(of: filter) { Task { await load() } }
+            .onChange(of: filter) { showKnownPosts(); Task { await load() } }
     }
 
     @ViewBuilder private var posted: some View {
@@ -242,6 +244,7 @@ struct SitePostsView: View {
         do {
             try await publisher.deletePost(id: post.id, site: site)
             posts.removeAll { $0.id == post.id }
+            tagged = [:]
             if filter == nil { publisher.remember(posts, on: site) }
             error = nil
         } catch {
@@ -249,11 +252,26 @@ struct SitePostsView: View {
         }
     }
 
+    /// A site can take a while to reach, so a filter shows what's already here at once and `load`
+    /// completes it.
+    private func showKnownPosts() {
+        let whole = site?.cachedPostList ?? []
+        if let filter {
+            posts = tagged[filter] ?? whole.filter { $0.tags?.contains(filter.id) == true }
+        } else {
+            posts = whole
+        }
+        page = 1
+        hasMore = false
+        loading = true
+    }
+
     private func load() async {
         guard let site else { return }
-        loading = true
-        defer { loading = false }
         let tag = filter
+        loading = true
+        // A newer filter's load is still going, and its list is still to come.
+        defer { if tag == filter { loading = false } }
         do {
             // Only the whole list is kept for next time.
             let first = if let tag {
@@ -261,11 +279,13 @@ struct SitePostsView: View {
             } else {
                 try await publisher.loadPosts(of: site)
             }
+            if let tag { tagged[tag] = first }
             guard tag == filter else { return }
             posts = first
             page = 1
             hasMore = first.count == SitePost.pageSize
             error = nil
+            guard tag == nil else { return }
             Task(priority: .utility) {
                 await publisher.refreshTags(of: site)
                 await publisher.refreshStats(of: site)

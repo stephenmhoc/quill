@@ -16,7 +16,7 @@ struct GhostBackend: SiteBackend {
             let untitled = post.title == "(Untitled)" || post.tags?.contains { $0.name == EntryBuilder.untitledTag } == true
             return SitePost(id: post.id, title: untitled ? (post.excerpt ?? post.title) : post.title, isUntitled: untitled,
                             date: post.publishedAt, badge: post.status == .published ? nil : post.status.rawValue.uppercased(),
-                            url: post.url)
+                            url: post.url, tags: post.tags?.compactMap(\.slug))
         }
     }
 
