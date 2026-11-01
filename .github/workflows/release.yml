@@ -79,10 +79,13 @@ jobs:
           echo "$ASC_API_KEY_P8_BASE64" | base64 --decode -o ~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
           echo "ASC_API_KEY_PATH=$HOME/.private_keys/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
 
-      - name: Create Temporary App Store Signing Assets
+      - name: Prepare App Store Signing Assets
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_DISTRIBUTION_CERT_BASE64: ${{ secrets.APPLE_DISTRIBUTION_CERT_BASE64 }}
+          APPLE_DISTRIBUTION_CERT_PASSWORD: ${{ secrets.APPLE_DISTRIBUTION_CERT_PASSWORD }}
+          APPLE_DISTRIBUTION_CERT_ID: ${{ secrets.APPLE_DISTRIBUTION_CERT_ID }}
         run: ruby Tools/app_store_connect_signing.rb prepare
 
       - name: Install Apple Certificate and Provisioning Profile
@@ -120,7 +123,7 @@ jobs:
 
           security find-identity -v -p codesigning "$KEYCHAIN_NAME"
 
-      # The project signs automatically for local builds; CI signs with the temporary assets above.
+      # The project signs automatically for local builds; CI signs with the assets above.
       - name: Archive
         run: |
           rm -rf "$ARCHIVE_PATH" "$EXPORT_PATH"
@@ -239,27 +242,11 @@ jobs:
           path: ${{ env.ARCHIVE_PATH }}
           retention-days: 30
 
-      - name: Cleanup App Store Connect Signing Assets
-        if: always()
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-        run: |
-          if [ -n "${ASC_API_KEY_PATH:-}" ] && [ -f "$ASC_API_KEY_PATH" ]; then
-            ruby Tools/app_store_connect_signing.rb cleanup
-          else
-            echo "No App Store Connect signing assets to clean up."
-          fi
-
       - name: Cleanup
         if: always()
         run: |
           security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/certificate.p12"
-          rm -f "$RUNNER_TEMP/apple_distribution.key"
-          rm -f "$RUNNER_TEMP/apple_distribution.csr"
-          rm -f "$RUNNER_TEMP/apple_distribution.cer"
-          rm -f "$RUNNER_TEMP/apple_distribution.pem"
           rm -f "$RUNNER_TEMP/ios.mobileprovision"
           rm -f "$RUNNER_TEMP/ExportOptions.plist"
           rm -rf ~/.private_keys

@@ -2,9 +2,11 @@
 
 ## TestFlight
 
-`.github/workflows/release.yml` archives Quill, signs it with a temporary certificate and
-profile, uploads it to App Store Connect, waits for Apple to finish processing it, then revokes
-the temporary signing assets. Revoking any earlier fails processing with `ITMS-90721`.
+`.github/workflows/release.yml` archives Quill, signs it with a long-lived distribution
+certificate, uploads it to App Store Connect and waits for Apple to finish processing it.
+
+Never revoke that certificate while builds still need it. Doing so before processing fails with
+`ITMS-90721`, and doing so before TestFlight review fails with `ITMS-90035`.
 
 ### One-time setup
 
@@ -32,6 +34,15 @@ the temporary signing assets. Revoking any earlier fails processing with `ITMS-9
    gh secret set ASC_KEY_ID -R stephenmhoc/quill
    gh secret set ASC_ISSUER_ID -R stephenmhoc/quill
    base64 -i AuthKey_XXXXXXXXXX.p8 | gh secret set ASC_API_KEY_P8_BASE64 -R stephenmhoc/quill
+   ```
+
+4. Create the distribution certificate, which also sets its three `APPLE_DISTRIBUTION_CERT_*`
+   secrets, with the Issuer ID from step 3 and your `.p8`. Run this again before it expires, about
+   a year on. The next release makes a matching profile by itself.
+
+   ```sh
+   ASC_ISSUER_ID=<Issuer ID> ASC_KEY_ID=<Key ID> ASC_API_KEY_PATH=AuthKey_<Key ID>.p8 \
+     ruby Tools/app_store_connect_signing.rb create-distribution-cert
    ```
 
 ### Shipping a build

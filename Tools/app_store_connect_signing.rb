@@ -6,7 +6,9 @@ require "fileutils"
 require "json"
 require "net/http"
 require "openssl"
+require "securerandom"
 require "shellwords"
+require "tmpdir"
 require "time"
 require "uri"
 
@@ -226,36 +228,63 @@ def append_env(values)
   end
 end
 
+# Revoking a certificate invalidates what it signed, and TestFlight review checks the signature
+# after processing (ITMS-90035), so one certificate stays for as long as builds need it.
 def prepare
   client = AppStoreConnectClient.new
   temp_dir = env_fetch("RUNNER_TEMP")
-  run_id = env_fetch("GITHUB_RUN_ID")
-  ios_bundle_identifier = env_fetch("IOS_BUNDLE_ID")
+  certificate_id = env_fetch("APPLE_DISTRIBUTION_CERT_ID")
+  p12_path = File.join(temp_dir, "certificate.p12")
+  profile_path = File.join(temp_dir, "ios.mobileprovision")
 
   FileUtils.mkdir_p(temp_dir)
+  File.binwrite(p12_path, Base64.decode64(env_fetch("APPLE_DISTRIBUTION_CERT_BASE64")))
+  ios_bundle_identifier = env_fetch("IOS_BUNDLE_ID")
+  # Named after the certificate, so that replacing it makes a new profile.
+  name = "Quill App Store #{certificate_id}"
 
-  ios_bundle_id = find_or_create_bundle_id(
-    client,
-    identifier: ios_bundle_identifier,
-    name: "Quill"
-  )
+  query = URI.encode_www_form("filter[name]" => name, "filter[profileState]" => "ACTIVE", "limit" => 200)
+  profile = client.get("/v1/profiles?#{query}").fetch("data").find do |candidate|
+    candidate.fetch("attributes").fetch("name") == name
+  end
 
-  certificate = create_distribution_certificate(client, temp_dir)
-  ios_profile = create_profile(
-    client,
-    name: "Quill CI iOS #{run_id}",
-    bundle_id: ios_bundle_id,
-    certificate_id: certificate.fetch(:id),
-    output_path: File.join(temp_dir, "ios.mobileprovision")
-  )
+  if profile
+    File.binwrite(profile_path, Base64.decode64(profile.fetch("attributes").fetch("profileContent")))
+  else
+    create_profile(
+      client,
+      name: name,
+      bundle_id: find_or_create_bundle_id(client, identifier: ios_bundle_identifier, name: "Quill"),
+      certificate_id: certificate_id,
+      output_path: profile_path
+    )
+  end
 
   append_env(
-    "APPLE_CERTIFICATE_PATH" => certificate.fetch(:p12_path),
-    "APPLE_CERTIFICATE_PASSWORD" => env_fetch("KEYCHAIN_PASSWORD"),
-    "IOS_PROVISIONING_PROFILE_PATH" => File.join(temp_dir, "ios.mobileprovision"),
-    "ASC_CREATED_CERTIFICATE_ID" => certificate.fetch(:id),
-    "ASC_CREATED_PROFILE_IDS" => ios_profile.fetch(:id)
+    "APPLE_CERTIFICATE_PATH" => p12_path,
+    "APPLE_CERTIFICATE_PASSWORD" => env_fetch("APPLE_DISTRIBUTION_CERT_PASSWORD"),
+    "IOS_PROVISIONING_PROFILE_PATH" => profile_path
   )
+end
+
+# Run once by hand, and again when the certificate nears its expiry. Goes straight to GitHub's
+# secrets, so the private key never stays on this machine.
+def create_distribution_cert
+  repo = "stephenmhoc/quill"
+  password = SecureRandom.hex(24)
+  ENV["KEYCHAIN_PASSWORD"] = password
+  Dir.mktmpdir do |temp_dir|
+    certificate = create_distribution_certificate(AppStoreConnectClient.new, temp_dir)
+    {
+      "APPLE_DISTRIBUTION_CERT_BASE64" => Base64.strict_encode64(File.binread(certificate.fetch(:p12_path))),
+      "APPLE_DISTRIBUTION_CERT_PASSWORD" => password,
+      "APPLE_DISTRIBUTION_CERT_ID" => certificate.fetch(:id)
+    }.each do |name, value|
+      IO.popen(["gh", "secret", "set", name, "-R", repo], "w") { |gh| gh.write(value) }
+      abort "Couldn't set #{name}." unless $?.success?
+      puts "Set #{name}"
+    end
+  end
 end
 
 # The Mac app's Keychain access group needs a profile even outside the App Store. Unlike the iOS
@@ -301,7 +330,6 @@ def developer_id_profile
   append_env("MAC_PROVISIONING_PROFILE_PATH" => output_path)
 end
 
-# Apple checks the signature while processing, so the certificate has to outlive this.
 def wait_for_processing
   bundle_identifier = env_fetch("IOS_BUNDLE_ID")
   build_number = env_fetch("BUILD_NUMBER")
@@ -341,22 +369,6 @@ def wait_for_processing
   exit 1
 end
 
-def cleanup
-  client = AppStoreConnectClient.new
-  profile_ids = ENV.fetch("ASC_CREATED_PROFILE_IDS", "").split(",").reject(&:empty?)
-  certificate_id = ENV.fetch("ASC_CREATED_CERTIFICATE_ID", "")
-
-  profile_ids.each do |profile_id|
-    puts "Deleting temporary provisioning profile #{profile_id}"
-    client.delete("/v1/profiles/#{profile_id}")
-  end
-
-  unless certificate_id.empty?
-    puts "Revoking temporary distribution certificate #{certificate_id}"
-    client.delete("/v1/certificates/#{certificate_id}")
-  end
-end
-
 case ARGV.fetch(0, "prepare")
 when "prepare"
   prepare
@@ -364,9 +376,9 @@ when "developer-id-profile"
   developer_id_profile
 when "wait"
   wait_for_processing
-when "cleanup"
-  cleanup
+when "create-distribution-cert"
+  create_distribution_cert
 else
-  warn "Usage: #{File.basename($PROGRAM_NAME)} [prepare|developer-id-profile|wait|cleanup]"
+  warn "Usage: #{File.basename($PROGRAM_NAME)} [prepare|create-distribution-cert|developer-id-profile|wait]"
   exit 1
 end
