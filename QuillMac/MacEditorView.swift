@@ -151,21 +151,24 @@ struct MacEditorView: View {
         case .editing where entry.remotePostID != nil:
             Text("Editing")
                 .help("Keeps until you publish or discard it.")
-            Button("Discard Changes", action: discardChanges)
-                .buttonStyle(.accessoryBar)
-                .controlSize(.small)
+            statusButton("Discard Changes", icon: "arrow.uturn.backward", action: discardChanges)
         case .sending:
             Text("Sending to \(site?.name ?? "the site")…")
         case .sent:
             Text(sentLabel)
             if viewURL != nil {
-                Button("View on Site", action: viewOnSite)
-                    .buttonStyle(.accessoryBar)
-                    .controlSize(.small)
+                statusButton("View on Site", icon: "arrow.up.right", action: viewOnSite)
             }
         default:
             EmptyView()
         }
+    }
+
+    private func statusButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Label(title, systemImage: icon) }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .foregroundStyle(.primary)
     }
 
     private var sentLabel: String {
@@ -203,10 +206,20 @@ struct MacEditorView: View {
         // Edit takes Publish's place, so the window's main action never moves.
         if entry.state == .sent {
             ToolbarItem(placement: .automatic) {
-                Button(action: beginEditing) { Text("Edit").padding(.horizontal, 14) }
-                    .controlSize(.large)
-                    .help("Edit This Entry (⌘E)")
+                // Tinted like the site pill: it has colour, but Publish stays the loud one.
+                Button(action: beginEditing) {
+                    Text("Edit")
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 22)
+                        .frame(height: 36)
+                        .background((site?.color.color ?? .gray).opacity(0.15), in: Capsule())
+                        .foregroundStyle(site?.color.color ?? .primary)
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .help("Edit This Entry (⌘E)")
             }
+            .sharedBackgroundVisibility(.hidden)
         }
         if isEditable {
             ToolbarItem(placement: .automatic) {
