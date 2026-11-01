@@ -35,7 +35,14 @@ enum EntryPage {
     /// updates by itself: pasting a tracked image shouldn't call its server from a private draft.
     static func html(title: String, markdown: String, isDark: Bool, imageHosts: [String]? = nil) -> String {
         let heading = title.isEmpty ? "" : "<h1>\(escaped(title))</h1>"
-        let images = imageHosts.map { hosts in hosts.flatMap { ["https://\($0)", "http://\($0)"] }.joined(separator: " ") } ?? "http: https:"
+        #if DEBUG
+        let schemes = ["https", "http"] // A test Ghost runs on plain http.
+        #else
+        let schemes = ["https"]
+        #endif
+        let images = imageHosts.map { hosts in
+            hosts.flatMap { host in schemes.map { "\($0)://\(host)" } }.joined(separator: " ")
+        } ?? "http: https:"
         return """
         <!doctype html><meta charset="utf-8">
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; \
@@ -54,9 +61,17 @@ enum EntryPage {
         pre { overflow-x: auto; padding: 12px; border: 1px solid var(--rule); border-radius: 6px; }
         table { border-collapse: collapse; } th, td { padding: 4px 10px; border: 1px solid var(--rule); }
         hr { border: 0; border-top: 1px solid var(--rule); }
-        </style>
+        \(styleEnd)
         \(heading)\(EntryBuilder.html(fromMarkdown: markdown))
         """
+    }
+
+    private static let styleEnd = "</style>"
+
+    /// What can change without a reload, and what can't: the policy and the theme live in the head.
+    static func parts(of html: String) -> (head: Substring, body: Substring)? {
+        guard let end = html.range(of: styleEnd) else { return nil }
+        return (html[..<end.upperBound], html[end.upperBound...])
     }
 
     /// Where a site's own images live.
@@ -112,9 +127,18 @@ extension PreviewPage {
         coordinator.openURL = environment.openURL
         guard coordinator.html != html else { return }
         let isFirstLoad = coordinator.html == nil
+        let previous = coordinator.html.flatMap(EntryPage.parts)
         coordinator.html = html
         if isFirstLoad {
             view.loadHTMLString(html, baseURL: nil)
+            return
+        }
+        // Swapping the text keeps the page and its place, where a reload would flash white.
+        if let next = EntryPage.parts(of: html), next.head == previous?.head,
+           let data = try? JSONEncoder().encode(String(next.body)), let text = String(data: data, encoding: .utf8) {
+            view.evaluateJavaScript("document.body.innerHTML = \(text); 0") { _, error in
+                if error != nil { view.loadHTMLString(html, baseURL: nil) }
+            }
             return
         }
         view.evaluateJavaScript("window.scrollY") { offset, _ in

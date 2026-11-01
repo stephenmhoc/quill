@@ -14,6 +14,8 @@ data="$HOME/Library/Containers/$DEV_ID/Data/Library/Application Support"
 stores=("$data/Quill" "$data/LocalImages")
 trap 'rm -rf "${stores[@]}"' EXIT
 rm -rf "${stores[@]}" build/results-mac.xcresult
+# A saved small window would hide the preview the tests open.
+defaults delete "$DEV_ID" "NSWindow Frame main" 2>/dev/null || true
 xcodebuild test -project Quill.xcodeproj -scheme QuillMac -configuration Debug -destination platform=macOS \
   -derivedDataPath build/mac-adhoc -resultBundlePath build/results-mac.xcresult \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= \

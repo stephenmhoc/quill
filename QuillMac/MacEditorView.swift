@@ -24,24 +24,51 @@ struct MacEditorView: View {
     @State private var pendingPublicImages: [Data] = []
     @State private var saveFailed = false
     @State private var bodyHasFocus = false
+    @State private var showsFocusHint = false
 
     private var site: Site? { sites.first { $0.id == entry.siteID } }
     private var isEditable: Bool { entry.state == .editing }
     private var canSend: Bool {
         isEditable && !entry.isBlank && site != nil && !uploading && !publisher.sending.contains(entry.id)
     }
-    private var isPreviewing: Bool { showsPreview && !entry.isBlank }
+    private var isPreviewing: Bool { showsPreview && !entry.isBlank && fitsPreview && !navigation.isFocused }
+    /// Measured from the window, because an open preview's own minimum would hold this view wide
+    /// and push the columns out of it.
+    private var fitsPreview: Bool {
+        let columns: CGFloat = switch navigation.columnVisibility {
+        case .detailOnly: 0
+        case .doubleColumn: 320
+        default: 550
+        }
+        return navigation.windowWidth - columns >= 280 + 240
+    }
 
     var body: some View {
         HSplitView {
-            page.frame(minWidth: 340, maxWidth: .infinity)
+            page.frame(minWidth: 280, maxWidth: .infinity)
             if isPreviewing {
                 LivePreview(title: entry.title, markdown: entry.body, site: site)
-                    .frame(minWidth: 280, maxWidth: .infinity)
+                    .frame(minWidth: 240, maxWidth: .infinity)
             }
         }
         .background(Color.paper)
+        .overlay(alignment: .bottom) {
+            if showsFocusHint {
+                Text("Press Esc to leave Focus Mode")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 16)
+                    .transition(.opacity)
+            }
+        }
+        .task(id: navigation.isFocused) {
+            withAnimation { showsFocusHint = navigation.isFocused }
+            guard navigation.isFocused else { return }
+            try? await Task.sleep(for: .seconds(2.5))
+            if !Task.isCancelled { withAnimation { showsFocusHint = false } }
+        }
         .navigationTitle(entry.isBlank ? "New Entry" : entry.displayTitle)
+        .toolbar(navigation.isFocused ? .hidden : .automatic, for: .windowToolbar)
         .toolbar { toolbar }
         .focusedSceneValue(\.editorActions, actions)
         .fileImporter(isPresented: $showingImagePicker, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
@@ -83,7 +110,7 @@ struct MacEditorView: View {
 
     private var page: some View {
         MacTextEditor(text: $entry.body, selection: $selection, focusRequest: focusRequest, isEditable: isEditable,
-                      onImages: receive, onFocus: { bodyHasFocus = $0 }) {
+                      isCentered: navigation.isFocused, onImages: receive, onFocus: { bodyHasFocus = $0 }) {
             // Hosted inside AppKit, so the environment has to be passed along.
             EditorHeader(entry: entry, site: site, isEditable: isEditable, showsTitle: showsTitle,
                          focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 },
@@ -94,7 +121,9 @@ struct MacEditorView: View {
                 .environment(navigation)
                 .environment(publisher)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { statusBar }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !navigation.isFocused || saveFailed { statusBar }
+        }
         .background(Color.paper)
     }
 
@@ -122,7 +151,7 @@ struct MacEditorView: View {
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         // Automatic, not navigation: that puts it beside the sidebar, over another column.
         ToolbarItem(placement: .automatic) {
-            SitePicker(entry: entry, sites: sites, locked: entry.remotePostID != nil || entry.uploadedToSiteID != nil || uploading || !isEditable)
+            MacSitePicker(entry: entry, sites: sites, locked: entry.remotePostID != nil || entry.uploadedToSiteID != nil || uploading || !isEditable)
         }
         // The pill is its own background: the toolbar's would ring it in grey.
         .sharedBackgroundVisibility(.hidden)
@@ -136,8 +165,10 @@ struct MacEditorView: View {
                 Label("Preview", systemImage: "sidebar.right")
             }
             .toggleStyle(.button)
-            .help("Show the rendered Markdown beside the text")
-            .disabled(entry.isBlank)
+            .help(fitsPreview ? "Show the rendered Markdown beside the text" : "Make the window wider to show the preview")
+            .disabled(entry.isBlank || !fitsPreview)
+            Button { navigation.toggleFocus() } label: { Label("Focus", systemImage: "arrow.up.left.and.arrow.down.right") }
+                .help("Focus Mode (⇧⌘F)")
         }
         if isEditable {
             ToolbarItem(placement: .automatic) {
@@ -157,7 +188,8 @@ struct MacEditorView: View {
     }
 
     private var actions: EditorActions {
-        EditorActions(canPublish: canSend, canPreview: !entry.isBlank, canEdit: isEditable,
+        EditorActions(canPublish: canSend, canPreview: !entry.isBlank,
+                      canShowPreview: !entry.isBlank && fitsPreview, canEdit: isEditable,
                       canFormat: isEditable && bodyHasFocus, hasTitle: showsTitle, isPreviewing: isPreviewing,
                       publishLabel: sendLabel, publish: send, format: apply, togglePreview: { showsPreview.toggle() },
                       print: { EntryPrinter.print(title: entry.title, markdown: entry.body, site: site) },

@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct LockView: View {
     @Environment(AppLock.self) private var lock
@@ -36,12 +39,27 @@ struct LockView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
+        #if os(macOS)
+        // A Mac's scene stays active behind other apps, and Quill can lock back there. The prompt
+        // takes over the screen, so it waits until Quill is in front.
+        .task { if NSApp.isActive { await autoPrompt() } }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await autoPrompt() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            didAutoPrompt = false
+        }
+        #else
         .task(id: scenePhase) {
             if scenePhase == .background { didAutoPrompt = false }
-            if scenePhase == .active, !didAutoPrompt {
-                didAutoPrompt = true
-                await lock.unlock()
-            }
+            if scenePhase == .active { await autoPrompt() }
         }
+        #endif
+    }
+
+    private func autoPrompt() async {
+        guard !didAutoPrompt else { return }
+        didAutoPrompt = true
+        await lock.unlock()
     }
 }

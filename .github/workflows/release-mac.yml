@@ -102,8 +102,12 @@ jobs:
             CODE_SIGN_IDENTITY="Developer ID Application" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$MAC_PROFILE_NAME" \
+            QUILL_BUNDLE_ID="$IOS_BUNDLE_ID" \
+            QUILL_APP_ICON=AppIcon \
             MARKETING_VERSION="$VERSION" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+          built=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$ARCHIVE_PATH/Products/Applications/Quill.app/Contents/Info.plist")
+          [ "$built" = "$IOS_BUNDLE_ID" ] || { echo "Archived $built, not $IOS_BUNDLE_ID" >&2; exit 1; }
 
       - name: Export
         run: |

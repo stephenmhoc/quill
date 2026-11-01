@@ -30,27 +30,14 @@ struct LocalSiteForm: View {
             if let error {
                 Section { Text(error).font(.footnote).foregroundStyle(.red) }
             }
-            #if os(iOS)
-            if site != nil {
-                Section {
-                    Button("Remove Site", role: .destructive) { confirmingDelete = true }
-                } footer: {
-                    Text("Permanently deletes this site and every entry on it.")
-                }
-            }
-            #endif
+            if site != nil { RemoveSiteSection(note: "Permanently deletes this site and every entry on it.", isConfirming: $confirmingDelete) }
         }
         .siteFormStyle(isCentered: isCentered)
         .navigationTitle(site == nil ? "Local Site" : "Edit Site")
         .compactTitle()
         .toolbar {
             #if os(macOS)
-            if site != nil {
-                ToolbarItem(placement: .destructiveAction) {
-                    Button("Remove Site…", role: .destructive) { confirmingDelete = true }
-                        .help("Permanently deletes this site and every entry on it.")
-                }
-            }
+            if site != nil { RemoveSiteToolbarItem(note: "Permanently deletes this site and every entry on it.", isConfirming: $confirmingDelete) }
             #endif
             ToolbarItem(placement: .confirmationAction) {
                 Button(action: save) { Text("Save").sheetButtonLabel() }

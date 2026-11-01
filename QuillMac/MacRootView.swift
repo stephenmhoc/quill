@@ -33,7 +33,9 @@ struct MacRootView: View {
                     MacDetailColumn()
                 }
                 .background {
-                    TitlebarButtons(toggleSidebar: toggleSidebar) { navigation.openBlankEntry(in: context) }
+                    TitlebarButtons(isHidden: navigation.isFocused, leaveFocus: navigation.toggleFocus, toggleSidebar: toggleSidebar) {
+                        navigation.openBlankEntry(in: context)
+                    }
                 }
                 .sheet(isPresented: $navigation.showingAddSite) { AddSiteView() }
                 .task(id: lock.isUnlocked) { await runOutbox() }
@@ -46,6 +48,9 @@ struct MacRootView: View {
                     restoredEntry = entry?.id.uuidString ?? ""
                 }
                 .onAppear {
+                    MacAppDelegate.newEntry = {
+                        if lock.isUnlocked { navigation.openBlankEntry(in: context) }
+                    }
                     repairSidebar()
                     restoreEntry()
                     if !sites.contains(where: { $0.id == navigation.selectedEntry?.siteID }) {
@@ -53,6 +58,9 @@ struct MacRootView: View {
                     }
                 }
             }
+        }
+        .onChange(of: lock.isUnlocked) { _, isUnlocked in
+            if !isUnlocked && navigation.isFocused { navigation.toggleFocus() }
         }
         .onChange(of: sites.isEmpty) { _, isEmpty in
             if !isEmpty { navigation.openBlankEntry(in: context) }
@@ -113,6 +121,9 @@ struct MacRootView: View {
 /// The sidebar and new entry buttons, in the title bar beside the traffic lights: a toolbar item
 /// would follow the sidebar's edge, and move when it closes.
 private struct TitlebarButtons: NSViewRepresentable {
+    /// Focus mode takes the traffic lights with it: the menu bar still has everything they do.
+    let isHidden: Bool
+    let leaveFocus: () -> Void
     let toggleSidebar: () -> Void
     let newEntry: () -> Void
 
@@ -122,9 +133,12 @@ private struct TitlebarButtons: NSViewRepresentable {
     func updateNSView(_ view: NSView, context: Context) {
         let coordinator = context.coordinator
         coordinator.toggleSidebar = toggleSidebar
+        coordinator.leaveFocus = leaveFocus
         coordinator.newEntry = newEntry
         DispatchQueue.main.async { [weak view] in
-            if let window = view?.window { coordinator.install(in: window) }
+            guard let window = view?.window else { return }
+            coordinator.install(in: window)
+            coordinator.setHidden(isHidden, in: window)
         }
     }
 
@@ -132,8 +146,33 @@ private struct TitlebarButtons: NSViewRepresentable {
 
     final class Coordinator {
         var toggleSidebar: () -> Void = {}
+        var leaveFocus: () -> Void = {}
+        private var escape: Any?
         var newEntry: () -> Void = {}
         private var accessory: NSTitlebarAccessoryViewController?
+
+        func setHidden(_ isHidden: Bool, in window: NSWindow) {
+            accessory?.isHidden = isHidden
+            // A Mac three-column split view ignores `.detailOnly`, so go to the AppKit one under it.
+            if let split = Self.splitController(in: window.contentView) {
+                for item in split.splitViewItems.dropLast() where item.isCollapsed != isHidden {
+                    item.animator().isCollapsed = isHidden
+                }
+            }
+            for kind: NSWindow.ButtonType in [.closeButton, .miniaturizeButton, .zoomButton] {
+                window.standardWindowButton(kind)?.isHidden = isHidden
+            }
+            if isHidden, escape == nil {
+                escape = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                    guard event.keyCode == 53, event.window == window, window.attachedSheet == nil else { return event }
+                    self?.leaveFocus()
+                    return nil
+                }
+            } else if !isHidden, let escape {
+                NSEvent.removeMonitor(escape)
+                self.escape = nil
+            }
+        }
 
         func install(in window: NSWindow) {
             guard accessory == nil else { return }
@@ -170,7 +209,14 @@ private struct TitlebarButtons: NSViewRepresentable {
             .accessibilityIdentifier(id)
         }
 
+        private static func splitController(in view: NSView?) -> NSSplitViewController? {
+            guard let view else { return nil }
+            if let split = (view as? NSSplitView)?.delegate as? NSSplitViewController { return split }
+            return view.subviews.lazy.compactMap(splitController).first
+        }
+
         func remove() {
+            if let window = accessory?.view.window { setHidden(false, in: window) }
             accessory?.removeFromParent()
             accessory = nil
         }

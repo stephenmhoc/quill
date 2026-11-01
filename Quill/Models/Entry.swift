@@ -128,6 +128,15 @@ final class Entry {
         try? modelContext?.save()
     }
 
+    /// Moving on from an entry. A Mac has no back button to mean "cancel", and any row is a click
+    /// away, so real changes wait in Drafts until they're published or discarded.
+    func leaveEdit() {
+        #if os(macOS)
+        if title != publishedTitle ?? title || body != publishedBody ?? body || tags != publishedTags ?? tags { return }
+        #endif
+        cancelEdit()
+    }
+
     /// A conflict was settled by taking the site's version.
     func resolveConflict() {
         clearPublishedCopy()

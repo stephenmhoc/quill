@@ -4,6 +4,7 @@ import SwiftUI
 
 @main
 struct QuillMacApp: App {
+    @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var delegate
     private let container: ModelContainer
     @State private var lock: AppLock
     @State private var navigation = Navigation()
@@ -17,7 +18,8 @@ struct QuillMacApp: App {
         #if DEBUG
         if CommandLine.arguments.contains("-skipUnlock") { lock.unlockForTesting(keys: [:]) }
         // A site to edit, because saving one for real needs the signed build's Keychain.
-        if CommandLine.arguments.contains("-seedGhostSite"), let url = URL(string: "https://key-test.example.com") {
+        if CommandLine.arguments.contains("-seedGhostSite"), let url = URL(string: "https://key-test.example.com"),
+           ((try? container.mainContext.fetch(FetchDescriptor<Site>())) ?? []).allSatisfy({ $0.name != "Key Test" }) {
             container.mainContext.insert(Site(name: "Key Test", url: url, isPublic: false, color: .ocean))
         }
         #endif
@@ -33,7 +35,8 @@ struct QuillMacApp: App {
                 .environment(lock)
                 .environment(navigation)
                 .environment(publisher)
-                .frame(minWidth: 920, minHeight: 480)
+                .frame(minWidth: 920, maxWidth: .infinity, minHeight: 480, maxHeight: .infinity)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { navigation.windowWidth = $0 }
                 .onChange(of: appearance, initial: true) { _, choice in
                     NSApp.appearance = choice.colorScheme.map { NSAppearance(named: $0 == .dark ? .darkAqua : .aqua) } ?? nil
                 }
@@ -50,10 +53,31 @@ struct QuillMacApp: App {
     }
 }
 
+/// The Dock icon's menu.
+final class MacAppDelegate: NSObject, NSApplicationDelegate {
+    /// Set by the window, which knows whether there's anywhere to write yet.
+    static var newEntry: (() -> Void)?
+
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        let item = NSMenuItem(title: "New Entry", action: #selector(newEntry), keyEquivalent: "")
+        item.target = self
+        menu.addItem(item)
+        return menu
+    }
+
+    @objc private func newEntry() {
+        NSApp.activate()
+        Self.newEntry?()
+    }
+}
+
 /// What the menu bar can do to whichever entry is open.
 struct EditorActions {
     let canPublish: Bool
     let canPreview: Bool
+    /// The window has to be wide enough for the text and the page side by side.
+    let canShowPreview: Bool
     let canEdit: Bool
     /// Formatting needs a selection, and only the body's is one it can use.
     let canFormat: Bool
@@ -127,11 +151,14 @@ struct MacCommands: Commands {
         CommandGroup(after: .sidebar) {
             Button(editor?.isPreviewing == true ? "Hide Preview" : "Show Preview") { editor?.togglePreview() }
                 .keyboardShortcut("p", modifiers: [.command, .option])
-                .disabled(editor?.canPreview != true)
-            Button("Focus Mode") {
-                withAnimation { navigation.columnVisibility = navigation.columnVisibility == .detailOnly ? .all : .detailOnly }
-            }
-            .keyboardShortcut("\\")
+                .disabled(editor?.canShowPreview != true)
+            Button("Reload") { navigation.reloadRequest += 1 }
+                .keyboardShortcut("r")
+                .disabled(!lock.isUnlocked || !navigation.canReload)
+            Button(navigation.isFocused ? "Leave Focus Mode" : "Focus Mode") { navigation.toggleFocus() }
+                // Not ⌘\, which 1Password takes system-wide.
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(!lock.isUnlocked)
             Divider()
         }
         CommandGroup(after: .appSettings) {

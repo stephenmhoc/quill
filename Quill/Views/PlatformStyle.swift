@@ -138,11 +138,56 @@ struct SecretField: View {
             SecureField(prompt, text: $text, prompt: fieldPrompt(prompt))
                 .promptedField()
                 .literalEntry()
+            #if os(macOS)
+            Button {
+                if let value = NSPasteboard.general.string(forType: .string) { paste(value) }
+            } label: {
+                Image(systemName: "doc.on.clipboard")
+            }
+            .buttonStyle(.borderless)
+            .help("Paste")
+            .accessibilityLabel("Paste")
+            #else
             PasteButton(payloadType: String.self) { pasted in
-                if let value = pasted.first?.trimmingCharacters(in: .whitespacesAndNewlines) { text = value }
+                if let value = pasted.first { paste(value) }
             }
             .labelStyle(.iconOnly)
             .buttonBorderShape(.capsule)
+            #endif
+        }
+    }
+
+    private func paste(_ value: String) {
+        text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// Below the form on iOS. A Mac sheet puts it in the footer, as `RemoveSiteToolbarItem`.
+struct RemoveSiteSection: View {
+    let note: String
+    @Binding var isConfirming: Bool
+
+    var body: some View {
+        #if os(iOS)
+        Section {
+            Button("Remove Site", role: .destructive) { isConfirming = true }
+        } footer: {
+            Text(note)
+        }
+        #endif
+    }
+}
+
+#if os(macOS)
+struct RemoveSiteToolbarItem: ToolbarContent {
+    let note: String
+    @Binding var isConfirming: Bool
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .destructiveAction) {
+            Button("Remove Site…", role: .destructive) { isConfirming = true }
+                .help(note)
         }
     }
 }
+#endif

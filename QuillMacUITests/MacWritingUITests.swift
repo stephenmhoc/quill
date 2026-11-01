@@ -73,6 +73,19 @@ final class MacWritingUITests: XCTestCase {
                              "preview didn't render")
         app.typeKey("p", modifierFlags: [.command, .option])
 
+        // Focus mode leaves the words and nothing else, and Esc brings the rest back.
+        app.typeKey("f", modifierFlags: [.command, .shift])
+        sleep(1)
+        attach("focus", app)
+        XCTAssertFalse(app.buttons["sendButton"].exists, "the toolbar stayed in focus mode")
+        XCTAssertEqual(editor.frame.width, app.windows.firstMatch.frame.width, accuracy: 30, "the columns stayed in focus mode")
+        editor.typeText("!")
+        editor.typeKey(.delete, modifierFlags: [])
+        app.typeKey(.escape, modifierFlags: [])
+        sleep(1)
+        XCTAssertTrue(app.buttons["sendButton"].exists, "Esc didn't leave focus mode")
+        XCTAssertLessThan(editor.frame.width, app.windows.firstMatch.frame.width - 300, "the columns didn't come back")
+
         app.typeKey(.return, modifierFlags: .command)
         attach("after-publish", app)
 
@@ -84,13 +97,38 @@ final class MacWritingUITests: XCTestCase {
         XCTAssertEqual(editor.value as? String ?? "", "", "the button didn't open a new entry")
         attach("new-entry", app)
 
+        // Clicking away from an edit of a published post keeps it until it's discarded.
+        app.staticTexts.matching(NSPredicate(format: "value == 'Notebook' OR label == 'Notebook'")).firstMatch.click()
+        let post = app.staticTexts.matching(NSPredicate(format: "value BEGINSWITH 'Written on a' OR label BEGINSWITH 'Written on a'")).firstMatch
+        XCTAssertTrue(post.waitForExistence(timeout: 5), "the published post isn't listed")
+        app.typeKey("r", modifierFlags: .command)
+        sleep(1)
+        XCTAssertTrue(post.exists, "reloading lost the list")
+        post.click()
+        let edit = app.buttons["Edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5), "no Edit on a published post")
+        edit.click()
+        sleep(1)
+        editor.typeText(" kept")
+        app.descendants(matching: .any)["newEntryButton"].click()
+        sleep(1)
+        post.click()
+        let discard = app.buttons["Discard Changes"]
+        XCTAssertTrue(discard.waitForExistence(timeout: 5), "the edit didn't survive clicking away")
+        XCTAssertTrue((editor.value as? String ?? "").hasSuffix(" kept"), "the edit lost its text: \(editor.value ?? "nil")")
+        attach("kept-edit", app)
+        discard.click()
+        sleep(1)
+        XCTAssertFalse((editor.value as? String ?? "").hasSuffix(" kept"), "discarding kept the text")
+
         app.typeKey(",", modifierFlags: .command)
         sleep(1)
         attach("settings", app)
     }
 
     /// A replacement key has to be pasteable into a site that already exists.
-    @MainActor func testPasteANewKeyIntoAnExistingSite() {
+    /// Named to run last: the seeded site would stand in for the one the writing test makes.
+    @MainActor func testZPasteANewKeyIntoAnExistingSite() {
         let app = XCUIApplication()
         app.launchArguments = ["-skipUnlock", "-seedGhostSite"]
         app.launch()

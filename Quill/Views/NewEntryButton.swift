@@ -20,6 +20,8 @@ private struct NewEntryButton: ViewModifier {
     @Environment(Navigation.self) private var navigation
     @Environment(\.modelContext) private var context
     @State private var offset = CGSize.zero
+    private static let reach: CGFloat = 16
+    private static let tapSlop: CGFloat = 44
 
     func body(content: Content) -> some View {
         content
@@ -32,6 +34,9 @@ private struct NewEntryButton: ViewModifier {
                             .font(.title2.weight(.medium))
                             .foregroundStyle(.white)
                             .frame(width: 58, height: 58))
+                            // A near miss still counts, even with a row right behind the button.
+                            .padding(Self.reach)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("New Entry")
@@ -40,7 +45,7 @@ private struct NewEntryButton: ViewModifier {
                     .offset(offset)
                     .highPriorityGesture(dropTargets.isEmpty ? nil : drag)
                     .sensoryFeedback(.selection, trigger: dropSite)
-                    .padding(20)
+                    .padding(20 - Self.reach)
                 }
             }
     }
@@ -61,9 +66,12 @@ private struct NewEntryButton: ViewModifier {
                 // Rows are taller than their text.
                 dropSite = dropTargets.first { $0.value.insetBy(dx: -16, dy: -10).contains(value.location) }?.key
             }
-            .onEnded { _ in
+            .onEnded { value in
                 if let target = dropSite {
                     navigation.openBlankEntry(in: context, site: target)
+                } else if hypot(value.translation.width, value.translation.height) < Self.tapSlop {
+                    // A finger that shifted during a tap meant a tap, not a drag to nowhere.
+                    navigation.openBlankEntry(in: context, site: site)
                 }
                 dropSite = nil
                 withAnimation(.spring(duration: 0.3)) { offset = .zero }

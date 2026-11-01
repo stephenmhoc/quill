@@ -29,6 +29,7 @@ struct EditorView: View {
     @State private var saveFailed = false
 
     private var site: Site? { sites.first { $0.id == entry.siteID } }
+    private var isFocused: Bool { navigation.isFocused }
     private var isEditable: Bool { entry.state == .editing }
     private var canSend: Bool {
         isEditable && !entry.isBlank && site != nil && !uploading && !publisher.sending.contains(entry.id)
@@ -62,16 +63,27 @@ struct EditorView: View {
                         .background(Color.paper)
                 }
                 VStack(spacing: 0) {
-                    if bodyFocused && isEditable { formatBar }
-                    if isEditable { publishBar }
+                    if bodyFocused && isEditable && !isFocused { formatBar }
+                    if isEditable && !isFocused { publishBar }
                 }
                 .tint(.secondary)
                 .opacity(isTyping ? 0.25 : 1)
                 .animation(.easeInOut(duration: 0.2), value: isTyping)
             }
         }
+        .overlay(alignment: .bottomTrailing) {
+            if isFocused {
+                focusButton
+                    .opacity(isTyping ? 0.15 : 0.6)
+                    .animation(.easeInOut(duration: 0.2), value: isTyping)
+                    .padding(8)
+            }
+        }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(isFocused ? .hidden : .automatic, for: .navigationBar)
+        .statusBarHidden(isFocused)
+        .persistentSystemOverlays(isFocused ? .hidden : .automatic)
         .toolbar { toolbar }
         .sheet(isPresented: $showingTags) { TagEditor(entry: entry, site: site) }
         .sheet(isPresented: $showingPreview) { EntryPreview(title: entry.title, markdown: entry.body) }
@@ -138,18 +150,20 @@ struct EditorView: View {
         ToolbarItem(placement: .principal) {
             SitePicker(entry: entry, sites: sites, locked: entry.remotePostID != nil || entry.uploadedToSiteID != nil || uploading || !isEditable)
         }
-        if usesColumns {
-            ToolbarItem(placement: .primaryAction) {
-                let focused = navigation.columnVisibility == .detailOnly
-                Button { navigation.toggleFocus() } label: {
-                    Image(systemName: focused ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                        .foregroundStyle(.primary)
-                }
-                .accessibilityLabel("Focus")
-                .id(focused)
-                .keyboardShortcut("f", modifiers: [.command, .shift])
-            }
+        ToolbarItem(placement: .primaryAction) {
+            if !isFocused { focusButton }
         }
+    }
+
+    private var focusButton: some View {
+        Button { navigation.toggleFocus() } label: {
+            Image(systemName: isFocused ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                .foregroundStyle(.primary)
+                .padding(isFocused ? 12 : 0)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Focus")
+        .keyboardShortcut("f", modifiers: [.command, .shift])
     }
 
     /// In the layout, not a keyboard toolbar: that one floats over the publish bar and takes its taps.

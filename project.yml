@@ -126,20 +126,17 @@ targets:
           # Lets a dev build reach a Ghost on http://localhost; real sites use HTTPS.
           NSAllowsLocalNetworking: true
     settings:
-      configs:
-        # Development builds and tests get their own data and Keychain items, so they can never
-        # touch the copy of Quill in /Applications.
-        Debug:
-          PRODUCT_BUNDLE_IDENTIFIER: com.merimerimeri.Quill.dev
-          ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon-Dev
-        Release:
-          PRODUCT_BUNDLE_IDENTIFIER: com.merimerimeri.Quill
       base:
+        # Every local build, in any configuration, gets its own data and Keychain items, so it can
+        # never touch the copy of Quill in /Applications. Only the release workflow overrides these.
+        QUILL_BUNDLE_ID: com.merimerimeri.Quill.dev
+        QUILL_APP_ICON: AppIcon-Dev
+        PRODUCT_BUNDLE_IDENTIFIER: $(QUILL_BUNDLE_ID)
+        ASSETCATALOG_COMPILER_APPICON_NAME: $(QUILL_APP_ICON)
         PRODUCT_NAME: Quill
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         SWIFT_APPROACHABLE_CONCURRENCY: YES
         ENABLE_HARDENED_RUNTIME: YES
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
     scheme:

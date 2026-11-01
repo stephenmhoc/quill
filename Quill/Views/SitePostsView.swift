@@ -73,6 +73,7 @@ struct SitePostsView: View {
             .onAppear { if posts.isEmpty, let site { posts = site.cachedPostList } }
             .task { await Task { await load() }.value }
             .onChange(of: publisher.sentCount) { Task { await load() } }
+            .onChange(of: navigation.reloadRequest) { Task { await load() } }
     }
 
     @ViewBuilder private var posted: some View {
@@ -224,6 +225,7 @@ struct SitePostsView: View {
 
     private func delete(_ post: SitePost) async {
         guard let site else { return }
+        localEntry(for: post)?.cancelEdit()
         if let entry = localEntry(for: post), navigation.selectedEntry == entry { navigation.selectedEntry = nil }
         do {
             try await publisher.deletePost(id: post.id, site: site)

@@ -9,49 +9,9 @@ struct SitePicker: View {
     let sites: [Site]
     let locked: Bool
 
-    #if os(macOS)
-    @State private var choosing = false
-    #endif
-
     private var site: Site? { sites.first { $0.id == entry.siteID } }
 
     var body: some View {
-        chooser
-            .disabled(locked)
-            .accessibilityLabel("Site: \(site?.name ?? "none")")
-    }
-
-    #if os(macOS)
-    /// A popover, because a Mac menu won't draw a coloured dot beside its items.
-    private var chooser: some View {
-        Button { choosing = true } label: { label }
-            .buttonStyle(.plain)
-            .popover(isPresented: $choosing, arrowEdge: .bottom) {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(sites) { s in
-                        Button {
-                            entry.siteID = s.id
-                            choosing = false
-                        } label: {
-                            HStack(spacing: 8) {
-                                Circle().fill(s.color.color).frame(width: 9, height: 9)
-                                Text(s.name)
-                                Spacer(minLength: 16)
-                                if s.id == entry.siteID { Image(systemName: "checkmark").font(.caption.weight(.semibold)) }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(8)
-                .frame(minWidth: 180)
-            }
-    }
-    #else
-    private var chooser: some View {
         Menu {
             ForEach(sites) { s in
                 Button {
@@ -60,11 +20,20 @@ struct SitePicker: View {
                     Label(s.name, systemImage: s.accessIcon)
                 }
             }
-        } label: { label }
+        } label: {
+            SitePickerLabel(site: site, locked: locked)
+        }
+        .disabled(locked)
+        .accessibilityLabel("Site: \(site?.name ?? "none")")
     }
-    #endif
+}
 
-    private var label: some View {
+/// The coloured pill naming where an entry will go.
+struct SitePickerLabel: View {
+    let site: Site?
+    let locked: Bool
+
+    var body: some View {
         HStack(spacing: 6) {
             Circle().fill(site?.color.color ?? .gray).frame(width: 8, height: 8)
             Text(site?.name ?? "Choose site").fontWeight(.semibold)
@@ -157,7 +126,17 @@ struct StatusBanner: View {
         switch entry.state {
         case .editing:
             if entry.remotePostID != nil {
+                #if os(macOS)
+                HStack {
+                    note("Editing. Keeps until you publish or discard it.", "pencil", .secondary)
+                    Spacer()
+                    Button("Discard Changes") { entry.cancelEdit() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
+                #else
                 note("Editing. Going back cancels.", "pencil", .secondary)
+                #endif
             }
         case .sending:
             note("Sending to \(site?.name ?? "the site")…", "arrow.up.circle", .secondary)

@@ -63,27 +63,14 @@ struct GhostSiteForm: View {
             if let error {
                 Section { Text(error).font(.footnote).foregroundStyle(.red) }
             }
-            #if os(iOS)
-            if !isNew {
-                Section {
-                    Button("Remove Site", role: .destructive) { confirmingDelete = true }
-                } footer: {
-                    Text("Removes the site and its key from this device. Nothing changes in Ghost.")
-                }
-            }
-            #endif
+            if !isNew { RemoveSiteSection(note: "Removes the site and its key from this device. Nothing changes in Ghost.", isConfirming: $confirmingDelete) }
         }
         .siteFormStyle(isCentered: isCentered)
         .navigationTitle(isNew ? "Ghost Site" : "Edit Site")
         .compactTitle()
         .toolbar {
             #if os(macOS)
-            if !isNew {
-                ToolbarItem(placement: .destructiveAction) {
-                    Button("Remove Site…", role: .destructive) { confirmingDelete = true }
-                        .help("Removes the site and its key from this device. Nothing changes in Ghost.")
-                }
-            }
+            if !isNew { RemoveSiteToolbarItem(note: "Removes the site and its key from this device. Nothing changes in Ghost.", isConfirming: $confirmingDelete) }
             #endif
             ToolbarItem(placement: .confirmationAction) {
                 if checking { ProgressView() } else {

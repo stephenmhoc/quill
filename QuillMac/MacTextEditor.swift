@@ -10,6 +10,8 @@ struct MacTextEditor<Header: View>: NSViewRepresentable {
     /// Bump to move the cursor to the text.
     let focusRequest: Int
     let isEditable: Bool
+    /// Focus mode: with nothing beside it, the text belongs in the middle.
+    var isCentered = false
     let onImages: ([Data]) -> Void
     let onFocus: (Bool) -> Void
     @ViewBuilder let header: () -> Header
@@ -41,6 +43,7 @@ struct MacTextEditor<Header: View>: NSViewRepresentable {
         view.onImages = onImages
         view.onFocus = onFocus
         view.isEditable = isEditable
+        view.isCentered = isCentered
         view.setHeader(AnyView(header()))
         if view.string != text {
             view.replaceChanges(with: text)
@@ -109,6 +112,9 @@ final class MacPageTextView: NSTextView {
 
     var onImages: (([Data]) -> Void)?
     var onFocus: ((Bool) -> Void)?
+    var isCentered = false {
+        didSet { if isCentered != oldValue { layOutPage() } }
+    }
     private var headerController: NSHostingController<AnyView>?
     private var top = MacPageTextView.topInset
     private var wantsFocus = false
@@ -151,6 +157,11 @@ final class MacPageTextView: NSTextView {
 
     // MARK: The page
 
+    /// The header sits inside the text view, where accessibility wouldn't look for its buttons.
+    override func accessibilityChildren() -> [Any]? {
+        (super.accessibilityChildren() ?? []) + (headerController.map { [$0.view] } ?? [])
+    }
+
     func setHeader(_ header: AnyView) {
         if let headerController {
             headerController.rootView = header
@@ -174,7 +185,7 @@ final class MacPageTextView: NSTextView {
 
     private func layOutPage() {
         // A constant margin, not a centred column, so the text stays put when the panes change.
-        let side = Self.margin
+        let side = isCentered ? max(Self.margin, (bounds.width - Self.maxWidth) / 2) : Self.margin
         let width = min(Self.maxWidth, bounds.width - side * 2)
         guard width > 0 else { return }
         textContainer?.size.width = width

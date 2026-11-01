@@ -220,6 +220,15 @@ final class PublishFlowUITests: XCTestCase {
             app.buttons["Focus"].tap()
             XCTAssertTrue(list.waitForExistence(timeout: 5), "focus mode didn't exit")
             XCTAssertTrue(app.buttons["Focus"].isHittable, "the focus button went away")
+        } else {
+            // iPhone: the bars go, and the one button left brings them back.
+            let back = app.buttons["BackButton"]
+            XCTAssertTrue(back.exists)
+            app.buttons["Focus"].tap()
+            XCTAssertTrue(back.waitForNonExistence(timeout: 5), "focus mode left the navigation bar")
+            attach("focus-mode", app)
+            app.buttons["Focus"].tap()
+            XCTAssertTrue(back.waitForExistence(timeout: 5), "focus mode didn't exit")
         }
 
         // Delete asks first, then it's gone from Ghost.
@@ -423,8 +432,18 @@ final class PublishFlowUITests: XCTestCase {
         // New Entry on a site's list writes to that site.
         // Writing here publishes on one tap, so stop short of sending.
         if UIDevice.current.userInterfaceIdiom == .phone {
-            app.buttons["New Entry"].firstMatch.tap()
-            XCTAssertTrue(editor.waitForExistence(timeout: 10))
+            // A finger that shifts during a tap on the draggable home button still opens a page.
+            showSidebar(app)
+            let center = app.buttons["floatingNewEntry"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            center.press(forDuration: 0.1, thenDragTo: center.withOffset(CGVector(dx: -20, dy: -6)))
+            XCTAssertTrue(editor.waitForExistence(timeout: 10), "a sloppy tap did nothing")
+            showSidebar(app)
+            app.cells.containing(.staticText, identifier: name).firstMatch.tap()
+            XCTAssertTrue(post.waitForExistence(timeout: 15))
+
+            // A near miss counts too, with a row right behind the button.
+            app.buttons["floatingNewEntry"].coordinate(withNormalizedOffset: CGVector(dx: 0.06, dy: 0.5)).tap()
+            XCTAssertTrue(editor.waitForExistence(timeout: 10), "a near miss did nothing")
             XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Site:' AND label CONTAINS %@", name)).firstMatch.exists,
                           "new entry isn't on the site whose list it came from")
         } else {

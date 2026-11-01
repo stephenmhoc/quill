@@ -32,7 +32,7 @@ struct AddSiteView: View {
             .compactTitle()
             .toolbar {
                 if !isRequired {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Text("Cancel").sheetButtonLabel() } }
                 }
             }
             .navigationDestination(for: SiteKind.self) { kind in
@@ -97,7 +97,7 @@ struct EditSiteView: View {
         NavigationStack {
             siteForm(kind: site.kind, site: site, isCentered: false) { dismiss() }
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Text("Cancel").sheetButtonLabel() } }
                 }
         }
         .sheetSize()

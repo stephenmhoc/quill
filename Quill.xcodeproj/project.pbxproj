@@ -36,6 +36,7 @@
 		728239642AFD23D314D465F0 /* Navigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A601AE5954D328F6E161E61 /* Navigation.swift */; };
 		7394364E99E07ED8DEBED287 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = D129A90B0F4AEE93CA5BA2F5 /* Sparkle */; };
 		760C5A038A9ACBF3229EAEB7 /* GhostSiteForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC2A3CC27E227D11249E64A /* GhostSiteForm.swift */; };
+		78BAC39BF5FF5FA2372F77B5 /* MacSitePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69B66DA2B54F91EA4487F5CB /* MacSitePicker.swift */; };
 		7943BCA4B2F3B299FA08702A /* QuillStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C0502ECC5CD16D03EEE45D /* QuillStore.swift */; };
 		7E146DC24D130D44E61F2CB0 /* PublishFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9234120738BBF6CBF48467A3 /* PublishFlowUITests.swift */; };
 		83DD1BB355DD2C19F8636403 /* MacWritingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A181928BECAE255D203FB3C2 /* MacWritingUITests.swift */; };
@@ -131,6 +132,7 @@
 		5A8EE99F1C2FDC7AC5F379E9 /* AddSiteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSiteView.swift; sourceTree = "<group>"; };
 		64CF96E4FEB2C5D36281BB0D /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		652A2E7C67C2F9335547BBB9 /* Site.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Site.swift; sourceTree = "<group>"; };
+		69B66DA2B54F91EA4487F5CB /* MacSitePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSitePicker.swift; sourceTree = "<group>"; };
 		7B776FA072E3EEF65311D230 /* EntryPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryPreview.swift; sourceTree = "<group>"; };
 		7ECB4E88FFB544CBB3212EA2 /* EditorTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTextView.swift; sourceTree = "<group>"; };
 		820CCF022A1C6E8727D5196E /* MacSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSettingsView.swift; sourceTree = "<group>"; };
@@ -255,6 +257,7 @@
 				4A4B1C33DC311E92AFFB155E /* MacRootView.swift */,
 				820CCF022A1C6E8727D5196E /* MacSettingsView.swift */,
 				4851296535464A92DA36EA6C /* MacSidebar.swift */,
+				69B66DA2B54F91EA4487F5CB /* MacSitePicker.swift */,
 				89DC87DAA5DF17BC839A22C8 /* MacTextEditor.swift */,
 				94B8FDACFB8E22C48D9BA201 /* QuillMac.entitlements */,
 				C684F49AE50326D752C22416 /* QuillMacApp.swift */,
@@ -571,6 +574,7 @@
 				95A4F49D30F1411095B10E8A /* MacRootView.swift in Sources */,
 				59B8B31D58D64F050E516A06 /* MacSettingsView.swift in Sources */,
 				29B8A3FB3C5ED2397023FB80 /* MacSidebar.swift in Sources */,
+				78BAC39BF5FF5FA2372F77B5 /* MacSitePicker.swift in Sources */,
 				114A3307EFB137CDD64A7589 /* MacTextEditor.swift in Sources */,
 				DD8B5EAF56D8403A956D7FCA /* MarkdownFormat.swift in Sources */,
 				5999C8A35A32FC1928906058 /* MarkdownStyler.swift in Sources */,
@@ -718,7 +722,7 @@
 		525D8016F05A48469C6DEA03 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-Dev";
+				ASSETCATALOG_COMPILER_APPICON_NAME = "$(QUILL_APP_ICON)";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = QuillMac/QuillMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -729,8 +733,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.merimerimeri.Quill.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(QUILL_BUNDLE_ID)";
 				PRODUCT_NAME = Quill;
+				QUILL_APP_ICON = "AppIcon-Dev";
+				QUILL_BUNDLE_ID = com.merimerimeri.Quill.dev;
 				SDKROOT = macosx;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -831,7 +837,7 @@
 		89EE285460893989931DD248 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "$(QUILL_APP_ICON)";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = QuillMac/QuillMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -842,8 +848,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.merimerimeri.Quill;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(QUILL_BUNDLE_ID)";
 				PRODUCT_NAME = Quill;
+				QUILL_APP_ICON = "AppIcon-Dev";
+				QUILL_BUNDLE_ID = com.merimerimeri.Quill.dev;
 				SDKROOT = macosx;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;

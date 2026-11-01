@@ -25,15 +25,28 @@ extension EnvironmentValues {
 final class Navigation {
     var sidebar: SidebarItem?
     var selectedEntry: Entry? {
-        didSet { if oldValue != selectedEntry { oldValue?.cancelEdit() } }
+        didSet { if oldValue != selectedEntry { oldValue?.leaveEdit() } }
     }
     var path: [Route] = [] {
         didSet {
-            if !path.contains(.editor) { selectedEntry?.cancelEdit() }
+            if !path.contains(.editor) {
+                selectedEntry?.leaveEdit()
+                isFocused = false
+            }
             if case .list(let item)? = path.first { sidebar = item }
         }
     }
-    var columnVisibility: NavigationSplitViewVisibility = .all
+    var columnVisibility: NavigationSplitViewVisibility = .all {
+        // iPad's sidebar can be swiped back in.
+        didSet {
+            #if os(iOS)
+            if columnVisibility != .detailOnly { isFocused = false }
+            #endif
+        }
+    }
+    /// Nothing on screen but the words: no columns, bars or buttons.
+    private(set) var isFocused = false
+    private var columnsBeforeFocus = NavigationSplitViewVisibility.all
     /// Narrow iPad: the sidebar floats over the list, so it closes once it's been used.
     var sidebarOverlays = false
     var showingSettings = false
@@ -41,6 +54,10 @@ final class Navigation {
     /// where the keyboard would take half the screen before anyone asked to write.
     var focusNextEntry = false
     var showingAddSite = false
+    /// Mac: ⌘R asks whichever site list is showing to fetch its posts again.
+    var reloadRequest = 0
+    var canReload: Bool { if case .site = sidebar { true } else { false } }
+    var windowWidth: CGFloat = .infinity
 
     static let defaultSiteKey = "defaultSiteID"
 
@@ -103,7 +120,14 @@ final class Navigation {
 
     func toggleFocus() {
         withAnimation {
-            columnVisibility = columnVisibility == .detailOnly ? .doubleColumn : .detailOnly
+            if isFocused {
+                isFocused = false
+                columnVisibility = columnsBeforeFocus
+            } else {
+                columnsBeforeFocus = columnVisibility == .detailOnly ? .all : columnVisibility
+                columnVisibility = .detailOnly
+                isFocused = true
+            }
         }
     }
 }
