@@ -124,7 +124,7 @@ struct EntryRow: View {
     let site: Site?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: rowSpacing) {
             HStack(spacing: 6) {
                 if let site {
                     Circle().fill(site.color.color).frame(width: 7, height: 7)
@@ -149,7 +149,20 @@ struct EntryRow: View {
             }
             status
         }
+        #if os(macOS)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 10)
+        #else
         .padding(.vertical, 4)
+        #endif
+    }
+
+    private var rowSpacing: CGFloat {
+        #if os(macOS)
+        7
+        #else
+        4
+        #endif
     }
 
     @ViewBuilder private var status: some View {
