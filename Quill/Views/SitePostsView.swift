@@ -177,7 +177,7 @@ struct SitePostsView: View {
         #else
         Button { Task { await open(post) } } label: { row(post) }
             .buttonStyle(.plain)
-            .cardRow()
+            .cardRow(isSelected: usesColumns && localEntry(for: post).map { $0 == navigation.selectedEntry } == true)
             .disabled(opening != nil)
         #endif
     }
@@ -219,12 +219,7 @@ struct SitePostsView: View {
         defer { if request == openRequest { opening = nil } }
         let (shownEntry, shownPath) = (navigation.selectedEntry, navigation.path)
         do {
-            var entry = localEntry(for: post)
-            if let entry {
-                await publisher.refresh(entry, site: site)
-            } else {
-                entry = try await publisher.importPost(id: post.id, site: site)
-            }
+            let entry = try await publisher.entry(for: post, on: site)
             // Someone who moved on while this loaded stays where they went.
             guard request == openRequest, navigation.selectedEntry == shownEntry, navigation.path == shownPath else { return }
             guard let entry else {
@@ -319,6 +314,7 @@ private struct TagFilterBar: View {
     let tags: [SiteTag]
     @Binding var selection: SiteTag?
     let tint: Color
+    @Environment(\.usesColumns) private var usesColumns
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -344,7 +340,7 @@ private struct TagFilterBar: View {
             #if os(macOS)
             .padding(.horizontal, 6)
             #else
-            .padding(.horizontal, 20)
+            .padding(.horizontal, usesColumns ? 8 : 20)
             #endif
         }
         .scrollIndicators(.hidden)

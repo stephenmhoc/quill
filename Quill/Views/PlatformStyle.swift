@@ -55,13 +55,7 @@ extension View {
         #endif
     }
 
-    @ViewBuilder func cardRow(isSelected: Bool = false) -> some View {
-        #if os(iOS)
-        listRowBackground(isSelected ? Color.accentColor.opacity(0.15) : Color.card)
-        #else
-        self
-        #endif
-    }
+    func cardRow(isSelected: Bool = false) -> some View { modifier(CardRow(isSelected: isSelected)) }
 
     /// A sheet on a Mac takes its size from its content, and needs telling.
     @ViewBuilder func sheetSize() -> some View {
@@ -82,6 +76,26 @@ extension View {
     }
 
     func siteFormStyle(isCentered: Bool) -> some View { modifier(SiteFormStyle(isCentered: isCentered)) }
+}
+
+/// A card on iPhone. In iPad's columns a block of rows looks boxy against the page, so they sit
+/// directly on it, and only the open one is marked. The Mac keeps its own list surfaces.
+private struct CardRow: ViewModifier {
+    let isSelected: Bool
+    @Environment(\.usesColumns) private var usesColumns
+
+    @ViewBuilder func body(content: Content) -> some View {
+        #if os(iOS)
+        if usesColumns {
+            content.listRowBackground(
+                RoundedRectangle(cornerRadius: 12).fill(isSelected ? Color.accentColor.opacity(0.15) : .clear))
+        } else {
+            content.listRowBackground(isSelected ? Color.accentColor.opacity(0.15) : Color.card)
+        }
+        #else
+        content
+        #endif
+    }
 }
 
 private struct SiteFormStyle: ViewModifier {

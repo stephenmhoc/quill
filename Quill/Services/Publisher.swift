@@ -106,6 +106,16 @@ final class Publisher {
         try? await backend(for: site).refresh(entry)
     }
 
+    /// What to open for a listed post: Quill's copy, up to date, or else a new one.
+    /// Nil if Quill can't edit it safely.
+    func entry(for post: SitePost, on site: Site) async throws -> Entry? {
+        guard let entry = try Entry.copy(of: post.id, on: site.id, in: context) else {
+            return try await importPost(id: post.id, site: site)
+        }
+        await refresh(entry, site: site)
+        return entry
+    }
+
     func deletePost(id: String, site: Site) async throws {
         try await backend(for: site).deletePost(id: id)
     }
