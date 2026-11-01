@@ -17,11 +17,18 @@ public struct GhostTag: Codable, Sendable, Equatable, Hashable {
     public let id: String?
     public let name: String
     public let slug: String?
+    /// How many posts use it, when asked for.
+    public let count: Count?
+
+    public struct Count: Codable, Sendable, Equatable, Hashable {
+        public let posts: Int
+    }
 
     public init(name: String) {
         self.id = nil
         self.name = name
         self.slug = nil
+        self.count = nil
     }
 
     /// Internal tags start with `#` and are never shown publicly.

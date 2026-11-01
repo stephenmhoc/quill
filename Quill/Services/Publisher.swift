@@ -13,6 +13,7 @@ final class Publisher {
     private(set) var sentCount = 0
     /// When each site's totals were last fetched.
     var statsChecked: [UUID: (at: Date, sent: Int)] = [:]
+    var siteTags: [UUID: [SiteTag]] = [:]
 
     let lock: AppLock
     let context: ModelContext

@@ -86,14 +86,16 @@ public struct GhostClient: Sendable {
         _ = try await send("DELETE", "posts/\(id)/")
     }
 
-    public func recentPosts(limit: Int = 20, page: Int = 1) async throws -> [GhostPost] {
-        let data = try await send("GET", "posts/", query: [
+    public func recentPosts(limit: Int = 20, page: Int = 1, tagSlug: String? = nil) async throws -> [GhostPost] {
+        var query = [
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "page", value: String(page)),
             URLQueryItem(name: "order", value: "updated_at desc"),
             URLQueryItem(name: "include", value: "tags"),
             URLQueryItem(name: "fields", value: "id,title,slug,status,url,created_at,updated_at,published_at,excerpt"),
-        ])
+        ]
+        if let tagSlug { query.append(URLQueryItem(name: "filter", value: "tag:\(tagSlug)")) }
+        let data = try await send("GET", "posts/", query: query)
         return try decode(PostsEnvelopeIn.self, from: data).posts
     }
 
@@ -144,6 +146,7 @@ public struct GhostClient: Sendable {
         let data = try await send("GET", "tags/", query: [
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "order", value: "name asc"),
+            URLQueryItem(name: "include", value: "count.posts"),
         ])
         return try decode(TagsEnvelope.self, from: data).tags
     }

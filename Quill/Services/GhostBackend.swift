@@ -11,8 +11,8 @@ struct GhostBackend: SiteBackend {
     let site: Site
     let context: ModelContext
 
-    func posts(limit: Int, page: Int) async throws -> [SitePost] {
-        try await client.recentPosts(limit: limit, page: page).map { post in
+    func posts(limit: Int, page: Int, tag: SiteTag?) async throws -> [SitePost] {
+        try await client.recentPosts(limit: limit, page: page, tagSlug: tag?.id).map { post in
             let untitled = post.title == "(Untitled)" || post.tags?.contains { $0.name == EntryBuilder.untitledTag } == true
             return SitePost(id: post.id, title: untitled ? (post.excerpt ?? post.title) : post.title, isUntitled: untitled,
                             date: post.publishedAt, badge: post.status == .published ? nil : post.status.rawValue.uppercased(),
@@ -118,6 +118,13 @@ struct GhostBackend: SiteBackend {
 
     func tags() async throws -> [String] {
         try await client.tags().filter { !$0.isInternal }.map(\.name)
+    }
+
+    func filterTags() async throws -> [SiteTag] {
+        try await client.tags()
+            .filter { !$0.isInternal && $0.name != EntryBuilder.untitledTag && ($0.count?.posts ?? 0) > 0 && $0.slug != nil }
+            .sorted { ($0.count?.posts ?? 0) > ($1.count?.posts ?? 0) }
+            .map { SiteTag(id: $0.slug ?? $0.name, name: $0.name) }
     }
 
     func uploadImage(_ jpeg: Data, filename: String) async throws -> URL {

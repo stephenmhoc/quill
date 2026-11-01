@@ -15,6 +15,12 @@ struct SitePost: Identifiable, Equatable, Codable {
     let url: URL?
 }
 
+/// A tag that posts can be filtered by. `id` is whatever the site filters on.
+struct SiteTag: Identifiable, Hashable {
+    let id: String
+    let name: String
+}
+
 /// What a backend reports after accepting an entry.
 struct SentPost {
     let id: String
@@ -26,7 +32,8 @@ struct SentPost {
 /// Everything the app needs from a kind of site. Views and the Publisher only talk to this;
 /// `Publisher.backend(for:)` is the one place that picks an implementation.
 protocol SiteBackend {
-    func posts(limit: Int, page: Int) async throws -> [SitePost]
+    /// With a tag, only its posts, from anywhere on the site.
+    func posts(limit: Int, page: Int, tag: SiteTag?) async throws -> [SitePost]
     /// Totals for everything published, which can mean reading the whole site.
     func stats() async throws -> PostStats
     /// The entry for a listed post, brought into Quill if needed. Nil if Quill can't edit it safely.
@@ -40,13 +47,27 @@ protocol SiteBackend {
     /// Replace a conflicted entry with the site's current version.
     func takeLatestVersion(of entry: Entry) async throws
     func tags() async throws -> [String]
+    /// Tags with posts, the ones worth offering first at the front.
+    func filterTags() async throws -> [SiteTag]
     /// Stores an image and returns the URL to put in the Markdown.
     func uploadImage(_ jpeg: Data, filename: String) async throws -> URL
     /// Called when the site is removed from Quill.
     func removeSiteData() throws
 }
 
+extension SiteBackend {
+    func posts(limit: Int, page: Int) async throws -> [SitePost] {
+        try await posts(limit: limit, page: page, tag: nil)
+    }
+}
+
 extension Publisher {
+    /// Keeps a site's tags for the app's lifetime, so going back to it doesn't shift the list.
+    func refreshTags(of site: Site) async {
+        guard let tags = try? await backend(for: site).filterTags() else { return }
+        siteTags[site.id] = tags
+    }
+
     /// Fetches a site's first page of posts and keeps it on the device for next time.
     func loadPosts(of site: Site) async throws -> [SitePost] {
         let posts = try await backend(for: site).posts(limit: SitePost.pageSize, page: 1)

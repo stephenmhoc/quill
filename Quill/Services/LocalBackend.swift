@@ -11,8 +11,8 @@ struct LocalBackend: SiteBackend {
     /// Markdown refers to images by this scheme, because the app's folder moves between installs.
     static let imageScheme = "quill-local"
 
-    func posts(limit: Int, page: Int) async throws -> [SitePost] {
-        try saved().dropFirst(limit * (page - 1)).prefix(limit).map { entry in
+    func posts(limit: Int, page: Int, tag: SiteTag?) async throws -> [SitePost] {
+        try saved().filter { tag == nil || $0.tags.contains(tag?.name ?? "") }.dropFirst(limit * (page - 1)).prefix(limit).map { entry in
             SitePost(id: entry.remotePostID ?? entry.id.uuidString, title: entry.displayTitle,
                      isUntitled: entry.title.isEmpty, date: entry.createdAt, badge: nil, url: nil)
         }
@@ -45,6 +45,10 @@ struct LocalBackend: SiteBackend {
 
     func tags() async throws -> [String] {
         Array(Set(try saved().flatMap(\.tags))).sorted()
+    }
+
+    func filterTags() async throws -> [SiteTag] {
+        try await tags().filter { !$0.hasPrefix("#") }.map { SiteTag(id: $0, name: $0) }
     }
 
     func uploadImage(_ jpeg: Data, filename: String) async throws -> URL {

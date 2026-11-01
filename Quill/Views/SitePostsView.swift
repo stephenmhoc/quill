@@ -24,6 +24,7 @@ struct SitePostsView: View {
     @State private var openRequest = 0
     @State private var pendingDelete: SitePost?
     @State private var unsupported: SitePost?
+    @State private var filter: SiteTag?
     #if os(macOS)
     @State private var selectedPost: String?
     #endif
@@ -38,7 +39,11 @@ struct SitePostsView: View {
             .overlay {
                 if loading && posts.isEmpty { ProgressView() }
                 else if posts.isEmpty && error == nil && !loading {
-                    ContentUnavailableView("No posts yet", systemImage: "doc.richtext")
+                    if let filter {
+                        ContentUnavailableView("No posts tagged #\(filter.name)", systemImage: "tag")
+                    } else {
+                        ContentUnavailableView("No posts yet", systemImage: "doc.richtext")
+                    }
                 }
             }
             #if os(iOS)
@@ -74,6 +79,7 @@ struct SitePostsView: View {
             .task { await Task { await load() }.value }
             .onChange(of: publisher.sentCount) { Task { await load() } }
             .onChange(of: navigation.reloadRequest) { Task { await load() } }
+            .onChange(of: filter) { Task { await load() } }
     }
 
     @ViewBuilder private var posted: some View {
@@ -106,6 +112,12 @@ struct SitePostsView: View {
                     .listRowSeparator(.hidden)
             }
             #endif
+            if let tags = publisher.siteTags[siteID], !tags.isEmpty {
+                TagFilterBar(tags: tags, selection: $filter, tint: site?.color.color ?? .accentColor)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0))
+            }
             Section {
                 ForEach(posts) { post in
                     postRow(post)
@@ -230,7 +242,7 @@ struct SitePostsView: View {
         do {
             try await publisher.deletePost(id: post.id, site: site)
             posts.removeAll { $0.id == post.id }
-            publisher.remember(posts, on: site)
+            if filter == nil { publisher.remember(posts, on: site) }
             error = nil
         } catch {
             self.error = error.localizedDescription
@@ -241,13 +253,23 @@ struct SitePostsView: View {
         guard let site else { return }
         loading = true
         defer { loading = false }
+        let tag = filter
         do {
-            let first = try await publisher.loadPosts(of: site)
+            // Only the whole list is kept for next time.
+            let first = if let tag {
+                try await publisher.backend(for: site).posts(limit: SitePost.pageSize, page: 1, tag: tag)
+            } else {
+                try await publisher.loadPosts(of: site)
+            }
+            guard tag == filter else { return }
             posts = first
             page = 1
             hasMore = first.count == SitePost.pageSize
             error = nil
-            Task(priority: .utility) { await publisher.refreshStats(of: site) }
+            Task(priority: .utility) {
+                await publisher.refreshTags(of: site)
+                await publisher.refreshStats(of: site)
+            }
         } catch {
             self.error = error.localizedDescription
         }
@@ -255,8 +277,10 @@ struct SitePostsView: View {
 
     private func loadMore() async {
         guard let site else { return }
+        let tag = filter
         do {
-            let next = try await publisher.backend(for: site).posts(limit: SitePost.pageSize, page: page + 1)
+            let next = try await publisher.backend(for: site).posts(limit: SitePost.pageSize, page: page + 1, tag: tag)
+            guard tag == filter else { return }
             let known = Set(posts.map(\.id))
             posts += next.filter { !known.contains($0.id) }
             hasMore = next.count == SitePost.pageSize
@@ -265,6 +289,44 @@ struct SitePostsView: View {
             hasMore = false
             self.error = error.localizedDescription
         }
+    }
+}
+
+/// Small tags above the posts, which scroll away with them. One narrows the list, and pressing it
+/// again brings everything back.
+private struct TagFilterBar: View {
+    let tags: [SiteTag]
+    @Binding var selection: SiteTag?
+    let tint: Color
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 6) {
+                ForEach(tags) { tag in
+                    let isSelected = tag == selection
+                    Button { selection = isSelected ? nil : tag } label: {
+                        Text(verbatim: "#\(tag.name)")
+                            .font(.system(.caption, design: .monospaced))
+                            .lineLimit(1)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(isSelected ? tint.opacity(0.18) : Color.secondary.opacity(0.1), in: Capsule())
+                            .foregroundStyle(isSelected ? tint : .secondary)
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Filter by \(tag.name)")
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                }
+            }
+            // In line with the text of the posts below.
+            #if os(macOS)
+            .padding(.horizontal, 6)
+            #else
+            .padding(.horizontal, 20)
+            #endif
+        }
+        .scrollIndicators(.hidden)
     }
 }
 

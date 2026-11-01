@@ -9,12 +9,26 @@ struct MicroblogBackend: SiteBackend {
     let site: Site
     let context: ModelContext
 
-    func posts(limit: Int, page: Int) async throws -> [SitePost] {
-        try await client.posts(limit: limit, offset: limit * (page - 1)).map { post in
-            SitePost(id: post.url, title: post.title.isEmpty ? Self.excerpt(of: post.content) : post.title,
-                     isUntitled: post.title.isEmpty, date: post.published,
-                     badge: post.status == .draft ? "DRAFT" : nil, url: URL(string: post.url))
+    func posts(limit: Int, page: Int, tag: SiteTag?) async throws -> [SitePost] {
+        guard let tag else {
+            return try await client.posts(limit: limit, offset: limit * (page - 1)).map(sitePost)
         }
+        // Micropub ignores a category filter, so this reads the blog, and answers in one page.
+        guard page == 1 else { return [] }
+        var tagged: [SitePost] = []
+        var offset = 0
+        while true {
+            let batch = try await client.posts(limit: 100, offset: offset)
+            guard !batch.isEmpty else { return tagged }
+            tagged += batch.filter { $0.categories.contains(tag.name) }.map(sitePost)
+            offset += batch.count
+        }
+    }
+
+    private func sitePost(_ post: MicropubPost) -> SitePost {
+        SitePost(id: post.url, title: post.title.isEmpty ? Self.excerpt(of: post.content) : post.title,
+                 isUntitled: post.title.isEmpty, date: post.published,
+                 badge: post.status == .draft ? "DRAFT" : nil, url: URL(string: post.url))
     }
 
     func stats() async throws -> PostStats {
@@ -88,6 +102,10 @@ struct MicroblogBackend: SiteBackend {
     }
 
     func tags() async throws -> [String] { try await client.categories() }
+
+    func filterTags() async throws -> [SiteTag] {
+        try await client.categories().map { SiteTag(id: $0, name: $0) }
+    }
 
     func uploadImage(_ jpeg: Data, filename: String) async throws -> URL {
         try await client.uploadImage(jpeg, filename: filename, mimeType: "image/jpeg")
