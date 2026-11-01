@@ -204,6 +204,16 @@ jobs:
             --title "Update feed" --notes "Quill for Mac's update feed. Not a version of Quill." --prerelease --latest=false
           gh release upload appcast build/appcast.xml --clobber
 
+      # A standing release too, so a website can link to one URL that always serves the newest DMG.
+      # GitHub's own latest link follows the iOS releases.
+      - name: Publish Latest DMG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view mac-latest >/dev/null 2>&1 || gh release create mac-latest \
+            --title "Quill for Mac (latest)" --notes "Always the newest Quill.dmg. Not a version of Quill." --prerelease --latest=false
+          gh release upload mac-latest build/Quill.dmg --clobber
+
       - name: Cleanup
         if: always()
         run: |
