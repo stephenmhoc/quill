@@ -56,6 +56,11 @@ gh workflow run release.yml -R stephenmhoc/quill -f version=0.2.0
 
 The tag sets the version and the run number sets the build number.
 
+Quill ships through TestFlight only, never the App Store, and TestFlight builds expire after 90
+days. `refresh-testflight.yml` checks weekly and, if the last iOS build is 30 days old, releases the
+next patch version from `main`. If the distribution certificate has expired, that build fails: run
+`create-distribution-cert` above again.
+
 GitHub only builds and publishes. All testing is local, so run the suites from `TESTING.md` on
 iPhone, iPad and Mac before tagging.
 
