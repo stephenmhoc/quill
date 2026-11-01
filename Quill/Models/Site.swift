@@ -69,6 +69,7 @@ final class Site {
     /// The first page of posts as last seen, so the list can appear before the site answers.
     var cachedPosts: Data?
     var cachedStats: Data?
+    var cachedTags: Data?
 
     init(name: String, url: URL, isPublic: Bool, color: SiteColor, kind: SiteKind = .ghost) {
         id = UUID()
@@ -103,6 +104,11 @@ final class Site {
     }
     var cachedPostList: [SitePost] {
         cachedPosts.flatMap { try? JSONDecoder().decode([SitePost].self, from: $0) } ?? []
+    }
+
+    /// Kept with the posts, so the list has its final shape from the first frame.
+    var cachedTagList: [SiteTag] {
+        cachedTags.flatMap { try? JSONDecoder().decode([SiteTag].self, from: $0) } ?? []
     }
 
     /// Who can read this site, in words and as a symbol.

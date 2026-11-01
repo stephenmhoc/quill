@@ -112,7 +112,7 @@ struct SitePostsView: View {
                     .listRowSeparator(.hidden)
             }
             #endif
-            if let tags = publisher.siteTags[siteID], !tags.isEmpty {
+            if let tags = site?.cachedTagList, !tags.isEmpty {
                 TagFilterBar(tags: tags, selection: $filter, tint: site?.color.color ?? .accentColor)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)

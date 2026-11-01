@@ -16,7 +16,7 @@ struct SitePost: Identifiable, Equatable, Codable {
 }
 
 /// A tag that posts can be filtered by. `id` is whatever the site filters on.
-struct SiteTag: Identifiable, Hashable {
+struct SiteTag: Identifiable, Hashable, Codable {
     let id: String
     let name: String
 }
@@ -62,10 +62,12 @@ extension SiteBackend {
 }
 
 extension Publisher {
-    /// Keeps a site's tags for the app's lifetime, so going back to it doesn't shift the list.
+    /// Only writes when something changed, because a write redraws every view of the site.
     func refreshTags(of site: Site) async {
-        guard let tags = try? await backend(for: site).filterTags() else { return }
-        siteTags[site.id] = tags
+        guard let tags = try? await backend(for: site).filterTags(), site.modelContext != nil, !site.isDeleted,
+              let data = try? JSONEncoder().encode(tags), data != site.cachedTags else { return }
+        site.cachedTags = data
+        try? context.save()
     }
 
     /// Fetches a site's first page of posts and keeps it on the device for next time.
@@ -100,6 +102,7 @@ extension Publisher {
         for site in sites where lock.canWork && !Task.isCancelled {
             guard site.modelContext != nil, !site.isDeleted else { continue }
             _ = try? await loadPosts(of: site)
+            await refreshTags(of: site)
         }
         for site in sites where lock.canWork && !Task.isCancelled {
             guard site.modelContext != nil, !site.isDeleted else { continue }
