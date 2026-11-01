@@ -40,6 +40,9 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
         view.isEditable = isEditable
         view.tintColor = UIColor(.cursor)
         view.setHeader(UIHostingConfiguration { header() }.margins(.all, 0))
+        // While the keyboard is composing the view holds text SwiftUI hasn't seen, so writing back
+        // would double what's been typed.
+        guard view.markedTextRange == nil else { return }
         if view.text != text {
             if view.isEditable, view.hasText { view.replaceChanges(with: text) } else { view.text = text }
             view.applyMarkdownStyle()

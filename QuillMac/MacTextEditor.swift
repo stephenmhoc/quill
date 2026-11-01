@@ -45,6 +45,9 @@ struct MacTextEditor<Header: View>: NSViewRepresentable {
         view.isEditable = isEditable
         view.isCentered = isCentered
         view.setHeader(AnyView(header()))
+        // While macOS is composing (a prediction, a dead key, an input method) the view holds text
+        // SwiftUI hasn't seen. Writing back then doubles what's been typed, and can crash.
+        guard !view.hasMarkedText() else { return }
         if view.string != text {
             view.replaceChanges(with: text)
             MarkdownStyler.style(view.textStorage!)
@@ -81,7 +84,10 @@ final class MacEditorCoordinator: NSObject, NSTextViewDelegate {
 
     func textDidChange(_ notification: Notification) {
         guard !isUpdating, let view = notification.object as? NSTextView else { return }
-        text.wrappedValue = view.string
+        // Marked text isn't written yet. A prediction only counts once Tab accepts it.
+        var written = view.string
+        if view.hasMarkedText(), let marked = Range(view.markedRange(), in: written) { written.removeSubrange(marked) }
+        text.wrappedValue = written
         if view.undoManager?.isUndoing == true || view.undoManager?.isRedoing == true {
             // AppKit puts the old attributes back after this, so style once it's finished.
             DispatchQueue.main.async { self.style(view) }
