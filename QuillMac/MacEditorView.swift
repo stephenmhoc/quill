@@ -206,20 +206,17 @@ struct MacEditorView: View {
         // Edit takes Publish's place, so the window's main action never moves.
         if entry.state == .sent {
             ToolbarItem(placement: .automatic) {
-                // Tinted like the site pill: it has colour, but Publish stays the loud one.
+                // A real button like Publish, softened so that Publish stays the loud one.
                 Button(action: beginEditing) {
-                    Text("Edit")
-                        .fontWeight(.semibold)
-                        .padding(.horizontal, 22)
-                        .frame(height: 36)
-                        .background((site?.color.color ?? .gray).opacity(0.15), in: Capsule())
-                        .foregroundStyle(site?.color.color ?? .primary)
-                        .contentShape(Capsule())
+                    Label("Edit", systemImage: "pencil")
+                        .labelStyle(.titleAndIcon)
+                        .padding(.horizontal, 8)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .tint((site?.color.color ?? .gray).opacity(0.7))
                 .help("Edit This Entry (⌘E)")
             }
-            .sharedBackgroundVisibility(.hidden)
         }
         if isEditable {
             ToolbarItem(placement: .automatic) {
