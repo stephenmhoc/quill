@@ -44,10 +44,11 @@ struct EntryListView: View {
             .largeTitle()
             .toolbar {
                 #if os(macOS)
-                // Also what keeps the editor's toolbar laid out as it is beside a site's posts.
+                // Empty, but without an item in this column the editor's toolbar loses its left edge.
                 ToolbarItem(placement: .primaryAction) {
-                    Button { navigation.openBlankEntry(in: context) } label: { Label("New Entry", systemImage: "square.and.pencil") }
+                    Color.clear.frame(width: 1, height: 1).accessibilityHidden(true)
                 }
+                .sharedBackgroundVisibility(.hidden)
                 #endif
                 if section == .outbox, !visible.isEmpty {
                     ToolbarItem(placement: .automatic) {
