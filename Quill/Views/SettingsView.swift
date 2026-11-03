@@ -4,7 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppLock.self) private var lock
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \Site.createdAt) private var sites: [Site]
+    @Query(sort: Site.order) private var sites: [Site]
     @AppStorage(AppLock.graceKey) private var grace: Double = 30
     @AppStorage(Navigation.defaultSiteKey) private var defaultSite = ""
     @AppStorage(Appearance.key) private var appearance = Appearance.auto

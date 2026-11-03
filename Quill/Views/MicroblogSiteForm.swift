@@ -111,7 +111,7 @@ struct MicroblogSiteForm: View {
                     // Token first, so a failed Keychain write leaves no site without one.
                     let new = Site(name: title, url: url, isPublic: true, color: color, kind: .microblog)
                     try lock.saveKey(token, for: new.id)
-                    context.insert(new)
+                    Site.add(new, to: context)
                 }
             }
             if let site {

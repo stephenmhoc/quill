@@ -62,7 +62,7 @@ struct LocalSiteForm: View {
             site.name = trimmedName
             site.color = color
         } else {
-            context.insert(Site(name: trimmedName, kind: .local, color: color))
+            Site.add(Site(name: trimmedName, kind: .local, color: color), to: context)
         }
         do {
             try context.save()

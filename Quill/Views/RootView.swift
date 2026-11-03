@@ -8,7 +8,7 @@ struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @Query(sort: \Site.createdAt) private var sites: [Site]
+    @Query(sort: Site.order) private var sites: [Site]
 
     var body: some View {
         @Bindable var navigation = navigation

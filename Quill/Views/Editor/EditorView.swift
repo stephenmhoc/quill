@@ -11,7 +11,7 @@ struct EditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.openURL) private var openURL
     @Environment(\.usesColumns) private var usesColumns
-    @Query(sort: \Site.createdAt) private var sites: [Site]
+    @Query(sort: Site.order) private var sites: [Site]
 
     @State private var selection: TextSelection?
     @State private var showingTags = false

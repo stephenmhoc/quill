@@ -63,7 +63,7 @@ final class Navigation {
 
     /// The site new entries go to: the chosen default, else the last-used private site.
     func defaultSiteID(in context: ModelContext) -> UUID? {
-        let sites = (try? context.fetch(FetchDescriptor<Site>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+        let sites = (try? context.fetch(FetchDescriptor<Site>(sortBy: Site.order))) ?? []
         if let raw = UserDefaults.standard.string(forKey: Self.defaultSiteKey),
            let id = UUID(uuidString: raw), sites.contains(where: { $0.id == id }) {
             return id

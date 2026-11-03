@@ -7,7 +7,7 @@ struct MacRootView: View {
     @Environment(Navigation.self) private var navigation
     @Environment(Publisher.self) private var publisher
     @Environment(\.modelContext) private var context
-    @Query(sort: \Site.createdAt) private var sites: [Site]
+    @Query(sort: Site.order) private var sites: [Site]
     /// Only an ID: the app's own state stays in its own locked-down store.
     @SceneStorage("selectedEntry") private var restoredEntry = ""
 

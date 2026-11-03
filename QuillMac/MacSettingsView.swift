@@ -13,7 +13,7 @@ struct MacSettingsView: View {
 
 private struct GeneralPane: View {
     @Environment(AppLock.self) private var lock
-    @Query(sort: \Site.createdAt) private var sites: [Site]
+    @Query(sort: Site.order) private var sites: [Site]
     @AppStorage(Appearance.key) private var appearance = Appearance.auto
     @AppStorage(Navigation.defaultSiteKey) private var defaultSite = ""
 

@@ -65,6 +65,9 @@ final class Site {
     var isPublic: Bool
     var colorRaw: String
     var createdAt: Date
+    /// Where the site sits in every list, set by dragging. Ties, like sites from before there
+    /// was an order, fall back to `createdAt`.
+    var sortIndex: Int = 0
     var lastUsedAt: Date?
     /// The first page of posts as last seen, so the list can appear before the site answers.
     var cachedPosts: Data?
@@ -90,6 +93,32 @@ final class Site {
         isPublic = false
         colorRaw = color.rawValue
         createdAt = .now
+    }
+
+    /// The order every list of sites uses.
+    static let order = [SortDescriptor(\Site.sortIndex), SortDescriptor(\Site.createdAt)]
+
+    /// Inserts a new site after the others.
+    static func add(_ site: Site, to context: ModelContext) {
+        let sites = (try? context.fetch(FetchDescriptor<Site>(sortBy: order))) ?? []
+        site.sortIndex = (sites.last?.sortIndex ?? -1) + 1
+        context.insert(site)
+    }
+
+    /// Renumbers every site after a drag, so the new order is the only one.
+    static func move(_ sites: [Site], from source: IndexSet, to destination: Int) {
+        var ordered = sites
+        ordered.move(fromOffsets: source, toOffset: destination)
+        for (index, site) in ordered.enumerated() where site.sortIndex != index {
+            site.sortIndex = index
+        }
+    }
+
+    /// Moves one site into another's place, for lists that drop a site onto a site.
+    static func move(_ sites: [Site], _ id: UUID, to target: UUID) {
+        guard id != target, let from = sites.firstIndex(where: { $0.id == id }),
+              let to = sites.firstIndex(where: { $0.id == target }) else { return }
+        move(sites, from: [from], to: to > from ? to + 1 : to)
     }
 
     var kind: SiteKind { SiteKind(rawValue: kindRaw) ?? .ghost }

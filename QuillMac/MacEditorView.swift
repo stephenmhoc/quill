@@ -10,7 +10,7 @@ struct MacEditorView: View {
     @Environment(Publisher.self) private var publisher
     @Environment(\.modelContext) private var context
     @Environment(\.openURL) private var openURL
-    @Query(sort: \Site.createdAt) private var sites: [Site]
+    @Query(sort: Site.order) private var sites: [Site]
     @AppStorage("showsPreview") private var showsPreview = false
 
     @State private var selection: TextSelection?

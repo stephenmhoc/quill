@@ -5,7 +5,7 @@ import SwiftUI
 struct MacSidebar: View {
     @Environment(Navigation.self) private var navigation
     @Environment(\.modelContext) private var context
-    @Query(sort: \Site.createdAt) private var sites: [Site]
+    @Query(sort: Site.order) private var sites: [Site]
     @Query private var entries: [Entry]
     /// Ticks so a slow send shows up without anything else changing.
     @State private var now = Date.now
@@ -34,6 +34,7 @@ struct MacSidebar: View {
                         Button("Edit Site…") { editing = site }
                     }
                 }
+                .onMove { Site.move(sites, from: $0, to: $1) }
             }
             if drafts > 0 || outbox != nil {
                 Section("Writing") {

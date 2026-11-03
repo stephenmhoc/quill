@@ -117,7 +117,7 @@ struct GhostSiteForm: View {
                 // Key first, so a failed Keychain write leaves no site without one.
                 let new = Site(name: title.isEmpty ? (url.host() ?? "Site") : title, url: url, isPublic: isPublic, color: color)
                 if let credentials { try lock.saveKey(credentials.apiKey, for: new.id) }
-                context.insert(new)
+                Site.add(new, to: context)
             }
             try context.save()
             onDone()
