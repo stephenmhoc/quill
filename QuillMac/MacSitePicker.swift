@@ -36,6 +36,8 @@ struct MacSitePicker: View {
                 }
                 .padding(8)
                 .frame(minWidth: 180)
+                // The text view underneath would otherwise leave its I-beam showing over the rows.
+                .pointerStyle(.default)
             }
     }
 }

@@ -182,6 +182,8 @@ struct MacEditorView: View {
     // MARK: Toolbar
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
+        // Fixed spacers at both ends, so the pill and Publish don't crowd the edges of the page.
+        ToolbarSpacer(.fixed)
         // Automatic, not navigation: that puts it beside the sidebar, over another column.
         ToolbarItem(placement: .automatic) {
             MacSitePicker(entry: entry, sites: sites, locked: entry.remotePostID != nil || entry.uploadedToSiteID != nil || uploading || !isEditable)
@@ -233,6 +235,7 @@ struct MacEditorView: View {
                 .accessibilityIdentifier("sendButton")
             }
         }
+        ToolbarSpacer(.fixed)
     }
 
     private var actions: EditorActions {
