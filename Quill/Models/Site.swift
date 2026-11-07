@@ -114,13 +114,6 @@ final class Site {
         }
     }
 
-    /// Moves one site into another's place, for lists that drop a site onto a site.
-    static func move(_ sites: [Site], _ id: UUID, to target: UUID) {
-        guard id != target, let from = sites.firstIndex(where: { $0.id == id }),
-              let to = sites.firstIndex(where: { $0.id == target }) else { return }
-        move(sites, from: [from], to: to > from ? to + 1 : to)
-    }
-
     var kind: SiteKind { SiteKind(rawValue: kindRaw) ?? .ghost }
     var url: URL? { URL(string: urlString) }
     var color: SiteColor {

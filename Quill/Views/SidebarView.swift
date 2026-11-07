@@ -13,8 +13,6 @@ struct SidebarView: View {
     /// Where each site's row is, so the new entry button can be dropped on one.
     @State private var siteFrames: [UUID: CGRect] = [:]
     @State private var dropSite: UUID?
-    /// The card a dragged site would land on.
-    @State private var moveTarget: UUID?
 
     var body: some View {
         @Bindable var navigation = navigation
@@ -88,27 +86,25 @@ struct SidebarView: View {
                 addSite
             }
         } else {
-            ForEach(sites) { site in
-                Section {
-                    // Each card is its own section, which onMove can't reorder, so a card is
-                    // dragged onto another to take its place.
+            // One section, so onMove can reorder the cards. Each draws its own card with a gap
+            // between, because row spacing would also split up the Recent list.
+            Section {
+                ForEach(sites) { site in
                     link(.site(site.id)) { SiteCard(site: site) }
                         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { siteFrames[site.id] = $0 }
-                        .draggable(site.id.uuidString) { SiteCard(site: site).padding(.horizontal).frame(width: 300).background(Color.card) }
-                        .dropDestination(for: String.self) { ids, _ in
-                            guard let id = ids.first.flatMap(UUID.init(uuidString:)) else { return false }
-                            withAnimation { Site.move(sites, id, to: site.id) }
-                            return true
-                        } isTargeted: { moveTarget = $0 ? site.id : (moveTarget == site.id ? nil : moveTarget) }
-                        .listRowBackground(cardBackground(site))
-                } header: {
-                    if site.id == sites.first?.id {
-                        Text(now.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-                            .font(.system(.subheadline, design: .monospaced))
-                            .textCase(nil)
-                            .accessibilityIdentifier("homeDate")
-                    }
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(cardBackground(site)
+                            .clipShape(.rect(cornerRadius: Self.cardRadius, style: .continuous))
+                            .padding(.top, site.id == sites.first?.id ? 0 : 6)
+                            .padding(.bottom, site.id == sites.last?.id ? 0 : 6))
                 }
+                // Press and drag, with no edit mode.
+                .onMove { Site.move(sites, from: $0, to: $1) }
+            } header: {
+                Text(now.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                    .font(.system(.subheadline, design: .monospaced))
+                    .textCase(nil)
+                    .accessibilityIdentifier("homeDate")
             }
             Section { addSite }
         }
@@ -148,8 +144,13 @@ struct SidebarView: View {
         }
     }
 
+    /// The system's corner radius for a grouped row, so a card matches the Add Site row.
+    private static var cardRadius: CGFloat {
+        if #available(iOS 26, *) { 26 } else { 10 }
+    }
+
     private func cardBackground(_ site: Site) -> some View {
-        Color.card.overlay(site.color.color.opacity(dropSite == site.id || moveTarget == site.id ? 0.4 : 0.12))
+        Color.card.overlay(site.color.color.opacity(dropSite == site.id ? 0.4 : 0.12))
     }
 
     /// The last to change across every site, as last seen. Drafts and scheduled posts aren't out yet.
