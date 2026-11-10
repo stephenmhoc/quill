@@ -55,10 +55,11 @@ final class SceneCover {
 }
 
 private struct LockHost: View {
-    let cover: SceneCover
+    /// Weak: the cover holds the window this is in.
+    weak var cover: SceneCover?
 
     var body: some View {
-        LockView().environment(\.scenePhase, cover.phase)
+        LockView().environment(\.scenePhase, cover?.phase ?? .active)
     }
 }
 

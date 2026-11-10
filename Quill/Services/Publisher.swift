@@ -49,6 +49,38 @@ final class Publisher {
         await send(entry)
     }
 
+    /// Once for the whole app rather than per window: while unlocked, fetch every site's posts,
+    /// and retry the outbox every minute.
+    func runWhileUnlocked() async {
+        while !Task.isCancelled {
+            guard lock.isUnlocked else {
+                await lockChange()
+                continue
+            }
+            let session = Task {
+                Task(priority: .utility) { await self.preloadPosts() }
+                while !Task.isCancelled {
+                    await self.flushOutbox()
+                    try? await Task.sleep(for: .seconds(60))
+                }
+            }
+            await lockChange()
+            session.cancel()
+        }
+    }
+
+    /// Returns once the lock locks or unlocks.
+    private func lockChange() async {
+        let wasUnlocked = lock.isUnlocked
+        while lock.isUnlocked == wasUnlocked, !Task.isCancelled {
+            await withCheckedContinuation { continuation in
+                withObservationTracking { _ = lock.isUnlocked } onChange: { continuation.resume() }
+            }
+            // The change is announced before it's made.
+            await Task.yield()
+        }
+    }
+
     func flushOutbox() async {
         guard lock.canWork, !isFlushing else { return }
         isFlushing = true

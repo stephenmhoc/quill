@@ -42,22 +42,27 @@ struct RootView: View {
             lock.didEnterBackground()
             try? context.save()
         }
-        .onChange(of: scenePhase) { _, phase in
+        .onChange(of: scenePhase) { old, phase in
             cover.phase = phase
             switch phase {
             case .background:
                 try? context.save()
-            case .active:
-                // Before the privacy cover lifts, so a lapsed grace period never shows the page.
+                // Only on background: an unfocused iPad Split View scene is merely inactive.
+                cover.setPrivate(true)
+            case .inactive where old == .background, .active:
+                // Back on screen, though maybe beside another app and not in front. The lock is
+                // checked before the privacy cover lifts, so a lapsed grace period never shows
+                // the page.
                 lock.didBecomeActive()
                 cover.setLocked(hasUnlocked && !lock.isUnlocked, lock: lock)
+                cover.setPrivate(false)
                 takeRequest()
             default:
                 break
             }
-            // Only on background: an unfocused iPad Split View scene is merely inactive.
-            cover.setPrivate(phase == .background)
         }
+        // A new entry with no window named goes to the one in front.
+        .onReceive(NotificationCenter.default.publisher(for: UIWindow.didBecomeKeyNotification)) { _ in takeRequest() }
     }
 
     @ViewBuilder private var columnsOrStack: some View {
@@ -96,10 +101,10 @@ struct RootView: View {
         .sheet(isPresented: $navigation.showingAddSite) { AddSiteView() }
         .sheet(item: Binding(get: { sites.first { $0.id == navigation.editingSite } },
                              set: { navigation.editingSite = $0?.id })) { EditSiteView(site: $0) }
-        .task(id: lock.isUnlocked) { await runOutbox() }
-        .task(id: lock.isUnlocked, priority: .utility) { await publisher.preloadPosts() }
+        // Only once there's a site to write on, so the menu bar can't act before then.
+        .focusedSceneValue(\.sceneNavigation, navigation)
         .onChange(of: sizeClass) { _, size in
-            if size != .regular { navigation.rebuildPath() }
+            if size == .regular { navigation.enterColumns() } else { navigation.rebuildPath() }
         }
         .onChange(of: sites.count) {
             repairSidebar()
@@ -119,7 +124,14 @@ struct RootView: View {
     /// A quick action or shortcut's new entry, once this window can show it.
     private func takeRequest() {
         guard let request = AppRequests.shared.newEntry, lock.isUnlocked, !sites.isEmpty, scenePhase == .active else { return }
-        if let scene = request.sceneID, scene != cover.window?.windowScene?.session.persistentIdentifier { return }
+        if let scene = request.sceneID {
+            guard scene == cover.window?.windowScene?.session.persistentIdentifier else { return }
+        } else {
+            // The window in front, or any while none has the keyboard yet.
+            let keyScene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+                .first { $0.activationState == .foregroundActive && $0.keyWindow != nil }
+            guard keyScene == nil || keyScene == cover.window?.windowScene else { return }
+        }
         AppRequests.shared.newEntry = nil
         navigation.openBlankEntry(in: context, text: request.text)
     }
@@ -129,14 +141,6 @@ struct RootView: View {
         if case .drafts? = navigation.sidebar { return }
         if case .outbox? = navigation.sidebar { return }
         navigation.sidebar = sites.first.map { .site($0.id) }
-    }
-
-    /// Retry queued entries every minute while unlocked and in the foreground.
-    private func runOutbox() async {
-        while lock.isUnlocked && !Task.isCancelled {
-            await publisher.flushOutbox()
-            try? await Task.sleep(for: .seconds(60))
-        }
     }
 }
 
