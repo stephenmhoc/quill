@@ -151,4 +151,35 @@ final class Entry {
         publishedTags = nil
         hiddenTitle = nil
     }
+
+    /// Everything about an entry, so a deletion can be undone by putting it back as it was.
+    struct Snapshot {
+        let id: UUID, siteID: UUID?, title: String, body: String, tags: [String], publishRaw: String, stateRaw: String
+        let createdAt: Date, updatedAt: Date
+        let remotePostID: String?, remoteUpdatedAt: String?, remoteURLString: String?, remoteStatusRaw: String?
+        let sentAt: Date?, lastError: String?, failureReason: String?, createAttemptedAt: Date?, uploadedToSiteID: UUID?
+        let publishedTitle: String?, publishedBody: String?, publishedTags: [String]?, hiddenTitle: String?
+
+        init(_ e: Entry) {
+            id = e.id; siteID = e.siteID; title = e.title; body = e.body; tags = e.tags; publishRaw = e.publishRaw
+            stateRaw = e.stateRaw; createdAt = e.createdAt; updatedAt = e.updatedAt; remotePostID = e.remotePostID
+            remoteUpdatedAt = e.remoteUpdatedAt; remoteURLString = e.remoteURLString; remoteStatusRaw = e.remoteStatusRaw
+            sentAt = e.sentAt; lastError = e.lastError; failureReason = e.failureReason; createAttemptedAt = e.createAttemptedAt
+            uploadedToSiteID = e.uploadedToSiteID; publishedTitle = e.publishedTitle; publishedBody = e.publishedBody
+            publishedTags = e.publishedTags; hiddenTitle = e.hiddenTitle
+        }
+
+        /// Inserts the entry again, with its old ID.
+        @discardableResult func restore(in context: ModelContext) -> Entry {
+            let e = Entry(siteID: siteID)
+            e.id = id; e.title = title; e.body = body; e.tags = tags; e.publishRaw = publishRaw; e.stateRaw = stateRaw
+            e.createdAt = createdAt; e.updatedAt = updatedAt; e.remotePostID = remotePostID; e.remoteUpdatedAt = remoteUpdatedAt
+            e.remoteURLString = remoteURLString; e.remoteStatusRaw = remoteStatusRaw; e.sentAt = sentAt; e.lastError = lastError
+            e.failureReason = failureReason; e.createAttemptedAt = createAttemptedAt; e.uploadedToSiteID = uploadedToSiteID
+            e.publishedTitle = publishedTitle; e.publishedBody = publishedBody; e.publishedTags = publishedTags
+            e.hiddenTitle = hiddenTitle
+            context.insert(e)
+            return e
+        }
+    }
 }

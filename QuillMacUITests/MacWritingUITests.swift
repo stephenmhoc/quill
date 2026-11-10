@@ -11,14 +11,15 @@ final class MacWritingUITests: XCTestCase {
         app.launch()
         app.activate()
 
-        let local = app.descendants(matching: .any)["siteKind.local"]
+        let local = app.buttons["siteKind.local"]
         XCTAssertTrue(local.waitForExistence(timeout: 5), "no site choice on first run")
         local.click()
-        let name = app.textFields.firstMatch
-        XCTAssertTrue(name.waitForExistence(timeout: 5))
-        name.click()
-        name.typeText("Notebook")
-        app.buttons["saveSite"].click()
+        // An empty name is the "Notebook" it shows. The form resizes for the new kind, so the
+        // button is still moving for a moment.
+        let addSite = app.buttons["saveSite"]
+        XCTAssertTrue(addSite.waitForExistence(timeout: 5))
+        RunLoop.current.run(until: .now + 0.6)
+        addSite.click()
 
         let editor = app.textViews["editor"]
         XCTAssertTrue(editor.waitForExistence(timeout: 10), "no editor")
@@ -31,8 +32,8 @@ final class MacWritingUITests: XCTestCase {
         shot.lifetime = .keepAlways
         add(shot)
 
+        // The new site is the one showing, so its list is where the saved entry appears.
         app.typeKey(.return, modifierFlags: .command)
-        app.staticTexts.matching(NSPredicate(format: "value == 'Notebook' OR label == 'Notebook'")).firstMatch.click()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "value BEGINSWITH 'Written on a Mac'")).firstMatch.waitForExistence(timeout: 5),
                       "the saved entry isn't listed")
     }

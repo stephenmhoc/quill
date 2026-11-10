@@ -16,39 +16,45 @@ struct LocalSiteForm: View {
     @State private var error: String?
     @State private var confirmingDelete = false
 
-    private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
+    /// On a Mac the field shows "Notebook" as its placeholder, and an empty field means that.
+    private var trimmedName: String {
+        let typed = name.trimmingCharacters(in: .whitespaces)
+        #if os(macOS)
+        return typed.isEmpty && site == nil ? "Notebook" : typed
+        #else
+        return typed
+        #endif
+    }
+    /// Nil once the site is gone: the sheet can still draw while it closes.
+    private var siteName: String? { site.flatMap { $0.isLive ? $0.name : nil } }
 
     var body: some View {
         Form {
             Section {
-                TextField("Name", text: $name, prompt: fieldPrompt("Name"))
+                TextField(fieldTitle(mac: "Name", iOS: "Name"), text: $name, prompt: fieldPrompt("Notebook"))
                     .promptedField()
+                #if os(macOS)
+                SiteColorSection(color: $color)
+                #endif
             } footer: {
-                Text("Entries on a local site stay on this device and are never sent anywhere.")
+                Text("Entries on a local site stay on \(thisDevice) and are never sent anywhere.")
+                    .formNote()
             }
+            #if os(iOS)
             SiteColorSection(color: $color)
-            if let error {
-                Section { Text(error).font(.footnote).foregroundStyle(.red) }
-            }
-            if site != nil { RemoveSiteSection(note: "Permanently deletes this site and every entry on it.", isConfirming: $confirmingDelete) }
+            #endif
+            if let error { FormErrorRow(message: error) }
+            if site != nil { RemoveSiteSection(note: SiteKind.local.removalNote, isConfirming: $confirmingDelete) }
         }
         .siteFormStyle(isCentered: isCentered)
-        .navigationTitle(site == nil ? "Local Site" : "Edit Site")
+        .formTitle(site == nil ? "Local Site" : "Edit Site")
         .compactTitle()
-        .toolbar {
-            #if os(macOS)
-            if site != nil { RemoveSiteToolbarItem(note: "Permanently deletes this site and every entry on it.", isConfirming: $confirmingDelete) }
-            #endif
-            ToolbarItem(placement: .confirmationAction) {
-                Button(action: save) { Text("Save").sheetButtonLabel() }
-                    .accessibilityIdentifier("saveSite")
-                    .disabled(trimmedName.isEmpty)
-            }
-        }
-        .confirmationDialog("Remove \(site?.name ?? "site") and all its entries?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .siteFormButtons(isNew: site == nil, canSave: !trimmedName.isEmpty, removeNote: site == nil ? nil : SiteKind.local.removalNote,
+                         isConfirmingRemove: $confirmingDelete, save: save)
+        .confirmationDialog("Remove \(siteName ?? "site") and all its entries?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete Everything", role: .destructive, action: remove)
         } message: {
-            Text("They exist only on this device, so this can't be undone.")
+            Text("They exist only on \(thisDevice), so this can't be undone.")
         }
         .onAppear {
             guard let site else { return }
@@ -73,12 +79,10 @@ struct LocalSiteForm: View {
     }
 
     private func remove() {
-        guard let site else { return }
+        guard let site, site.isLive else { return }
         navigation.leaveSite(site.id)
         do {
-            try publisher.backend(for: site).removeSiteData()
-            context.delete(site)
-            try context.save()
+            try publisher.removeSite(site)
             onDone()
         } catch {
             self.error = error.localizedDescription

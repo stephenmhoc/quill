@@ -58,6 +58,17 @@ final class Publisher {
         }
     }
 
+    /// Removes a site from Quill, along with its key and what Quill keeps for it. Its posts stay
+    /// on the site. Call `Navigation.leaveSite(_:)` first.
+    func removeSite(_ site: Site) throws {
+        guard site.isLive else { return }
+        // A missing key only means there's no backend to tidy up after; the site still goes.
+        if let backend = try? backend(for: site) { try backend.removeSiteData() }
+        lock.deleteKey(for: site.id)
+        context.delete(site)
+        try context.save()
+    }
+
     /// The outbox's Retry All. Conflicts stay put: they need a decision, not another try.
     func retryAll() async {
         let failed = Entry.State.failed.rawValue

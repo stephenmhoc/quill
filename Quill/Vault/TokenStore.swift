@@ -15,7 +15,11 @@ enum TokenStore {
         var errorDescription: String? {
             switch self {
             case .noPasscode:
+                #if os(macOS)
+                "Set a login password first. Quill only stores site keys on a Mac that has one."
+                #else
                 "Set a device passcode first. Quill only stores site keys on a passcode-protected device."
+                #endif
             case .status(let status):
                 (SecCopyErrorMessageString(status, nil) as String?) ?? "Keychain error \(status)"
             }

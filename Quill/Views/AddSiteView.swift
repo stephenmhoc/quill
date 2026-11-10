@@ -32,7 +32,7 @@ struct AddSiteView: View {
             .compactTitle()
             .toolbar {
                 if !isRequired {
-                    ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Text("Cancel").sheetButtonLabel() } }
+                    ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Text("Cancel") } }
                 }
             }
             .navigationDestination(for: SiteKind.self) { kind in
@@ -94,13 +94,27 @@ struct EditSiteView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            siteForm(kind: site.kind, site: site, isCentered: false) { dismiss() }
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Text("Cancel").sheetButtonLabel() } }
-                }
+        // The sheet can draw once more as it closes after the site is removed.
+        if site.isLive {
+            #if os(macOS)
+            // No navigation on a Mac: the form and its buttons are the whole sheet.
+            VStack(spacing: 0) {
+                SiteSetupHeader(symbol: site.kind.systemImage, title: site.name, subtitle: "\(site.kind.title) site")
+                siteForm(kind: site.kind, site: site, isCentered: false) { dismiss() }
+                    .environment(\.siteFormHasCancel, true)
+                    .environment(\.siteFormHeight, site.kind.formHeight(isNew: false))
+            }
+            .sheetSize()
+            #else
+            NavigationStack {
+                siteForm(kind: site.kind, site: site, isCentered: false) { dismiss() }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) { Button { dismiss() } label: { Text("Cancel") } }
+                    }
+            }
+            .sheetSize()
+            #endif
         }
-        .sheetSize()
     }
 }
 
@@ -118,7 +132,14 @@ struct SiteColorSection: View {
     @Binding var color: SiteColor
 
     var body: some View {
-        Section("Colour") {
+        #if os(macOS)
+        LabeledContent("Color") {
+            HStack(spacing: 8) {
+                ForEach(SiteColor.allCases) { option in MacSwatch(color: option, isSelected: option == color) { color = option } }
+            }
+        }
+        #else
+        Section("Color") {
             HStack(spacing: 14) {
                 ForEach(SiteColor.allCases) { option in
                     Button { color = option } label: {
@@ -134,5 +155,35 @@ struct SiteColorSection: View {
                 }
             }
         }
+        #endif
     }
 }
+
+#if os(macOS)
+/// A colour to choose, the size of the Mac's own accent colour swatches, ringed when chosen.
+private struct MacSwatch: View {
+    let color: SiteColor
+    let isSelected: Bool
+    let choose: () -> Void
+
+    var body: some View {
+        Button(action: choose) {
+            Circle()
+                .fill(color.color)
+                .frame(width: 18, height: 18)
+                .overlay { if isSelected { Circle().fill(.white).frame(width: 6, height: 6) } }
+                .padding(3)
+                // The ring is drawn over the same fixed frame, so choosing one never moves the row.
+                .overlay { if isSelected { Circle().strokeBorder(color.color, lineWidth: 1.5) } }
+                .frame(width: 24, height: 24)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        // A ring that follows Tab when keyboard navigation is on.
+        .focusable()
+        .help(color.label)
+        .accessibilityLabel(color.label)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+#endif

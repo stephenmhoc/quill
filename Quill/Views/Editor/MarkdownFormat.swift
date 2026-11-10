@@ -3,6 +3,8 @@ import SwiftUI
 /// Markdown shortcuts applied to the current selection. Pure string logic so it's testable.
 enum MarkdownFormat {
     case bold, italic, link, heading, bullet, quote
+    /// A heading of a given level, 1 to 6, replacing any other level already on the line.
+    case headingLevel(Int)
 
     func apply(to text: String, selection: TextSelection?) -> (String, TextSelection?) {
         let range = Self.range(in: text, selection)
@@ -13,6 +15,7 @@ enum MarkdownFormat {
         case .heading: return Self.prefixLine(text, range, "## ")
         case .bullet: return Self.prefixLine(text, range, "- ")
         case .quote: return Self.prefixLine(text, range, "> ")
+        case .headingLevel(let level): return Self.heading(text, range, level: level)
         }
     }
 
@@ -57,6 +60,31 @@ enum MarkdownFormat {
         }
         result.insert(contentsOf: prefix, at: lineStart)
         return (result, caret(in: result, at: caretOffset + prefix.count))
+    }
+
+    private static func heading(_ text: String, _ range: Range<String.Index>, level: Int) -> (String, TextSelection?) {
+        let lineStart = text[..<range.lowerBound].lastIndex(of: "\n").map { text.index(after: $0) } ?? text.startIndex
+        let existing = text[lineStart...].prefix { $0 == "#" }.count
+        let hasHeading = (1...6).contains(existing) && text[lineStart...].dropFirst(existing).hasPrefix(" ")
+        guard hasHeading else { return prefixLine(text, range, String(repeating: "#", count: level) + " ") }
+        // The same level again takes it off; another level replaces it.
+        let caretOffset = text.distance(from: text.startIndex, to: range.upperBound)
+        let marker = lineStart..<text.index(lineStart, offsetBy: existing + 1)
+        let replacement = existing == level ? "" : String(repeating: "#", count: level) + " "
+        var result = text
+        result.replaceSubrange(marker, with: replacement)
+        return (result, caret(in: result, at: max(0, caretOffset - (existing + 1) + replacement.count)))
+    }
+
+    var actionName: String {
+        switch self {
+        case .bold: "Bold"
+        case .italic: "Italic"
+        case .link: "Link"
+        case .heading, .headingLevel: "Heading"
+        case .bullet: "List"
+        case .quote: "Quote"
+        }
     }
 
     private static func caret(in text: String, at offset: Int) -> TextSelection {

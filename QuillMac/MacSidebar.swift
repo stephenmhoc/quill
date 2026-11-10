@@ -1,18 +1,25 @@
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The source list: sites, then Drafts, and the Outbox when it needs attention.
 struct MacSidebar: View {
     @Environment(Navigation.self) private var navigation
+    @Environment(MacWindowState.self) private var window
+    @Environment(Publisher.self) private var publisher
+    @Environment(AppLock.self) private var lock
     @Environment(\.modelContext) private var context
+    @Environment(\.openURL) private var openURL
     @Query(sort: Site.order) private var sites: [Site]
     @Query private var entries: [Entry]
     /// Ticks so a slow send shows up without anything else changing.
     @State private var now = Date.now
-    @State private var editing: Site?
+    @State private var removeError: String?
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         @Bindable var navigation = navigation
+        @Bindable var window = window
         List(selection: $navigation.sidebar) {
             Section("Sites") {
                 ForEach(sites) { site in
@@ -31,27 +38,41 @@ struct MacSidebar: View {
                     .tag(SidebarItem.site(site.id))
                     .contextMenu {
                         Button("New Entry") { navigation.openBlankEntry(in: context, site: site.id) }
-                        Button("Edit Site…") { editing = site }
+                        Divider()
+                        Button("Edit Site…") { window.editingSite = site }
+                        if let url = site.url, !site.urlString.isEmpty {
+                            Button("Open in Browser") { openURL(url) }
+                        }
+                        Divider()
+                        Button("Remove Site…", role: .destructive) { window.removingSite = site }
                     }
                 }
                 .onMove { Site.move(sites, from: $0, to: $1) }
             }
-            if drafts > 0 || outbox != nil {
+            // A row being looked at stays until something else is chosen, even once it's empty.
+            if drafts > 0 || outbox != nil || navigation.sidebar == .drafts || navigation.sidebar == .outbox {
                 Section("Writing") {
-                    if drafts > 0 {
+                    if drafts > 0 || navigation.sidebar == .drafts {
                         Label("Drafts", systemImage: "doc.text")
                             .badge(drafts)
                             .tag(SidebarItem.drafts)
                     }
-                    if let outbox {
+                    if let count = outbox ?? (navigation.sidebar == .outbox ? 0 : nil) {
                         Label("Outbox", systemImage: "tray.and.arrow.up")
-                            .badge(outbox)
+                            .badge(count)
                             .tag(SidebarItem.outbox)
+                            .contextMenu {
+                                Button("Retry All") { Task { await publisher.retryAll() } }
+                            }
                     }
                 }
             }
         }
         .listStyle(.sidebar)
+        // In the sidebar, so the window's main actions keep the trailing end of the toolbar.
+        .searchable(text: $window.searchText, placement: .sidebar, prompt: "Search")
+        .searchFocused($searchFocused)
+        .onChange(of: window.searchRequest) { searchFocused = true }
         .safeAreaInset(edge: .bottom) {
             Button { navigation.showingAddSite = true } label: {
                 Label("Add Site", systemImage: "plus")
@@ -61,13 +82,42 @@ struct MacSidebar: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .padding(10)
+            .help("Add Site…")
+            .accessibilityIdentifier("addSiteButton")
         }
-        .sheet(item: $editing) { EditSiteView(site: $0) }
+        // Markdown files dropped here become drafts.
+        .dropDestination(for: URL.self) { urls, _ in
+            let made = MarkdownFile.makeDrafts(from: urls.filter(\.isFileURL), in: context, siteID: navigation.defaultSiteID(in: context))
+            if let first = made.first { navigation.sidebar = .drafts; navigation.show(first) }
+            return !made.isEmpty
+        }
+        .sheet(item: $window.editingSite) { EditSiteView(site: $0) }
+        .onChange(of: lock.isUnlocked) { _, isUnlocked in if !isUnlocked { removeError = nil } }
+        .confirmationDialog("Remove \(window.removingSite.flatMap { $0.isLive ? $0.name : nil } ?? "site")?",
+                            isPresented: Binding(get: { window.removingSite != nil }, set: { if !$0 { window.removingSite = nil } }),
+                            titleVisibility: .visible, presenting: window.removingSite) { site in
+            Button("Remove", role: .destructive) { remove(site) }
+        } message: { site in
+            Text(site.isLive ? site.kind.removalNote : "")
+        }
+        .alert("Couldn't remove the site", isPresented: Binding(get: { removeError != nil }, set: { if !$0 { removeError = nil } })) {
+            Button("OK") {}
+        } message: { Text(removeError ?? "") }
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(10))
                 now = .now
             }
+        }
+    }
+
+    private func remove(_ site: Site) {
+        guard site.isLive else { return }
+        navigation.leaveSite(site.id)
+        do {
+            try publisher.removeSite(site)
+        } catch {
+            removeError = error.localizedDescription
         }
     }
 

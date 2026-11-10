@@ -70,7 +70,11 @@ final class AppLock {
             isUnlocked = true
             lastError = nil
         } catch let error as LAError where error.code == .passcodeNotSet {
+            #if os(macOS)
+            lastError = "Set a login password in System Settings to use Quill."
+            #else
             lastError = "Set a device passcode in Settings to use Quill."
+            #endif
         } catch let error as LAError where [.userCancel, .appCancel, .systemCancel].contains(error.code) {
             lastError = nil
         } catch {

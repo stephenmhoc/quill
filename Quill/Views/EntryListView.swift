@@ -12,10 +12,25 @@ struct EntryListView: View {
     @Query(sort: \Entry.updatedAt, order: .reverse) private var entries: [Entry]
     @Query private var sites: [Site]
     #if os(macOS)
-    @State private var pendingDelete: Entry?
+    @Environment(\.undoManager) private var undoManager
+    @Query(sort: Site.order) private var orderedSites: [Site]
+    @State private var selection: Set<UUID> = []
+    @Environment(\.listQuery) private var query
+    @Environment(\.isCovered) private var isCovered
+    @Environment(\.hidesTitle) private var hidesTitle
     #endif
 
     private var visible: [Entry] {
+        #if os(macOS)
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return unfiltered }
+        return unfiltered.filter { $0.title.localizedStandardContains(q) || $0.body.localizedStandardContains(q) }
+        #else
+        unfiltered
+        #endif
+    }
+
+    private var unfiltered: [Entry] {
         switch section {
         case .drafts:
             entries.filter { $0.state == .editing && !$0.isBlank }
@@ -40,16 +55,13 @@ struct EntryListView: View {
                 if visible.isEmpty { emptyState }
             }
             .paperList()
+            #if os(macOS)
+            .navigationTitle(isCovered ? "Quill" : hidesTitle ? "" : title)
+            #else
             .navigationTitle(title)
+            #endif
             .largeTitle()
             .toolbar {
-                #if os(macOS)
-                // Empty, but without an item in this column the editor's toolbar loses its left edge.
-                ToolbarItem(placement: .primaryAction) {
-                    Color.clear.frame(width: 1, height: 1).accessibilityHidden(true)
-                }
-                .sharedBackgroundVisibility(.hidden)
-                #endif
                 if section == .outbox, !visible.isEmpty {
                     ToolbarItem(placement: .automatic) {
                         Button("Retry All") { Task { await publisher.retryAll() } }
@@ -60,27 +72,25 @@ struct EntryListView: View {
 
     @ViewBuilder private var list: some View {
         #if os(macOS)
-        List(selection: Binding(get: { navigation.selectedEntry }, set: { if let entry = $0 { navigation.show(entry) } })) {
+        List(selection: $selection) {
             ForEach(visible) { entry in
                 EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID })
-                    .tag(entry)
-                    .contextMenu {
-                        if entry.state != .sending {
-                            Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = entry }
-                        }
-                    }
+                    .tag(entry.id)
+                    .draggable(MarkdownFile(entry: entry))
             }
         }
-        .onDeleteCommand {
-            if let entry = navigation.selectedEntry, visible.contains(entry), entry.state != .sending { pendingDelete = entry }
+        .contextMenu(forSelectionType: UUID.self) { ids in contextMenu(for: entries(ids)) }
+        .onDeleteCommand { delete(entries(selection)) }
+        // One row is the one that's open; several are only chosen, for deleting or exporting.
+        .onChange(of: selection) { _, ids in
+            if ids.count == 1, let entry = entries(ids).first, entry != navigation.selectedEntry { navigation.show(entry) }
         }
-        // Nothing else keeps a copy of a draft.
-        .confirmationDialog("Delete “\(pendingDelete?.displayTitle ?? "")”?",
-                            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
-                            titleVisibility: .visible, presenting: pendingDelete) { entry in
-            Button("Delete", role: .destructive) { delete(entry) }
-        } message: { _ in
-            Text("This can't be undone.")
+        .onChange(of: navigation.selectedEntry, initial: true) { _, entry in
+            if let entry, visible.contains(entry) {
+                if !selection.contains(entry.id) { selection = [entry.id] }
+            } else if selection.count <= 1 {
+                selection = []
+            }
         }
         #else
         List {
@@ -105,7 +115,7 @@ struct EntryListView: View {
     @ViewBuilder private var emptyState: some View {
         switch section {
         case .drafts: ContentUnavailableView("No drafts", systemImage: "doc.text",
-                                             description: Text("Unsent writing is kept here, on this device only."))
+                                             description: Text("Unsent writing is kept here, on \(thisDevice) only."))
         case .outbox: ContentUnavailableView("Outbox empty", systemImage: "tray",
                                              description: Text("Entries that couldn't be sent wait here and retry automatically."))
         case .site: EmptyView()
@@ -117,6 +127,43 @@ struct EntryListView: View {
         context.delete(entry)
         try? context.save()
     }
+
+    #if os(macOS)
+    private func entries(_ ids: Set<UUID>) -> [Entry] { visible.filter { ids.contains($0.id) } }
+
+    @ViewBuilder private func contextMenu(for chosen: [Entry]) -> some View {
+        let deletable = chosen.filter { $0.modelContext != nil && !$0.isDeleted && $0.state != .sending }
+        if !chosen.isEmpty {
+            Button(chosen.count == 1 ? "Export as Markdown…" : "Export \(chosen.count) Entries as Markdown…") {
+                MarkdownFile.export(chosen)
+            }
+            if chosen.allSatisfy({ $0.state == .editing && $0.remotePostID == nil && $0.uploadedToSiteID == nil }) {
+                Menu("Move to Site") {
+                    ForEach(orderedSites) { site in
+                        Button(site.name) { for entry in chosen { entry.siteID = site.id }; try? context.save() }
+                    }
+                }
+            }
+            if section == .outbox {
+                Divider()
+                // Any of them can be deleted while an earlier one sends.
+                Button("Retry") {
+                    Task { for entry in chosen where entry.modelContext != nil && !entry.isDeleted { await publisher.publish(entry) } }
+                }
+                Button("Retry All") { Task { await publisher.retryAll() } }
+            }
+            if !deletable.isEmpty {
+                Divider()
+                Button(deletable.count == 1 ? "Delete" : "Delete \(deletable.count) Entries", role: .destructive) { delete(deletable) }
+            }
+        }
+    }
+
+    private func delete(_ chosen: [Entry]) {
+        EntryDeletion.delete(chosen, in: context, navigation: navigation, undoManager: undoManager)
+        selection = []
+    }
+    #endif
 }
 
 struct EntryRow: View {

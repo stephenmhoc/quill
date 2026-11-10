@@ -7,16 +7,23 @@ struct MacEditorView: View {
     @Bindable var entry: Entry
 
     @Environment(Navigation.self) private var navigation
+    @Environment(MacWindowState.self) private var window
     @Environment(Publisher.self) private var publisher
+    @Environment(AppLock.self) private var lock
     @Environment(\.modelContext) private var context
     @Environment(\.openURL) private var openURL
+    @Environment(\.undoManager) private var undoManager
     @Query(sort: Site.order) private var sites: [Site]
     @AppStorage("showsPreview") private var showsPreview = false
+    @AppStorage(MarkdownStyler.textSizeKey) private var textSize = MarkdownStyler.defaultTextSize
 
     @State private var selection: TextSelection?
     @State private var focusRequest = 0
+    @State private var titleFocusRequest = 0
+    @State private var command: EditorCommand?
     @State private var showingTags = false
     @State private var showingImagePicker = false
+    @State private var showingExporter = false
     /// The title stays out of the way unless it's turned on, or the entry already has one.
     @State private var showsTitle = false
     @State private var focusTitle = false
@@ -25,24 +32,29 @@ struct MacEditorView: View {
     @State private var pendingPublicImages: [Data] = []
     @State private var saveFailed = false
     @State private var bodyHasFocus = false
-    @State private var showsFocusHint = false
+    @State private var confirmingRevert = false
 
     private var site: Site? { sites.first { $0.id == entry.siteID } }
     private var isEditable: Bool { entry.state == .editing }
+    private var isSending: Bool { publisher.sending.contains(entry.id) }
     private var canSend: Bool {
-        isEditable && !entry.isBlank && site != nil && !uploading && !publisher.sending.contains(entry.id)
+        isEditable && !entry.isBlank && site != nil && !uploading && !isSending
     }
-    private var isPreviewing: Bool { showsPreview && !entry.isBlank && fitsPreview && !navigation.isFocused }
-    /// Measured from the window, because an open preview's own minimum would hold this view wide
-    /// and push the columns out of it.
+    /// Images already on a site, or a post that's there, keep an entry where it is.
+    private var siteIsFixed: Bool { entry.remotePostID != nil || entry.uploadedToSiteID != nil || uploading || !isEditable }
+    private var isPreviewing: Bool { showsPreview && !entry.isBlank && fitsPreview && !window.isFocused }
+    /// Measured from the columns beside it, because an open preview's own minimum would hold
+    /// this view wide and push the columns out of it.
     private var fitsPreview: Bool {
         let columns: CGFloat = switch navigation.columnVisibility {
         case .detailOnly: 0
-        case .doubleColumn: 320
-        default: 550
+        case .doubleColumn: window.listWidth
+        default: window.sidebarWidth + window.listWidth
         }
         return navigation.windowWidth - columns >= 280 + 240
     }
+    /// Only a draft that's never been sent lives nowhere else, so only it can be deleted here.
+    private var canDelete: Bool { isEditable && entry.remotePostID == nil && !entry.isBlank }
 
     var body: some View {
         HSplitView {
@@ -53,25 +65,21 @@ struct MacEditorView: View {
             }
         }
         .background(Color.paper)
-        .overlay(alignment: .bottom) {
-            if showsFocusHint {
-                Text("Press Esc to leave Focus Mode")
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 16)
-                    .transition(.opacity)
-            }
-        }
-        .task(id: navigation.isFocused) {
-            withAnimation { showsFocusHint = navigation.isFocused }
-            guard navigation.isFocused else { return }
-            try? await Task.sleep(for: .seconds(2.5))
-            if !Task.isCancelled { withAnimation { showsFocusHint = false } }
-        }
-        .navigationTitle(entry.isBlank ? "New Entry" : entry.displayTitle)
-        .toolbar(navigation.isFocused ? .hidden : .automatic, for: .windowToolbar)
+        // Locked, the window shows nothing of what's behind it, title included.
+        // Focus Mode shows the page and nothing about it, title bar included.
+        .navigationTitle(!lock.isUnlocked ? "Quill" : window.isFocused ? "" : entry.isBlank ? "New Entry" : entry.displayTitle)
+        .navigationSubtitle(lock.isUnlocked && !window.isFocused ? site?.name ?? "" : "")
         .toolbar { toolbar }
         .focusedSceneValue(\.editorActions, actions)
+        .onChange(of: lock.isUnlocked) { _, isUnlocked in
+            guard !isUnlocked else { return }
+            showingTags = false
+            showingImagePicker = false
+            showingExporter = false
+            pendingPublicImages = []
+            uploadError = nil
+            confirmingRevert = false
+        }
         .fileImporter(isPresented: $showingImagePicker, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard let urls = try? result.get() else { return }
             receive(urls.compactMap { url in
@@ -83,7 +91,7 @@ struct MacEditorView: View {
         .confirmationDialog("Upload image to \(site?.name ?? "")?", isPresented: Binding(
             get: { !pendingPublicImages.isEmpty }, set: { if !$0 { pendingPublicImages = [] } }
         ), titleVisibility: .visible) {
-            Button("Upload to public site") {
+            Button("Upload") {
                 let images = pendingPublicImages
                 pendingPublicImages = []
                 Task { await insert(images) }
@@ -94,9 +102,19 @@ struct MacEditorView: View {
         .alert("Image upload failed", isPresented: Binding(get: { uploadError != nil }, set: { if !$0 { uploadError = nil } })) {
             Button("OK") { uploadError = nil }
         } message: { Text(uploadError ?? "") }
+        .alert("Revert to the published version?", isPresented: $confirmingRevert) {
+            Button("Revert") { revert() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your changes since it was published are removed. You can undo this with Edit > Undo.")
+        }
         // Throttled: updatedAt re-sorts every list on screen.
         .onChange(of: entry.title) { touchIfStale() }
-        .onChange(of: entry.body) { touchIfStale() }
+        .onChange(of: entry.body) {
+            touchIfStale()
+            // Writing in Focus Mode puts the bars away again.
+            if window.isFocused { window.hideFocusChrome() }
+        }
         // Saved as you type, so there's nothing to do to keep a draft.
         .task(id: "\(entry.title)\(entry.body)") {
             try? await Task.sleep(for: .seconds(1))
@@ -104,22 +122,33 @@ struct MacEditorView: View {
         }
         .onAppear {
             showsTitle = !entry.title.isEmpty
-            if isEditable && entry.isBlank && navigation.focusNextEntry { focusRequest += 1 }
+            if isEditable && navigation.focusNextEntry { focusRequest += 1 }
             navigation.focusNextEntry = false
         }
+        // Switching entries or closing the window inside the second the save waits for.
+        .onDisappear { try? context.save() }
     }
 
     private var page: some View {
         MacTextEditor(text: $entry.body, selection: $selection, focusRequest: focusRequest, isEditable: isEditable,
-                      isCentered: navigation.isFocused, onImages: receive, onFocus: { bodyHasFocus = $0 }) {
+                      isLocked: !lock.isUnlocked, textSize: textSize, command: command, onImages: receive,
+                      onFocus: { bodyHasFocus = $0 },
+                      onLeaveTop: showsTitle && isEditable ? { titleFocusRequest += 1 } : nil,
+                      onEscape: {
+                          guard window.isFocused else { return false }
+                          window.exitFocus()
+                          return true
+                      },
+                      onSave: save, stage: window.focusStage) {
             // Hosted inside AppKit, so the environment has to be passed along.
             EditorHeader(entry: entry, site: site, isEditable: isEditable, showsTitle: showsTitle,
-                         focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 })
+                         focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 },
+                         titleFocusRequest: titleFocusRequest)
                 .environment(navigation)
                 .environment(publisher)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !navigation.isFocused || saveFailed { statusBar }
+            if !window.isFocused || saveFailed { statusBar }
         }
         .background(Color.paper)
     }
@@ -130,6 +159,9 @@ struct MacEditorView: View {
                 Label("Couldn't save to this Mac. Keep this page open and free up some space.",
                       systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
+            } else if let notice = window.notice, entry.isBlank {
+                Label(notice, systemImage: "checkmark.circle")
+                    .transition(.opacity)
             } else {
                 entryStatus
             }
@@ -142,6 +174,7 @@ struct MacEditorView: View {
         .padding(.horizontal, 14)
         // Fixed, or the page would shift when a button comes and goes.
         .frame(height: 26)
+        .animation(.default, value: window.notice)
     }
 
     /// Where the entry stands, down here so the page above is only the writing. Problems that need
@@ -150,8 +183,8 @@ struct MacEditorView: View {
         switch entry.state {
         case .editing where entry.remotePostID != nil:
             Text("Editing")
-                .help("Keeps until you publish or discard it.")
-            statusButton("Discard Changes", icon: "arrow.uturn.backward", action: discardChanges)
+                .help("Keeps until you publish or revert it.")
+            statusButton("Revert to Published…", icon: "arrow.uturn.backward") { confirmingRevert = true }
         case .sending:
             Text("Sending to \(site?.name ?? "the site")…")
         case .sent:
@@ -182,72 +215,66 @@ struct MacEditorView: View {
     // MARK: Toolbar
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
-        // Fixed spacers at both ends, so the pill and Publish don't crowd the edges of the page.
-        ToolbarSpacer(.fixed)
         // Automatic, not navigation: that puts it beside the sidebar, over another column.
         ToolbarItem(placement: .automatic) {
-            MacSitePicker(entry: entry, sites: sites, locked: entry.remotePostID != nil || entry.uploadedToSiteID != nil || uploading || !isEditable)
+            MacSitePicker(entry: entry, sites: sites, locked: siteIsFixed)
         }
         // The pill is its own background: the toolbar's would ring it in grey.
         .sharedBackgroundVisibility(.hidden)
         ToolbarSpacer(.flexible)
         ToolbarItemGroup(placement: .automatic) {
             Button { showingTags = true } label: { Label("Tags", systemImage: "tag") }
-                .help("Tags")
+                .help("Tags (⌥⌘T)")
                 .disabled(!isEditable)
                 .popover(isPresented: $showingTags, arrowEdge: .bottom) { MacTagEditor(entry: entry, site: site) }
-            Toggle(isOn: Binding(get: { showsPreview }, set: { showsPreview = $0 })) {
+            Toggle(isOn: Binding(get: { isPreviewing }, set: { showsPreview = $0 })) {
                 Label("Preview", systemImage: "sidebar.right")
             }
             .toggleStyle(.button)
-            .help(fitsPreview ? "Show the rendered Markdown beside the text" : "Make the window wider to show the preview")
+            .help(fitsPreview ? "Show the rendered Markdown beside the text (⌥⌘P)" : "Make the window wider to show the preview")
             .disabled(entry.isBlank || !fitsPreview)
-            Button { navigation.toggleFocus() } label: { Label("Focus", systemImage: "arrow.up.left.and.arrow.down.right") }
-                .help("Focus Mode (⇧⌘F)")
+            Button { window.toggleFocus() } label: { Label("Focus", systemImage: "rectangle.center.inset.filled") }
+                .help("Enter Focus Mode (⇧⌘F)")
         }
         // Edit takes Publish's place, so the window's main action never moves.
         if entry.state == .sent {
             ToolbarItem(placement: .automatic) {
                 // A real button like Publish, softened so that Publish stays the loud one.
-                Button(action: beginEditing) {
-                    Label("Edit", systemImage: "pencil")
-                        .labelStyle(.titleAndIcon)
-                        .padding(.horizontal, 8)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint((site?.color.color ?? .gray).opacity(0.7))
-                .help("Edit This Entry (⌘E)")
+                Button(action: beginEditing) { Label("Edit", systemImage: "pencil").labelStyle(.titleAndIcon) }
+                    .buttonStyle(.borderedProminent)
+                    .tint((site?.color.color ?? .gray).opacity(0.7))
+                    .help("Edit This Entry (⌘↩)")
             }
         }
         if isEditable {
             ToolbarItem(placement: .automatic) {
                 Button(action: send) {
-                    if publisher.sending.contains(entry.id) {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Text(sendLabel).padding(.horizontal, 14)
-                    }
+                    // The label keeps its width under the spinner, so nothing beside it moves.
+                    Text(sendLabel)
+                        .opacity(isSending ? 0 : 1)
+                        .overlay { if isSending { ProgressView().controlSize(.small) } }
                 }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.large)
                 .disabled(!canSend)
+                .help("\(sendLabel) to \(site?.name ?? "the site") (⌘↩)")
                 .accessibilityIdentifier("sendButton")
             }
         }
-        ToolbarSpacer(.fixed)
     }
 
     private var actions: EditorActions {
-        EditorActions(canPublish: canSend, canPreview: !entry.isBlank,
+        EditorActions(canPublish: canSend && lock.isUnlocked, canPreview: !entry.isBlank,
                       canShowPreview: !entry.isBlank && fitsPreview, canEdit: isEditable,
                       canFormat: isEditable && bodyHasFocus, hasTitle: showsTitle, isPreviewing: isPreviewing,
                       publishLabel: sendLabel, publish: send, format: apply, togglePreview: { showsPreview.toggle() },
                       print: { EntryPrinter.print(title: entry.title, markdown: entry.body, site: site) },
                       toggleTitle: toggleTitle, chooseImage: { showingImagePicker = true },
-                      canBeginEditing: entry.state == .sent, canDiscard: isEditable && entry.remotePostID != nil,
-                      canViewOnSite: viewURL != nil, beginEditing: beginEditing, discardChanges: discardChanges,
-                      viewOnSite: viewOnSite)
+                      canBeginEditing: entry.state == .sent, canRevert: isEditable && entry.remotePostID != nil,
+                      canViewOnSite: viewURL != nil, beginEditing: beginEditing, revert: { confirmingRevert = true },
+                      viewOnSite: viewOnSite, showTags: showTags,
+                      canMove: !siteIsFixed, siteID: entry.siteID,
+                      moveTo: { entry.siteID = $0 }, copyLink: copyLink,
+                      export: { MarkdownFile.export([entry]) }, canDelete: canDelete, delete: delete)
     }
 
     private var sendLabel: String {
@@ -272,6 +299,11 @@ struct MacEditorView: View {
         }
     }
 
+    /// ⌘S. Writing saves itself, so only a site whose Publish is a save has more to do.
+    private func save() {
+        if site?.kind.sendsOnSave == true, canSend { send() } else { try? context.save() }
+    }
+
     private func beginEditing() {
         entry.beginEdit()
         selection = TextSelection(insertionPoint: entry.body.endIndex)
@@ -282,8 +314,49 @@ struct MacEditorView: View {
         if let viewURL { openURL(viewURL) }
     }
 
-    private func discardChanges() {
+    private func copyLink() {
+        guard let viewURL else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(viewURL.absoluteString, forType: .string)
+    }
+
+    /// Back to the published version. Undo brings the edit back, and Redo reverts it again.
+    private func revert() {
+        guard entry.modelContext != nil, !entry.isDeleted, entry.state == .editing, entry.remotePostID != nil else { return }
+        let edited = (title: entry.title, body: entry.body, tags: entry.tags, hidden: entry.hiddenTitle,
+                      published: (entry.publishedTitle, entry.publishedBody, entry.publishedTags))
+        // The page drops its own typing steps when the text changes under it; see `MacTextEditor`.
         entry.cancelEdit()
+        showsTitle = !entry.title.isEmpty
+        UndoAction.register(undoManager, name: "Revert to Published") { [entry] in
+            guard entry.modelContext != nil, !entry.isDeleted, entry.state == .sent else { return }
+            (entry.publishedTitle, entry.publishedBody, entry.publishedTags) = edited.published
+            entry.title = edited.title
+            entry.body = edited.body
+            entry.tags = edited.tags
+            entry.hiddenTitle = edited.hidden
+            entry.state = .editing
+            try? entry.modelContext?.save()
+            showsTitle = !entry.title.isEmpty
+            UndoAction.register(undoManager, name: "Revert to Published") { revert() }
+        }
+    }
+
+    /// The popover hangs from the Tags button, which Focus Mode hides, so that ends first.
+    private func showTags() {
+        guard window.isFocused else { return showingTags = true }
+        window.exitFocus()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { showingTags = true }
+    }
+
+    /// An unsent draft, put back by Undo.
+    private func delete() {
+        guard canDelete else { return }
+        let nav = navigation
+        EntryDeletion.delete([entry], in: context, navigation: nav, undoManager: undoManager) { restored in
+            if let first = restored.first { nav.show(first) }
+        }
+        nav.openBlankEntry(in: context)
     }
 
     private func touchIfStale() {
@@ -304,14 +377,16 @@ struct MacEditorView: View {
     }
 
     private func send() {
-        guard canSend else { return }
+        guard canSend, let site else { return }
         let sent = entry
         let isNew = sent.remotePostID == nil
+        let (siteName, done) = (site.name, site.kind.doneLabel)
         sent.publishStatus = .published
         Task {
             await publisher.publish(sent)
             // A new entry is done, so start a fresh page. An update stays on the entry.
-            if isNew, sent.state == .sent, navigation.selectedEntry == sent {
+            if isNew, sent.modelContext != nil, !sent.isDeleted, sent.state == .sent, navigation.selectedEntry == sent {
+                window.announce("\(done) to \(siteName)")
                 navigation.openBlankEntry(in: context)
             }
         }
@@ -319,10 +394,7 @@ struct MacEditorView: View {
 
     private func apply(_ format: MarkdownFormat) {
         guard isEditable else { return }
-        let (text, newSelection) = format.apply(to: entry.body, selection: selection)
-        entry.body = text
-        selection = newSelection
-        focusRequest += 1
+        command = EditorCommand(id: (command?.id ?? 0) + 1, action: .format(format))
     }
 
     /// Pasted, dropped or chosen. A public site asks first, because an upload can't wait for Publish.
@@ -350,9 +422,7 @@ struct MacEditorView: View {
                 // Leaving an edit cancels it, and the picture goes with it.
                 guard entry.modelContext != nil, !entry.isDeleted, entry.state == .editing else { return }
                 entry.uploadedToSiteID = site.id
-                let (text, newSelection) = MarkdownFormat.insert("\n![](\(url.absoluteString))\n", into: entry.body, at: selection)
-                entry.body = text
-                selection = newSelection
+                command = EditorCommand(id: (command?.id ?? 0) + 1, action: .insert("\n![](\(url.absoluteString))\n", name: "Insert Image"))
             }
         } catch {
             uploadError = error.localizedDescription
@@ -379,74 +449,5 @@ private struct LivePreview: View {
                 try? await Task.sleep(for: .seconds(0.25))
                 if !Task.isCancelled { html = source }
             }
-    }
-}
-
-/// Tags in a popover: added by typing, removed by clicking, with the site's own as suggestions.
-private struct MacTagEditor: View {
-    @Bindable var entry: Entry
-    let site: Site?
-
-    @Environment(Publisher.self) private var publisher
-    @State private var input = ""
-    @State private var suggestions: [String] = []
-
-    private var visibleTags: [String] { entry.tags.filter { !$0.hasPrefix("#") } }
-    private var matches: [String] {
-        let q = input.trimmingCharacters(in: .whitespaces).lowercased()
-        return suggestions.filter { s in
-            !entry.tags.contains { $0.caseInsensitiveCompare(s) == .orderedSame }
-                && (q.isEmpty || s.lowercased().contains(q))
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            TextField("Add a tag", text: $input)
-                .textFieldStyle(.roundedBorder)
-                .autocorrectionDisabled()
-                .onSubmit(addInput)
-            ForEach(visibleTags, id: \.self) { tag in
-                HStack {
-                    Text(tag)
-                    Spacer()
-                    Button { entry.tags.removeAll { $0 == tag } } label: { Image(systemName: "xmark.circle.fill") }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("Remove \(tag)")
-                }
-            }
-            if !matches.isEmpty {
-                Divider()
-                Text("On \(site?.name ?? "this site")").font(.caption).foregroundStyle(.secondary)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(matches.prefix(30), id: \.self) { tag in
-                            Button(tag) { add(tag) }.buttonStyle(.link)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxHeight: 160)
-            }
-        }
-        .padding(12)
-        .frame(width: 240)
-        .task { await loadSuggestions() }
-        .onDisappear(perform: addInput)
-    }
-
-    private func addInput() {
-        for part in input.split(separator: ",") { add(String(part)) }
-        input = ""
-    }
-
-    private func add(_ tag: String) {
-        entry.tags = EntryBuilder.normalizedTags(entry.tags + [tag])
-    }
-
-    private func loadSuggestions() async {
-        guard let site, let backend = try? publisher.backend(for: site) else { return }
-        suggestions = (try? await backend.tags()) ?? []
     }
 }

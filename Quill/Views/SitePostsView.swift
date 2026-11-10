@@ -29,9 +29,22 @@ struct SitePostsView: View {
     @State private var tagged: [SiteTag: [SitePost]] = [:]
     #if os(macOS)
     @State private var selectedPost: String?
+    @Environment(\.listQuery) private var query
+    @Environment(\.isCovered) private var isCovered
+    @Environment(\.hidesTitle) private var hidesTitle
     #endif
 
     private var site: Site? { sites.first { $0.id == siteID } }
+
+    /// What the list shows: on a Mac, narrowed by the search field.
+    private var shown: [SitePost] {
+        #if os(macOS)
+        let q = query.trimmingCharacters(in: .whitespaces)
+        return q.isEmpty ? posts : posts.filter { $0.title.localizedStandardContains(q) }
+        #else
+        posts
+        #endif
+    }
 
     var body: some View {
         posted
@@ -52,16 +65,37 @@ struct SitePostsView: View {
             .newEntryButton(site: siteID, tint: site?.color.color ?? .accentColor, isShown: !usesColumns)
             #endif
             .paperList()
+            #if os(macOS)
+            .navigationTitle(isCovered ? "Quill" : hidesTitle ? "" : site?.name ?? "Site")
+            #else
             .navigationTitle(site?.name ?? "Site")
+            #endif
             .largeTitle()
             .toolbar {
+                #if os(macOS)
+                if let tags = site?.cachedTagList, !tags.isEmpty {
+                    ToolbarItem(placement: .primaryAction) { TagFilterMenu(tags: tags, selection: $filter) }
+                }
+                #endif
                 ToolbarItem(placement: .primaryAction) {
                     Button { editing = true } label: { Label("Edit Site", systemImage: "slider.horizontal.3") }
+                        #if os(macOS)
+                        .help("Edit Site")
+                        #endif
                 }
             }
             .sheet(isPresented: $editing) {
                 if let site { EditSiteView(site: site) }
             }
+            #if os(macOS)
+            // Nothing stays open over the lock screen.
+            .onChange(of: isCovered) { _, covered in
+                guard covered else { return }
+                editing = false
+                pendingDelete = nil
+                unsupported = nil
+            }
+            #endif
             .confirmationDialog(deleteQuestion, isPresented: isConfirmingDelete,
                                 titleVisibility: .visible, presenting: pendingDelete) { post in
                 Button("Delete from \(site?.name ?? "site")", role: .destructive) { Task { await delete(post) } }
@@ -87,6 +121,9 @@ struct SitePostsView: View {
     @ViewBuilder private var posted: some View {
         #if os(macOS)
         List(selection: $selectedPost) { rows }
+            .onDeleteCommand {
+                if let post = posts.first(where: { $0.id == selectedPost }) { pendingDelete = post }
+            }
             .onChange(of: selectedPost) { _, id in
                 if let post = posts.first(where: { $0.id == id }) { Task { await open(post) } }
             }
@@ -113,24 +150,35 @@ struct SitePostsView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             }
-            #endif
+            // A Mac filters from the toolbar instead.
             if let tags = site?.cachedTagList, !tags.isEmpty {
                 TagFilterBar(tags: tags, selection: $filter, tint: site?.color.color ?? .accentColor)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0))
             }
+            #endif
             Section {
-                ForEach(posts) { post in
+                ForEach(shown) { post in
                     postRow(post)
                         .swipeActions(edge: .trailing) {
                             Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
                         }
                         .contextMenu {
                             #if os(macOS)
-                            if let url = post.url { Button("Open in Browser", systemImage: "safari") { openURL(url) } }
-                            #endif
+                            Button("Edit", systemImage: "pencil") { Task { await open(post, edit: true) } }
+                            if let url = post.url {
+                                Button("Open in Browser", systemImage: "safari") { openURL(url) }
+                                Button("Copy Link", systemImage: "link") { copyLink(url) }
+                            }
+                            if let entry = localEntry(for: post) {
+                                Button("Export as Markdown…", systemImage: "square.and.arrow.up") { MarkdownFile.export([entry]) }
+                            }
+                            Divider()
+                            Button("Delete…", systemImage: "trash", role: .destructive) { pendingDelete = post }
+                            #else
                             Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
+                            #endif
                         }
                 }
             } header: {
@@ -170,10 +218,21 @@ struct SitePostsView: View {
     }
     #endif
 
+    #if os(macOS)
+    private func copyLink(_ url: URL) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+    }
+    #endif
+
     /// A Mac selects a row; iOS taps a button.
     @ViewBuilder private func postRow(_ post: SitePost) -> some View {
         #if os(macOS)
-        row(post).tag(post.id)
+        if let entry = localEntry(for: post) {
+            row(post).tag(post.id).draggable(MarkdownFile(entry: entry))
+        } else {
+            row(post).tag(post.id)
+        }
         #else
         Button { Task { await open(post) } } label: { row(post) }
             .buttonStyle(.plain)
@@ -211,7 +270,7 @@ struct SitePostsView: View {
         entries.first { $0.remotePostID == post.id && $0.siteID == siteID }
     }
 
-    private func open(_ post: SitePost) async {
+    private func open(_ post: SitePost, edit: Bool = false) async {
         guard let site else { return }
         openRequest += 1
         let request = openRequest
@@ -227,6 +286,7 @@ struct SitePostsView: View {
                 return
             }
             navigation.show(entry)
+            if edit, entry.state == .sent { entry.beginEdit() }
         } catch {
             self.error = error.localizedDescription
         }
@@ -307,6 +367,28 @@ struct SitePostsView: View {
         }
     }
 }
+
+#if os(macOS)
+/// The site's tags as a toolbar pop-up, the Mac's way to narrow a list.
+private struct TagFilterMenu: View {
+    let tags: [SiteTag]
+    @Binding var selection: SiteTag?
+
+    var body: some View {
+        Menu {
+            Picker("Filter by Tag", selection: $selection) {
+                Text("All Posts").tag(SiteTag?.none)
+                Divider()
+                ForEach(tags) { tag in Text(verbatim: "#\(tag.name)").tag(Optional(tag)) }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Label("Filter by Tag", systemImage: selection == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+        }
+        .help(selection.map { "Showing posts tagged #\($0.name)" } ?? "Filter by Tag")
+    }
+}
+#endif
 
 /// Small tags above the posts, which scroll away with them. One narrows the list, and pressing it
 /// again brings everything back.

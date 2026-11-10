@@ -106,7 +106,8 @@ targets:
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
-        com.apple.security.files.user-selected.read-only: true
+        # Read-write: File > Export as Markdown saves where it's told to.
+        com.apple.security.files.user-selected.read-write: true
         com.apple.security.print: true
         # Lets Sparkle's installer run from inside the sandbox.
         com.apple.security.temporary-exception.mach-lookup.global-name:
@@ -125,7 +126,19 @@ targets:
         SUPublicEDKey: YNe2V/xce3HQJv4cZ8+d5tLFFIwEP7OiVUkXDgz+wo8=
         SUEnableInstallerLauncherService: true
         SUEnableAutomaticChecks: true
-        NSHumanReadableCopyright: ""
+        NSHumanReadableCopyright: Copyright © 2026 Stephen Meriwether. All rights reserved.
+        # Markdown files open as new drafts, from Finder or the Dock.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Markdown
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [net.daringfireball.markdown, public.plain-text]
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: net.daringfireball.markdown
+            UTTypeDescription: Markdown
+            UTTypeConformsTo: [public.plain-text]
+            UTTypeTagSpecification:
+              public.filename-extension: [md, markdown]
         ITSAppUsesNonExemptEncryption: false
         NSAppTransportSecurity:
           # Lets a dev build reach a Ghost on http://localhost; real sites use HTTPS.

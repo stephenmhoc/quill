@@ -61,6 +61,8 @@ struct EditorHeader: View {
     let focusesTitle: Bool
     let onTags: () -> Void
     let onSubmit: () -> Void
+    /// Bump to move the cursor to the title, as ↑ on the first line does on a Mac.
+    var titleFocusRequest = 0
     @FocusState private var titleFocused: Bool
 
     var body: some View {
@@ -88,6 +90,13 @@ struct EditorHeader: View {
                         onSubmit()
                     }
                     .task { if focusesTitle { titleFocused = true } }
+                    .onChange(of: titleFocusRequest) { titleFocused = true }
+                    #if os(macOS)
+                    // The title and the text read as one page, so the keys cross between them.
+                    // While an input method is composing, its candidate list has them first.
+                    .onKeyPress(.downArrow) { moveOn() }
+                    .onKeyPress(.tab) { moveOn() }
+                    #endif
             }
             if !entry.tags.isEmpty {
                 TagStrip(tags: entry.tags, onTap: onTags)
@@ -97,6 +106,14 @@ struct EditorHeader: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    #if os(macOS)
+    private func moveOn() -> KeyPress.Result {
+        if (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true { return .ignored }
+        onSubmit()
+        return .handled
+    }
+    #endif
 }
 
 struct TagStrip: View {
@@ -125,10 +142,11 @@ struct StatusBanner: View {
             VStack(alignment: .leading, spacing: 8) {
                 StatusNote(text: entry.lastError ?? "Waiting to send to \(site?.name ?? "the site").", icon: "clock", color: .orange)
                 HStack {
-                    Button("Retry now") { Task { await publisher.publish(entry) } }
+                    Button(Self.label("Retry now", mac: "Retry Now")) { Task { await publisher.publish(entry) } }
                     // A post that may already be on the site has to be found again before it can change.
                     if entry.createAttemptedAt == nil {
-                        Button(entry.remotePostID == nil ? "Back to drafts" : "Keep editing") { entry.state = .editing }
+                        Button(entry.remotePostID == nil ? Self.label("Back to drafts", mac: "Back to Drafts")
+                                                         : Self.label("Keep editing", mac: "Keep Editing")) { entry.state = .editing }
                     }
                 }
                 .buttonStyle(.bordered)
@@ -139,8 +157,12 @@ struct StatusBanner: View {
                 StatusNote(text: entry.lastError ?? "Couldn't send.", icon: "exclamationmark.triangle", color: .red)
                 HStack {
                     if entry.isConflict {
-                        Button("Overwrite \(site?.kind.title ?? "the site")'s version") { Task { await publisher.overwrite(entry) } }
-                        Button("Use \(site?.kind.title ?? "the site")'s version") { Task { await publisher.takeSiteVersion(entry) } }
+                        Button(Self.label("Overwrite \(site?.kind.title ?? "the site")'s version", mac: "Overwrite \(site?.kind.title ?? "the Site")'s Version")) {
+                            Task { await publisher.overwrite(entry) }
+                        }
+                        Button(Self.label("Use \(site?.kind.title ?? "the site")'s version", mac: "Use \(site?.kind.title ?? "the Site")'s Version")) {
+                            Task { await publisher.takeSiteVersion(entry) }
+                        }
                     } else {
                         Button("Retry") { Task { await publisher.publish(entry) } }
                     }
@@ -155,6 +177,15 @@ struct StatusBanner: View {
         default:
             EmptyView()
         }
+    }
+
+    /// A Mac's buttons are in Title Case; iOS keeps its own wording.
+    private static func label(_ iOS: String, mac: String) -> String {
+        #if os(macOS)
+        mac
+        #else
+        iOS
+        #endif
     }
 }
 

@@ -1,7 +1,68 @@
 import SwiftUI
 
+/// What the writing lives on, in words. A Mac isn't a "device" to the person using it.
+nonisolated let thisDevice: String = {
+    #if os(macOS)
+    "this Mac"
+    #else
+    "this device"
+    #endif
+}()
+
+/// A form row's title. A Mac shows it as a label beside the field, iOS uses the placeholder.
+func fieldTitle(mac: String, iOS: String) -> String {
+    #if os(macOS)
+    mac
+    #else
+    iOS
+    #endif
+}
+
+extension EnvironmentValues {
+    /// Mac: the form is in a sheet, so it has a Cancel beside its own buttons.
+    @Entry var siteFormHasCancel = false
+    /// Mac: the height of a site form's fields. A grouped form scrolls, so it can't size itself.
+    @Entry var siteFormHeight: CGFloat = 360
+}
+
+#if os(macOS)
+extension EnvironmentValues {
+    /// Mac: what's typed in the sidebar's search field, which narrows the list beside it.
+    @Entry var listQuery = ""
+    /// Mac: the lock screen covers the window, so its title mustn't name a site.
+    @Entry var isCovered = false
+    /// Mac: Focus Mode's page covers the window, so the columns behind it give it no title.
+    @Entry var hidesTitle = false
+}
+#endif
+
+/// A form section's heading. A Mac's labelled rows already say what each one is.
+@ViewBuilder func sectionHeader(_ text: String) -> some View {
+    #if os(iOS)
+    Text(text)
+    #endif
+}
+
 /// The small differences between iOS and the Mac, so shared views stay free of `#if`.
 extension View {
+    /// A form's note under its fields. iOS styles footers itself; a Mac form shows plain text.
+    @ViewBuilder func formNote() -> some View {
+        #if os(macOS)
+        font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        #else
+        self
+        #endif
+    }
+
+    /// A site form's title in the bar. A Mac sheet has no bar, and first run names the window itself.
+    @ViewBuilder func formTitle(_ title: String) -> some View {
+        #if os(iOS)
+        navigationTitle(title)
+        #else
+        self
+        #endif
+    }
+
     /// A short title in the bar, where iOS would otherwise choose.
     @ViewBuilder func compactTitle() -> some View {
         #if os(iOS)
@@ -36,13 +97,21 @@ extension View {
         #endif
     }
 
-    /// A field that says what it's for inside its own box. A Mac form would otherwise turn the
-    /// title into a label beside a blank, invisible field.
+    /// A field that says what it's for inside its own box. A Mac form labels it beside the field.
     @ViewBuilder func promptedField() -> some View {
         #if os(macOS)
-        labelsHidden().multilineTextAlignment(.leading)
+        multilineTextAlignment(.leading)
         #else
         self
+        #endif
+    }
+
+    /// A choice between a couple of options: radio buttons on a Mac, segments on iOS.
+    @ViewBuilder func choiceStyle() -> some View {
+        #if os(macOS)
+        pickerStyle(.radioGroup).horizontalRadioGroupLayout()
+        #else
+        pickerStyle(.segmented)
         #endif
     }
 
@@ -57,22 +126,21 @@ extension View {
 
     func cardRow(isSelected: Bool = false) -> some View { modifier(CardRow(isSelected: isSelected)) }
 
-    /// A sheet on a Mac takes its size from its content, and needs telling.
+    /// A sheet on a Mac takes its height from its content, and only needs a width.
     @ViewBuilder func sheetSize() -> some View {
         #if os(macOS)
-        frame(minWidth: 500, minHeight: 460)
+        frame(width: 480)
         #else
         self
         #endif
     }
 
-    /// A sheet's main button on a Mac needs more room than its word.
-    @ViewBuilder func sheetButtonLabel() -> some View {
-        #if os(macOS)
-        padding(.horizontal, 12)
-        #else
-        self
-        #endif
+    /// A site form's Save, plus Remove and Cancel on a Mac. iOS puts Save in the bar; a Mac
+    /// puts them all along the bottom, where a Mac sheet's buttons go, Return and Esc included.
+    func siteFormButtons(isNew: Bool, canSave: Bool, isWorking: Bool = false, removeNote: String? = nil,
+                         isConfirmingRemove: Binding<Bool> = .constant(false), save: @escaping () -> Void) -> some View {
+        modifier(SiteFormButtons(isNew: isNew, canSave: canSave, isWorking: isWorking, removeNote: removeNote,
+                                 isConfirmingRemove: isConfirmingRemove, save: save))
     }
 
     func siteFormStyle(isCentered: Bool) -> some View { modifier(SiteFormStyle(isCentered: isCentered)) }
@@ -105,6 +173,7 @@ private struct CardRow: ViewModifier {
 
 private struct SiteFormStyle: ViewModifier {
     let isCentered: Bool
+    @Environment(\.siteFormHeight) private var height
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
     #endif
@@ -113,8 +182,76 @@ private struct SiteFormStyle: ViewModifier {
         #if os(iOS)
         content.safeAreaPadding(.horizontal, isCentered && sizeClass == .regular ? 180 : 0)
         #else
-        content.formStyle(.grouped)
+        // System Settings' grouped rows, at the height their kind of site needs (see
+        // `SiteKind.formHeight`), which Add Site animates between. The heights fit, so they don't scroll.
+        content.formStyle(.grouped).scrollDisabled(true).frame(height: height)
         #endif
+    }
+}
+
+private struct SiteFormButtons: ViewModifier {
+    let isNew: Bool
+    let canSave: Bool
+    let isWorking: Bool
+    let removeNote: String?
+    @Binding var isConfirmingRemove: Bool
+    let save: () -> Void
+    @Environment(\.siteFormHasCancel) private var hasCancel
+    @Environment(\.dismiss) private var dismiss
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        content.toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                if isWorking { ProgressView() } else {
+                    Button(action: save) { Text("Save") }
+                        .accessibilityIdentifier("saveSite")
+                        .disabled(!canSave)
+                }
+            }
+        }
+        #else
+        VStack(spacing: 0) {
+            content
+            Divider()
+            HStack(spacing: 8) {
+                if let removeNote {
+                    Button("Remove Site…", role: .destructive) { isConfirmingRemove = true }
+                        .help(removeNote)
+                }
+                Spacer()
+                if isWorking {
+                    ProgressView().controlSize(.small)
+                    Text("Checking…").font(.callout).foregroundStyle(.secondary)
+                }
+                if hasCancel { Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction) }
+                Button(isNew ? "Add Site" : "Save", action: save)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canSave || isWorking)
+                    .accessibilityIdentifier("saveSite")
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+        }
+        #endif
+    }
+}
+
+/// A form's error, where it happened instead of in an alert.
+struct FormErrorRow: View {
+    let message: String
+
+    var body: some View {
+        Section {
+            #if os(macOS)
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .font(.callout)
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+            #else
+            Text(message).font(.footnote).foregroundStyle(.red)
+            #endif
+        }
     }
 }
 
@@ -149,12 +286,14 @@ func fieldPrompt(_ text: String) -> Text? {
 /// stray line break from that copy would make a good key fail. No password content type: iOS
 /// would offer to save the key to Passwords, and these stay in this device's Keychain.
 struct SecretField: View {
+    /// The Mac's label beside the field. iOS shows the prompt instead.
+    var label = ""
     let prompt: String
     @Binding var text: String
 
     var body: some View {
         HStack {
-            SecureField(prompt, text: $text, prompt: fieldPrompt(prompt))
+            SecureField(fieldTitle(mac: label, iOS: prompt), text: $text, prompt: fieldPrompt(prompt))
                 .promptedField()
                 .literalEntry()
             #if os(macOS)
@@ -181,7 +320,7 @@ struct SecretField: View {
     }
 }
 
-/// Below the form on iOS. A Mac sheet puts it in the footer, as `RemoveSiteToolbarItem`.
+/// Below the form on iOS. A Mac sheet puts Remove in its footer instead; see `siteFormButtons`.
 struct RemoveSiteSection: View {
     let note: String
     @Binding var isConfirming: Bool
@@ -196,17 +335,3 @@ struct RemoveSiteSection: View {
         #endif
     }
 }
-
-#if os(macOS)
-struct RemoveSiteToolbarItem: ToolbarContent {
-    let note: String
-    @Binding var isConfirming: Bool
-
-    var body: some ToolbarContent {
-        ToolbarItem(placement: .destructiveAction) {
-            Button("Remove Site…", role: .destructive) { isConfirming = true }
-                .help(note)
-        }
-    }
-}
-#endif

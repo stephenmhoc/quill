@@ -22,7 +22,8 @@ private struct GeneralPane: View {
             Picker("Appearance:", selection: $appearance) {
                 ForEach(Appearance.allCases) { Text($0.label).tag($0) }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.radioGroup)
+            .horizontalRadioGroupLayout()
             if lock.isUnlocked {
                 Picker("New entries go to:", selection: $defaultSite) {
                     Text("Last used").tag("")

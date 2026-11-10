@@ -24,14 +24,17 @@ struct GhostSiteForm: View {
 
     private var isNew: Bool { site == nil }
     private var keyPrompt: String { isNew ? "Staff Access Token or Admin API key" : "New key, or leave blank to keep the current one" }
+    /// Nil once the site is gone: the sheet can still draw while it closes.
+    private var siteName: String? { site.flatMap { $0.isLive ? $0.name : nil } }
     private var canSave: Bool {
         !urlText.trimmingCharacters(in: .whitespaces).isEmpty && (!isNew || !key.isEmpty) && !checking
     }
 
     var body: some View {
         Form {
-            Section("Site") {
-                TextField("https://journal.example.com", text: $urlText, prompt: fieldPrompt("https://journal.example.com"))
+            Section {
+                TextField(fieldTitle(mac: "Address", iOS: "https://journal.example.com"), text: $urlText,
+                          prompt: fieldPrompt("https://journal.example.com"))
                     .promptedField()
                     .urlKeyboard()
                     #if os(iOS)
@@ -40,48 +43,65 @@ struct GhostSiteForm: View {
                     .literalEntry()
                     .disabled(!isNew)
                     .foregroundStyle(isNew ? .primary : .secondary)
-                TextField("Name (uses the site title if empty)", text: $name, prompt: fieldPrompt("Name (uses the site title if empty)"))
+                TextField(fieldTitle(mac: "Name", iOS: "Name (uses the site title if empty)"), text: $name,
+                          prompt: fieldPrompt("Uses the site title if empty"))
                     .promptedField()
-            }
-            Section {
-                SecretField(prompt: keyPrompt, text: $key)
             } header: {
-                Text("Key")
-            } footer: {
-                Text("Ghost Admin → your profile → Staff access token. Stored in this device's Keychain, protected by \(lock.biometryName), and never synced.")
+                sectionHeader("Site")
             }
             Section {
+                SecretField(label: "Key", prompt: keyPrompt, text: $key)
+            } header: {
+                sectionHeader("Key")
+            } footer: {
+                Text("Ghost Admin → your profile → Staff access token. Stored in \(thisDevice)'s Keychain, protected by \(lock.biometryName), and never synced.")
+                    .formNote()
+                #if os(macOS)
+                Link("About Ghost's keys", destination: URL(string: "https://ghost.org/docs/admin-api/#token-authentication")!)
+                    .font(.callout)
+                #endif
+            }
+            Section {
+                #if os(macOS)
+                // At the row's trailing edge, like the other controls in a grouped form.
+                LabeledContent("Visibility") {
+                    Picker("Visibility", selection: $isPublic) {
+                        Text("Private").tag(false)
+                        Text("Public").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 150)
+                }
+                SiteColorSection(color: $color)
+                #else
                 Picker("Visibility", selection: $isPublic) {
                     Text("Private").tag(false)
                     Text("Public").tag(true)
                 }
-                .pickerStyle(.segmented)
+                .choiceStyle()
+                #endif
             } footer: {
                 Text("Uploading an image to a public site always asks first. To change a site's address, remove it and add it again.")
+                    .formNote()
             }
+            #if os(iOS)
             SiteColorSection(color: $color)
-            if let error {
-                Section { Text(error).font(.footnote).foregroundStyle(.red) }
-            }
-            if !isNew { RemoveSiteSection(note: "Removes the site and its key from this device. Nothing changes in Ghost.", isConfirming: $confirmingDelete) }
+            #endif
+            if let error { FormErrorRow(message: error) }
+            if !isNew { RemoveSiteSection(note: SiteKind.ghost.removalNote, isConfirming: $confirmingDelete) }
         }
         .siteFormStyle(isCentered: isCentered)
-        .navigationTitle(isNew ? "Ghost Site" : "Edit Site")
+        .formTitle(isNew ? "Ghost Site" : "Edit Site")
         .compactTitle()
-        .toolbar {
-            #if os(macOS)
-            if !isNew { RemoveSiteToolbarItem(note: "Removes the site and its key from this device. Nothing changes in Ghost.", isConfirming: $confirmingDelete) }
-            #endif
-            ToolbarItem(placement: .confirmationAction) {
-                if checking { ProgressView() } else {
-                    Button { Task { await save() } } label: { Text("Save").sheetButtonLabel() }
-                        .accessibilityIdentifier("saveSite")
-                        .disabled(!canSave)
-                }
-            }
-        }
-        .confirmationDialog("Remove \(site?.name ?? "site")?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .siteFormButtons(isNew: isNew, canSave: canSave, isWorking: checking, removeNote: isNew ? nil : SiteKind.ghost.removalNote,
+                         isConfirmingRemove: $confirmingDelete) { Task { await save() } }
+        .confirmationDialog("Remove \(siteName ?? "site")?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Remove", role: .destructive, action: remove)
+        } message: {
+            #if os(macOS)
+            Text(SiteKind.ghost.removalNote)
+            #endif
         }
         .onAppear(perform: load)
     }
@@ -127,12 +147,13 @@ struct GhostSiteForm: View {
     }
 
     private func remove() {
-        guard let site else { return }
+        guard let site, site.isLive else { return }
         navigation.leaveSite(site.id)
-        try? publisher.backend(for: site).removeSiteData()
-        lock.deleteKey(for: site.id)
-        context.delete(site)
-        try? context.save()
-        onDone()
+        do {
+            try publisher.removeSite(site)
+            onDone()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }

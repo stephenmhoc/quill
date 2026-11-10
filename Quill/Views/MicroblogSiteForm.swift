@@ -25,6 +25,8 @@ struct MicroblogSiteForm: View {
 
     private var isNew: Bool { site == nil }
     private var tokenPrompt: String { isNew ? "App token" : "New token, or leave blank to keep the current one" }
+    /// Nil once the site is gone: the sheet can still draw while it closes.
+    private var siteName: String? { site.flatMap { $0.isLive ? $0.name : nil } }
     private var canSave: Bool {
         (!isNew || !token.isEmpty) && !checking && (blogs.count < 2 || chosenBlog != nil)
     }
@@ -32,51 +34,61 @@ struct MicroblogSiteForm: View {
     var body: some View {
         Form {
             Section {
-                SecretField(prompt: tokenPrompt, text: $token)
+                SecretField(label: "Token", prompt: tokenPrompt, text: $token)
                     .onChange(of: token) { blogs = []; chosenBlog = nil }
             } header: {
-                Text("Token")
+                sectionHeader("Token")
             } footer: {
-                Text("Micro.blog → Account → App tokens. Stored in this device's Keychain, protected by \(lock.biometryName), and never synced.")
+                Text("Micro.blog → Account → App tokens. Stored in \(thisDevice)'s Keychain, protected by \(lock.biometryName), and never synced.")
+                    .formNote()
+                #if os(macOS)
+                Link("Open App Tokens on Micro.blog", destination: URL(string: "https://micro.blog/account/apps")!)
+                    .font(.callout)
+                #endif
             }
             if blogs.count > 1 {
-                Section("Blog") {
-                    Picker("Blog", selection: $chosenBlog) {
+                Section {
+                    Picker(fieldTitle(mac: "Blog", iOS: "Blog"), selection: $chosenBlog) {
                         ForEach(blogs) { blog in Text(blog.title ?? blog.name).tag(Optional(blog.uid)) }
                     }
+                    #if os(macOS)
+                    .pickerStyle(.radioGroup)
+                    #else
                     .pickerStyle(.inline)
                     .labelsHidden()
+                    #endif
+                } header: {
+                    sectionHeader("Blog")
                 }
             }
             Section {
-                TextField("Name (uses the blog's title if empty)", text: $name, prompt: fieldPrompt("Name (uses the blog's title if empty)"))
+                TextField(fieldTitle(mac: "Name", iOS: "Name (uses the blog's title if empty)"), text: $name,
+                          prompt: fieldPrompt("Uses the blog's title if empty"))
                     .promptedField()
+                #if os(macOS)
+                SiteColorSection(color: $color)
+                #endif
             } footer: {
                 Text("Micro.blog sites are public, so uploading an image always asks first. Published posts also go to anywhere your blog cross-posts to.")
+                    .formNote()
             }
+            #if os(iOS)
             SiteColorSection(color: $color)
-            if let error {
-                Section { Text(error).font(.footnote).foregroundStyle(.red) }
-            }
-            if !isNew { RemoveSiteSection(note: "Removes the site and its token from this device. Nothing changes on Micro.blog.", isConfirming: $confirmingDelete) }
+            #endif
+            if let error { FormErrorRow(message: error) }
+            if !isNew { RemoveSiteSection(note: SiteKind.microblog.removalNote, isConfirming: $confirmingDelete) }
         }
         .siteFormStyle(isCentered: isCentered)
-        .navigationTitle(isNew ? "Micro.blog" : "Edit Site")
+        .formTitle(isNew ? "Micro.blog" : "Edit Site")
         .compactTitle()
-        .toolbar {
-            #if os(macOS)
-            if !isNew { RemoveSiteToolbarItem(note: "Removes the site and its token from this device. Nothing changes on Micro.blog.", isConfirming: $confirmingDelete) }
-            #endif
-            ToolbarItem(placement: .confirmationAction) {
-                if checking { ProgressView() } else {
-                    Button { Task { await save() } } label: { Text("Save").sheetButtonLabel() }
-                        .accessibilityIdentifier("saveSite")
-                        .disabled(!canSave)
-                }
-            }
-        }
-        .confirmationDialog("Remove \(site?.name ?? "site")?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .siteFormButtons(isNew: isNew, canSave: canSave, isWorking: checking, removeNote: isNew ? nil : SiteKind.microblog.removalNote,
+                         isConfirmingRemove: $confirmingDelete) { Task { await save() } }
+        .confirmationDialog("Remove \(siteName ?? "site")?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Remove", role: .destructive, action: remove)
+        } message: {
+            #if os(macOS)
+            Text(SiteKind.microblog.removalNote)
+            #endif
         }
         .onAppear {
             guard let site else { return }
@@ -126,12 +138,13 @@ struct MicroblogSiteForm: View {
     }
 
     private func remove() {
-        guard let site else { return }
+        guard let site, site.isLive else { return }
         navigation.leaveSite(site.id)
-        try? publisher.backend(for: site).removeSiteData()
-        lock.deleteKey(for: site.id)
-        context.delete(site)
-        try? context.save()
-        onDone()
+        do {
+            try publisher.removeSite(site)
+            onDone()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }

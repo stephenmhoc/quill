@@ -1,43 +1,42 @@
 import SwiftUI
 
-/// A popover, because a Mac menu won't draw a coloured dot beside its items.
+/// Where the entry goes: the coloured pill, opening a menu of sites with their colours.
 struct MacSitePicker: View {
     @Bindable var entry: Entry
     let sites: [Site]
     let locked: Bool
-    @State private var choosing = false
 
     private var site: Site? { sites.first { $0.id == entry.siteID } }
 
     var body: some View {
-        Button { choosing = true } label: { SitePickerLabel(site: site, locked: locked) }
-            .buttonStyle(.plain)
-            .disabled(locked)
-            .accessibilityLabel("Site: \(site?.name ?? "none")")
-            .popover(isPresented: $choosing, arrowEdge: .bottom) {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(sites) { s in
-                        Button {
-                            entry.siteID = s.id
-                            choosing = false
-                        } label: {
-                            HStack(spacing: 8) {
-                                Circle().fill(s.color.color).frame(width: 9, height: 9)
-                                Text(s.name)
-                                Spacer(minLength: 16)
-                                if s.id == entry.siteID { Image(systemName: "checkmark").font(.caption.weight(.semibold)) }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(8)
-                .frame(minWidth: 180)
-                // The text view underneath would otherwise leave its I-beam showing over the rows.
-                .pointerStyle(.default)
+        Menu {
+            MacSiteChoices(entry: entry, sites: sites)
+        } label: {
+            SitePickerLabel(site: site, locked: locked)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .disabled(locked)
+        .help(locked ? "\(site?.name ?? "No site"): this entry stays on its site" : "Choose where this entry goes")
+        .accessibilityLabel("Site: \(site?.name ?? "none")")
+    }
+}
+
+/// The sites as menu items with a tick, for the pill and Entry > Move to Site.
+struct MacSiteChoices: View {
+    @Bindable var entry: Entry
+    let sites: [Site]
+
+    var body: some View {
+        Picker("Site", selection: Binding(get: { entry.siteID }, set: { entry.siteID = $0 })) {
+            ForEach(sites) { site in
+                Label { Text(site.name) } icon: { Image(nsImage: site.color.swatch) }
+                    .tag(Optional(site.id))
             }
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
     }
 }

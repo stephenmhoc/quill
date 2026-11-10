@@ -10,6 +10,42 @@ struct LockView: View {
     @State private var didAutoPrompt = false
 
     var body: some View {
+        #if os(macOS)
+        // A small centred group, like the login window, with Return as the way in.
+        VStack(spacing: 14) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(.secondary)
+            Text("Quill Is Locked")
+                .font(.title3.weight(.semibold))
+            if let error = lock.lastError {
+                Text(error)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 300)
+            }
+            Button {
+                Task { await lock.unlock() }
+            } label: {
+                Label("Unlock with \(lock.biometryName)", systemImage: lock.biometryIcon)
+            }
+            .keyboardShortcut(.defaultAction)
+            .disabled(lock.isAuthenticating)
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.background)
+        // A Mac's scene stays active behind other apps, and Quill can lock back there. The prompt
+        // takes over the screen, so it waits until Quill is in front.
+        .task { if NSApp.isActive { await autoPrompt() } }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await autoPrompt() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            didAutoPrompt = false
+        }
+        #else
         VStack(spacing: 24) {
             Spacer()
             Image(systemName: "lock.fill")
@@ -39,17 +75,6 @@ struct LockView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
-        #if os(macOS)
-        // A Mac's scene stays active behind other apps, and Quill can lock back there. The prompt
-        // takes over the screen, so it waits until Quill is in front.
-        .task { if NSApp.isActive { await autoPrompt() } }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            Task { await autoPrompt() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-            didAutoPrompt = false
-        }
-        #else
         .task(id: scenePhase) {
             if scenePhase == .background { didAutoPrompt = false }
             if scenePhase == .active { await autoPrompt() }

@@ -21,12 +21,43 @@ extension UIColor {
 /// Quiet live styling. It only sets attributes: the text is always plain Markdown.
 enum MarkdownStyler {
     #if os(macOS)
-    /// Monospaced, because it reads as a draft in progress rather than finished type.
-    static let bodyFont = NSFont.monospacedSystemFont(ofSize: 15, weight: .regular)
-    private static let lineHeight = NSLayoutManager().defaultLineHeight(for: bodyFont)
+    /// View > Zoom In and Zoom Out change this, and it's kept for every entry.
+    static let textSizeKey = "editorTextSize"
+    static let defaultTextSize: Double = 15
+    static let textSizes: ClosedRange<Double> = 10...36
+    static var textSize: Double {
+        let saved = UserDefaults.standard.double(forKey: textSizeKey)
+        return saved > 0 ? min(max(saved, textSizes.lowerBound), textSizes.upperBound) : defaultTextSize
+    }
+
+    private struct Fonts {
+        let size: Double
+        let body: NSFont
+        let bold: NSFont
+        let italic: NSFont
+        let lineHeight: CGFloat
+
+        init(size: Double) {
+            self.size = size
+            // Monospaced, because it reads as a draft in progress rather than finished type.
+            body = .monospacedSystemFont(ofSize: size, weight: .regular)
+            bold = NSFontManager.shared.convert(body, toHaveTrait: .boldFontMask)
+            italic = NSFontManager.shared.convert(body, toHaveTrait: .italicFontMask)
+            lineHeight = NSLayoutManager().defaultLineHeight(for: body)
+        }
+    }
+
+    private static var cached = Fonts(size: defaultTextSize)
+    private static var fonts: Fonts {
+        if cached.size != textSize { cached = Fonts(size: textSize) }
+        return cached
+    }
+
+    static var bodyFont: NSFont { fonts.body }
+    private static var lineHeight: CGFloat { fonts.lineHeight }
     private static let textColor = NSColor.labelColor
-    private static let boldFont = NSFontManager.shared.convert(bodyFont, toHaveTrait: .boldFontMask)
-    private static let italicFont = NSFontManager.shared.convert(bodyFont, toHaveTrait: .italicFontMask)
+    private static var boldFont: NSFont { fonts.bold }
+    private static var italicFont: NSFont { fonts.italic }
     #else
     /// Monospaced, because it reads as a draft in progress rather than finished type.
     static let bodyFont: UIFont = {
@@ -58,8 +89,15 @@ enum MarkdownStyler {
     private static let marker = try! NSRegularExpression(pattern: "^(#{1,6} |> |[-+*] |\\d+\\. )", options: .anchorsMatchLines)
     private static let linkTarget = try! NSRegularExpression(pattern: "(?<=\\])\\([^)\\n]*\\)")
 
-    static func style(_ storage: NSTextStorage) {
-        let all = NSRange(location: 0, length: storage.length)
+    /// Every pattern stays within a line, so an edit only needs its own paragraphs restyled.
+    static func style(_ storage: NSTextStorage, around edited: NSRange? = nil) {
+        let length = storage.length
+        let all: NSRange = if let edited {
+            (storage.string as NSString).paragraphRange(for: NSRange(location: min(edited.location, length),
+                                                                     length: min(edited.length, length - min(edited.location, length))))
+        } else {
+            NSRange(location: 0, length: length)
+        }
         let quiet = PlatformColor.quietText
         func each(_ pattern: NSRegularExpression, _ body: (NSTextCheckingResult) -> Void) {
             pattern.enumerateMatches(in: storage.string, range: all) { match, _, _ in if let match { body(match) } }
