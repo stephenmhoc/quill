@@ -88,6 +88,7 @@
 		E747228E257D309154D22014 /* EditorPieces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2512AEC549E7B9706302AB28 /* EditorPieces.swift */; };
 		F0A50691C9BF7B33331CA1AE /* Site.swift in Sources */ = {isa = PBXBuildFile; fileRef = 652A2E7C67C2F9335547BBB9 /* Site.swift */; };
 		F25BD6E5EA056616ACEBA212 /* MarkdownStyler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDB73E8EE505185F7AB5DE9B /* MarkdownStyler.swift */; };
+		F4134338E92D35C7315511F1 /* SceneCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75CCBF70BA9166B86445727B /* SceneCover.swift */; };
 		F5F0BBB891F093490DBFDF2C /* PublisherLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A65A91C0E406B03993C6B547 /* PublisherLiveTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -138,6 +139,7 @@
 		64CF96E4FEB2C5D36281BB0D /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		652A2E7C67C2F9335547BBB9 /* Site.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Site.swift; sourceTree = "<group>"; };
 		69B66DA2B54F91EA4487F5CB /* MacSitePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSitePicker.swift; sourceTree = "<group>"; };
+		75CCBF70BA9166B86445727B /* SceneCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCover.swift; sourceTree = "<group>"; };
 		7B776FA072E3EEF65311D230 /* EntryPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryPreview.swift; sourceTree = "<group>"; };
 		7ECB4E88FFB544CBB3212EA2 /* EditorTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTextView.swift; sourceTree = "<group>"; };
 		820CCF022A1C6E8727D5196E /* MacSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSettingsView.swift; sourceTree = "<group>"; };
@@ -345,6 +347,7 @@
 				C9908E6604B2E633C1858956 /* NewEntryButton.swift */,
 				8B7B1C8DE12137C4D8030E3F /* PlatformStyle.swift */,
 				F9D0E9058F0132B412E20176 /* RootView.swift */,
+				75CCBF70BA9166B86445727B /* SceneCover.swift */,
 				AF31C8EE91FDE72C86EE086E /* SettingsView.swift */,
 				BBBB8425B76428A097BB6A89 /* SidebarView.swift */,
 				4CFFE080A6F3B5F2C89C9662 /* SitePostsView.swift */,
@@ -644,6 +647,7 @@
 				D4A4486ECDF96AE03E6D8076 /* QuillApp.swift in Sources */,
 				86562C9A89790FA3F4553F12 /* QuillStore.swift in Sources */,
 				B20BDEC9EBC1444779B839AB /* RootView.swift in Sources */,
+				F4134338E92D35C7315511F1 /* SceneCover.swift in Sources */,
 				42387E640DDEC9B914B85410 /* SettingsView.swift in Sources */,
 				6DA99894461AF26112196137 /* SidebarView.swift in Sources */,
 				AD6CB3E7F7621C5439B8CCE5 /* Site.swift in Sources */,

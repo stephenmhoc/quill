@@ -9,84 +9,109 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Query(sort: Site.order) private var sites: [Site]
+    @State private var cover = SceneCover()
+    /// Before the first unlock there's nothing to keep, so the lock stands in for everything.
+    /// After it, locking covers the scene instead, and the writing underneath stays as it was.
+    @State private var hasUnlocked = false
 
     var body: some View {
-        @Bindable var navigation = navigation
         ZStack {
-            if !lock.isUnlocked {
+            if !hasUnlocked {
                 LockView()
             } else if sites.isEmpty {
                 AddSiteView(isRequired: true)
             } else {
-                Group {
-                    if sizeClass == .regular {
-                        NavigationSplitView(columnVisibility: $navigation.columnVisibility) {
-                            SidebarView()
-                        } content: {
-                            ContentColumn()
-                        } detail: {
-                            DetailColumn()
-                        }
-                        .navigationSplitViewStyle(.balanced)
-                        .onGeometryChange(for: Bool.self) { $0.size.width < 1100 } action: { overlays in
-                            navigation.sidebarOverlays = overlays
-                            if overlays { navigation.columnVisibility = .doubleColumn }
-                        }
-                    } else {
-                        NavigationStack(path: $navigation.path) {
-                            SidebarView()
-                                .navigationDestination(for: Route.self) { route in
-                                    switch route {
-                                    case .list(let item): SectionList(item: item)
-                                    case .editor: DetailColumn()
-                                    }
-                                }
-                        }
-                    }
-                }
-                .environment(\.usesColumns, sizeClass == .regular)
-                .opensLinksInChosenBrowser()
-                .sheet(isPresented: $navigation.showingSettings) { SettingsView() }
-                .sheet(isPresented: $navigation.showingAddSite) { AddSiteView() }
-                .task(id: lock.isUnlocked) { await runOutbox() }
-                .task(id: lock.isUnlocked, priority: .utility) { await publisher.preloadPosts() }
-                .onReceive(NotificationCenter.default.publisher(for: .quillNewEntry)) { _ in
-                    navigation.openBlankEntry(in: context)
-                }
-                .onChange(of: sizeClass) { _, size in
-                    if size != .regular { navigation.rebuildPath() }
-                }
-                .onChange(of: sites.count) {
-                    repairSidebar()
-                    if sizeClass == .regular, navigation.selectedEntry == nil {
-                        navigation.openBlankEntry(in: context, focus: false)
-                    }
-                }
-                .onAppear {
-                    repairSidebar()
-                    // iPhone opens on home. iPad's detail column always has a page in it.
-                    if sizeClass == .regular, !sites.contains(where: { $0.id == navigation.selectedEntry?.siteID }) {
-                        navigation.openBlankEntry(in: context, focus: false)
-                    }
-                }
+                columnsOrStack
             }
+        }
+        .accessibilityHidden(hasUnlocked && !lock.isUnlocked)
+        .background(SceneWindowReader { cover.window = $0 })
+        .onChange(of: lock.isUnlocked, initial: true) { _, unlocked in
+            if unlocked { hasUnlocked = true }
+            cover.setLocked(hasUnlocked && !unlocked, lock: lock)
         }
         // Setting up the first site goes straight to writing on it.
         .onChange(of: sites.isEmpty) { _, isEmpty in
             if !isEmpty { navigation.openBlankEntry(in: context, focus: sizeClass != .regular) }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            // The whole app, not this scene: another of its windows can still be on screen.
+            lock.didEnterBackground()
+            try? context.save()
+        }
         .onChange(of: scenePhase) { _, phase in
+            cover.phase = phase
             switch phase {
             case .background:
-                lock.didEnterBackground()
                 try? context.save()
             case .active:
+                // Before the privacy cover lifts, so a lapsed grace period never shows the page.
                 lock.didBecomeActive()
+                cover.setLocked(hasUnlocked && !lock.isUnlocked, lock: lock)
             default:
                 break
             }
             // Only on background: an unfocused iPad Split View scene is merely inactive.
-            PrivacyWindow.shared.setVisible(phase == .background)
+            cover.setPrivate(phase == .background)
+        }
+    }
+
+    @ViewBuilder private var columnsOrStack: some View {
+        @Bindable var navigation = navigation
+        Group {
+            if sizeClass == .regular {
+                NavigationSplitView(columnVisibility: $navigation.columnVisibility) {
+                    SidebarView()
+                } content: {
+                    ContentColumn()
+                } detail: {
+                    DetailColumn()
+                }
+                .navigationSplitViewStyle(.balanced)
+                .onGeometryChange(for: Bool.self) { $0.size.width < 1100 } action: { overlays in
+                    navigation.sidebarOverlays = overlays
+                    // Focus mode keeps its one column at any width.
+                    guard !navigation.isFocused else { return }
+                    navigation.columnVisibility = overlays ? .doubleColumn : .all
+                }
+            } else {
+                NavigationStack(path: $navigation.path) {
+                    SidebarView()
+                        .navigationDestination(for: Route.self) { route in
+                            switch route {
+                            case .list(let item): SectionList(item: item)
+                            case .editor: DetailColumn()
+                            }
+                        }
+                }
+            }
+        }
+        .environment(\.usesColumns, sizeClass == .regular)
+        .opensLinksInChosenBrowser()
+        .sheet(isPresented: $navigation.showingSettings) { SettingsView() }
+        .sheet(isPresented: $navigation.showingAddSite) { AddSiteView() }
+        .sheet(item: Binding(get: { sites.first { $0.id == navigation.editingSite } },
+                             set: { navigation.editingSite = $0?.id })) { EditSiteView(site: $0) }
+        .task(id: lock.isUnlocked) { await runOutbox() }
+        .task(id: lock.isUnlocked, priority: .utility) { await publisher.preloadPosts() }
+        .onReceive(NotificationCenter.default.publisher(for: .quillNewEntry)) { _ in
+            navigation.openBlankEntry(in: context)
+        }
+        .onChange(of: sizeClass) { _, size in
+            if size != .regular { navigation.rebuildPath() }
+        }
+        .onChange(of: sites.count) {
+            repairSidebar()
+            if sizeClass == .regular, navigation.selectedEntry == nil {
+                navigation.openBlankEntry(in: context, focus: false)
+            }
+        }
+        .onAppear {
+            repairSidebar()
+            // iPhone opens on home. iPad's detail column always has a page in it.
+            if sizeClass == .regular, !sites.contains(where: { $0.id == navigation.selectedEntry?.siteID }) {
+                navigation.openBlankEntry(in: context, focus: false)
+            }
         }
     }
 
@@ -137,6 +162,8 @@ private struct DetailColumn: View {
         if let entry = navigation.selectedEntry, entry.modelContext != nil, !entry.isDeleted {
             EditorView(entry: entry)
                 .id(entry.id)
+        } else if let opening = navigation.openingPost {
+            OpeningPostView(opening: opening)
         } else {
             ContentUnavailableView {
                 Label("No entry selected", systemImage: "square.and.pencil")
@@ -148,37 +175,46 @@ private struct DetailColumn: View {
     }
 }
 
-/// Covers everything, sheets included, in the app switcher snapshot.
-/// It needs its own window because sheets sit above the root view.
-final class PrivacyWindow {
-    static let shared = PrivacyWindow()
-    private var window: UIWindow?
+/// A post that's been tapped, while it comes from its site.
+private struct OpeningPostView: View {
+    let opening: OpeningPost
 
-    func setVisible(_ visible: Bool) {
-        guard visible else {
-            window?.isHidden = true
-            window = nil
-            return
-        }
-        guard window == nil, let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
-        let cover = UIWindow(windowScene: scene)
-        cover.windowLevel = .alert + 1
-        cover.rootViewController = UIHostingController(rootView: PrivacyCover())
-        cover.isHidden = false
-        window = cover
-    }
-}
+    @Environment(Navigation.self) private var navigation
+    @Environment(Publisher.self) private var publisher
+    @Environment(\.openURL) private var openURL
+    @Environment(\.usesColumns) private var usesColumns
+    @Query private var sites: [Site]
 
-struct PrivacyCover: View {
+    private var site: Site? { sites.first { $0.id == opening.siteID } }
+
     var body: some View {
-        ZStack {
-            Rectangle().fill(.background)
-            VStack(spacing: 12) {
-                Image(systemName: "lock.fill").font(.largeTitle)
-                Text("Quill").font(.system(.title2, design: .monospaced).weight(.semibold))
+        VStack(alignment: .leading, spacing: 16) {
+            Text(opening.post.title)
+                .font(.system(.title2, design: .monospaced).weight(.semibold))
+                .italic(opening.post.isUntitled)
+                .foregroundStyle(.secondary)
+            if opening.isUnsupported {
+                StatusNote(text: "Quill can't edit this post. It has layouts Markdown can't hold, like galleries or embeds, and saving it here would remove them.",
+                           icon: "exclamationmark.triangle", color: .orange)
+                if let url = opening.post.url { Button("Open in Browser") { openURL(url) }.buttonStyle(.bordered) }
+            } else if let failure = opening.failure {
+                StatusNote(text: failure, icon: "exclamationmark.triangle", color: .red)
+                HStack {
+                    if let site { Button("Try Again") { navigation.retryOpening(publisher: publisher, site: site) } }
+                    if let url = opening.post.url { Button("Open in Browser") { openURL(url) } }
+                }
+                .buttonStyle(.bordered)
+            } else {
+                ProgressView().accessibilityLabel("Loading post")
             }
-            .foregroundStyle(.secondary)
+            Spacer()
         }
-        .ignoresSafeArea()
+        .tint(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, usesColumns ? 48 : 20)
+        .padding(.top, 20)
+        .background(Color.paper.ignoresSafeArea())
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

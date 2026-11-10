@@ -31,13 +31,14 @@ struct QuillApp: App {
                 .preferredColorScheme(appearance.colorScheme)
         }
         .modelContainer(container)
-        .commands { QuillCommands(navigation: navigation) }
+        .commands { QuillCommands(navigation: navigation, lock: lock) }
     }
 }
 
 /// Menu-bar / ⌘-key shortcuts on iPad with a keyboard.
 struct QuillCommands: Commands {
     let navigation: Navigation
+    let lock: AppLock
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -45,10 +46,13 @@ struct QuillCommands: Commands {
                 NotificationCenter.default.post(name: .quillNewEntry, object: nil)
             }
             .keyboardShortcut("n")
+            .disabled(!lock.isUnlocked)
         }
         CommandGroup(after: .sidebar) {
-            Button("Focus Mode") { navigation.toggleFocus() }
-                .keyboardShortcut("\\")
+            Button(navigation.isFocused ? "Leave Focus Mode" : "Focus Mode") { navigation.toggleFocus() }
+                // Not ⌘\, which 1Password takes system-wide.
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(!lock.isUnlocked || navigation.selectedEntry == nil)
         }
     }
 }
