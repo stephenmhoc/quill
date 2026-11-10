@@ -353,6 +353,11 @@ struct MacCommands: Commands {
                 .disabled(!canWrite || window.isFocused)
             Divider()
         }
+        navigationCommands
+    }
+
+    /// Split out because CommandsBuilder takes at most ten items on the release SDK.
+    @CommandsBuilder private var navigationCommands: some Commands {
         CommandMenu("Go") {
             // Site names stay out of the menu bar while Quill is locked.
             if lock.isUnlocked {
