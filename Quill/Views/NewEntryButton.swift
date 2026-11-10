@@ -43,13 +43,15 @@ private struct NewEntryButton: ViewModifier {
                     .accessibilityLabel("New Entry")
                     .accessibilityIdentifier("floatingNewEntry")
                     .hoverEffect(.lift)
-                    // What dragging onto a site does, for anyone who can't or wouldn't think to drag.
-                    .contextMenu { if !dropTargets.isEmpty { siteChoices } }
+                    // What dragging onto a site does, for VoiceOver. Sighted people also have each
+                    // card's New Entry Here. Not a context menu: its long press takes the touch,
+                    // so the drag never starts.
                     .accessibilityActions { if !dropTargets.isEmpty { siteChoices } }
                     .scaleEffect(offset == .zero ? 1 : 1.12)
                     .offset(offset)
                     .highPriorityGesture(dropTargets.isEmpty ? nil : drag)
-                    .sensoryFeedback(.selection, trigger: dropSite)
+                    // A tick on reaching a site, not on leaving one or on the drop.
+                    .sensoryFeedback(.selection, trigger: dropSite) { _, new in new != nil }
                     .padding(20 - Self.reach)
                 }
             }

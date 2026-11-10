@@ -14,6 +14,7 @@
 		0C96706F2D9004D7FD1AD34B /* MicroblogBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = A95758EBD292D01EBDCDB5F3 /* MicroblogBackend.swift */; };
 		0CF8BF40CD9AD3D8F98CFA3D /* MacTagEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D73C06A67AFDA67AB2AFE7 /* MacTagEditor.swift */; };
 		114A3307EFB137CDD64A7589 /* MacTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89DC87DAA5DF17BC839A22C8 /* MacTextEditor.swift */; };
+		17A9877FACBB9AB083CC5F57 /* FormatBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1262BF0E8FDB43D554CFE31 /* FormatBar.swift */; };
 		20DB7C0BAABAD4B82EF6613D /* AddSiteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A8EE99F1C2FDC7AC5F379E9 /* AddSiteView.swift */; };
 		20EBC6E5E44C65F0921126E5 /* LocalBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE560BD846C9515352C0A7B2 /* LocalBackend.swift */; };
 		22085D4C3562398CCEF206C1 /* MicroblogSiteForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 874F94F3CF6520EE05693513 /* MicroblogSiteForm.swift */; };
@@ -179,6 +180,7 @@
 		BBC2A3CC27E227D11249E64A /* GhostSiteForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GhostSiteForm.swift; sourceTree = "<group>"; };
 		BDB73E8EE505185F7AB5DE9B /* MarkdownStyler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownStyler.swift; sourceTree = "<group>"; };
 		C0C0502ECC5CD16D03EEE45D /* QuillStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuillStore.swift; sourceTree = "<group>"; };
+		C1262BF0E8FDB43D554CFE31 /* FormatBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatBar.swift; sourceTree = "<group>"; };
 		C684F49AE50326D752C22416 /* QuillMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuillMacApp.swift; sourceTree = "<group>"; };
 		C9908E6604B2E633C1858956 /* NewEntryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewEntryButton.swift; sourceTree = "<group>"; };
 		CDAF3617E80CB2B9F6DF0200 /* EntryPrinter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryPrinter.swift; sourceTree = "<group>"; };
@@ -255,6 +257,7 @@
 				7ECB4E88FFB544CBB3212EA2 /* EditorTextView.swift */,
 				1641461940ABADF3553A64FE /* EditorView.swift */,
 				7B776FA072E3EEF65311D230 /* EntryPreview.swift */,
+				C1262BF0E8FDB43D554CFE31 /* FormatBar.swift */,
 				E38D052F3FD1038D28BD2E47 /* MarkdownFormat.swift */,
 				BDB73E8EE505185F7AB5DE9B /* MarkdownStyler.swift */,
 				37E75D2A90726438075942B1 /* TagEditor.swift */,
@@ -652,6 +655,7 @@
 				2DECFDE235C863317DFF34BF /* Entry.swift in Sources */,
 				A45A30C56D3270D2493CEFFD /* EntryListView.swift in Sources */,
 				41B77222AA0F25535C86C173 /* EntryPreview.swift in Sources */,
+				17A9877FACBB9AB083CC5F57 /* FormatBar.swift in Sources */,
 				B2E6FF19908D96DDAD354767 /* GhostBackend.swift in Sources */,
 				760C5A038A9ACBF3229EAEB7 /* GhostSiteForm.swift in Sources */,
 				456B60126BF7D86DED1712DC /* LinkBrowser.swift in Sources */,

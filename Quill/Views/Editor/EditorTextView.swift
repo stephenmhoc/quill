@@ -294,6 +294,7 @@ final class PageTextView: UITextView {
         let wasShown = self.formatting != nil
         self.formatting = formatting
         imageItem.isEnabled = formatting?.canInsertImage ?? false
+        formatBar.isImageEnabled = imageItem.isEnabled
         guard wasShown != (formatting != nil) else { return }
         if traitCollection.userInterfaceIdiom == .pad {
             inputAssistantItem.trailingBarButtonGroups = formatting == nil ? [] : [
@@ -305,33 +306,30 @@ final class PageTextView: UITextView {
         if isFirstResponder { reloadInputViews() }
     }
 
-    private lazy var imageItem = item("Insert Image", "photo") { $0.insertImage() }
-
-    private lazy var formatItems: [UIBarButtonItem] = [
-        item("Bold", "bold") { $0.format(.bold) },
-        item("Italic", "italic") { $0.format(.italic) },
-        item("Heading", "number") { $0.format(.heading) },
-        item("List", "list.bullet") { $0.format(.bullet) },
-        item("Quote", "text.quote") { $0.format(.quote) },
-        item("Link", "link") { $0.format(.link) },
-        imageItem,
+    private static let formatActions: [FormatBar.Action] = [
+        .init(title: "Bold", symbol: "bold") { $0.format(.bold) },
+        .init(title: "Italic", symbol: "italic") { $0.format(.italic) },
+        .init(title: "Heading", symbol: "number") { $0.format(.heading) },
+        .init(title: "List", symbol: "list.bullet") { $0.format(.bullet) },
+        .init(title: "Quote", symbol: "text.quote") { $0.format(.quote) },
+        .init(title: "Link", symbol: "link") { $0.format(.link) },
+        .init(title: "Insert Image", symbol: "photo", isImage: true) { $0.insertImage() },
     ]
 
-    private func item(_ title: String, _ symbol: String, _ action: @escaping (PageFormatting) -> Void) -> UIBarButtonItem {
-        let item = UIBarButtonItem(title: title, image: UIImage(systemName: symbol), primaryAction: UIAction { [weak self] _ in
-            if let formatting = self?.formatting { action(formatting) }
+    private lazy var formatItems: [UIBarButtonItem] = Self.formatActions.map { action in
+        let item = UIBarButtonItem(title: action.title, image: UIImage(systemName: action.symbol), primaryAction: UIAction { [weak self] _ in
+            if let formatting = self?.formatting { action.perform(formatting) }
         })
-        item.accessibilityLabel = title
+        item.accessibilityLabel = action.title
         return item
     }
 
-    private func makeFormatBar() -> UIToolbar {
-        let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
-        let hide = UIBarButtonItem(title: "Hide Keyboard", image: UIImage(systemName: "keyboard.chevron.compact.down"),
-                                   primaryAction: UIAction { [weak self] _ in _ = self?.resignFirstResponder() })
-        bar.items = formatItems + [.flexibleSpace(), hide]
-        bar.sizeToFit()
-        return bar
+    private var imageItem: UIBarButtonItem { formatItems[Self.formatActions.firstIndex { $0.isImage }!] }
+
+    private func makeFormatBar() -> FormatBar {
+        FormatBar(actions: Self.formatActions,
+                  perform: { [weak self] action in if let formatting = self?.formatting { action.perform(formatting) } },
+                  hide: { [weak self] in _ = self?.resignFirstResponder() })
     }
 
     override var keyCommands: [UIKeyCommand]? {
