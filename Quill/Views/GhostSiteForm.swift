@@ -88,13 +88,15 @@ struct GhostSiteForm: View {
             #if os(iOS)
             SiteColorSection(color: $color)
             #endif
+            #if os(iOS)
             if let error { FormErrorRow(message: error) }
+            #endif
             if !isNew { RemoveSiteSection(note: SiteKind.ghost.removalNote, isConfirming: $confirmingDelete) }
         }
         .siteFormStyle(isCentered: isCentered)
         .formTitle(isNew ? "Ghost Site" : "Edit Site")
         .compactTitle()
-        .siteFormButtons(isNew: isNew, canSave: canSave, isWorking: checking, removeNote: isNew ? nil : SiteKind.ghost.removalNote,
+        .siteFormButtons(isNew: isNew, canSave: canSave, isWorking: checking, error: error, removeNote: isNew ? nil : SiteKind.ghost.removalNote,
                          isConfirmingRemove: $confirmingDelete) { Task { await save() } }
         .confirmationDialog("Remove \(siteName ?? "site")?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Remove", role: .destructive, action: remove)
@@ -138,6 +140,8 @@ struct GhostSiteForm: View {
                 if title.isEmpty { title = try await client.site().title }
             }
             if let site {
+                // Removed while the key was checked: there's nothing left to save to.
+                guard site.isLive else { onDone(); return }
                 if let credentials { try lock.saveKey(credentials.apiKey, for: site.id) }
                 site.name = title.isEmpty ? site.name : title
                 site.isPublic = isPublic

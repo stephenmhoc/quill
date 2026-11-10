@@ -43,13 +43,15 @@ struct LocalSiteForm: View {
             #if os(iOS)
             SiteColorSection(color: $color)
             #endif
+            #if os(iOS)
             if let error { FormErrorRow(message: error) }
+            #endif
             if site != nil { RemoveSiteSection(note: SiteKind.local.removalNote, isConfirming: $confirmingDelete) }
         }
         .siteFormStyle(isCentered: isCentered)
         .formTitle(site == nil ? "Local Site" : "Edit Site")
         .compactTitle()
-        .siteFormButtons(isNew: site == nil, canSave: !trimmedName.isEmpty, removeNote: site == nil ? nil : SiteKind.local.removalNote,
+        .siteFormButtons(isNew: site == nil, canSave: !trimmedName.isEmpty, error: error, removeNote: site == nil ? nil : SiteKind.local.removalNote,
                          isConfirmingRemove: $confirmingDelete, save: save)
         .confirmationDialog("Remove \(siteName ?? "site") and all its entries?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete Everything", role: .destructive, action: remove)

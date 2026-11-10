@@ -96,7 +96,15 @@ struct MacTextEditor<Header: View>: NSViewRepresentable {
         // While macOS is composing (a prediction, a dead key, an input method) the view holds text
         // SwiftUI hasn't seen. Writing back then doubles what's been typed, and can crash.
         guard !view.hasMarkedText() else { return }
-        if view.string != text {
+        if view.hasUnreportedCommit {
+            // Composing was committed as the page lost the keyboard during this update, so the
+            // text it wrote hasn't reached SwiftUI yet. It's the newer text: send it on, after this.
+            DispatchQueue.main.async { [weak view, weak coordinator] in
+                guard let view, let coordinator, view.hasUnreportedCommit else { return }
+                view.hasUnreportedCommit = false
+                coordinator.text.wrappedValue = view.string
+            }
+        } else if view.string != text {
             // Only a change from elsewhere gets here (a revert, or undoing one). The typing steps
             // belong to the text it replaced, so they go, and this change isn't one either.
             view.string = text
@@ -159,6 +167,7 @@ final class MacEditorCoordinator: NSObject, NSTextViewDelegate {
 
     func textDidChange(_ notification: Notification) {
         guard !isUpdating, let view = notification.object as? NSTextView else { return }
+        (view as? MacPageTextView)?.hasUnreportedCommit = false
         // Marked text isn't written yet. A prediction only counts once Tab accepts it.
         var written = view.string
         if view.hasMarkedText(), let marked = Range(view.markedRange(), in: written) { written.removeSubrange(marked) }
@@ -172,6 +181,7 @@ final class MacEditorCoordinator: NSObject, NSTextViewDelegate {
             style(view, around: edits == 1 ? edited : nil)
             resetEdits()
         }
+        if !view.hasMarkedText() { (view as? MacPageTextView)?.runPendingSoon() }
     }
 
     private func resetEdits() {
@@ -212,6 +222,7 @@ final class MacPageHost: NSView {
         scroll.frame = surface.bounds
         scroll.autoresizingMask = [.width, .height]
         surface.addSubview(scroll)
+        showCaretSoon()
     }
 
     /// Back here, where the column has it.
@@ -221,6 +232,16 @@ final class MacPageHost: NSView {
         scroll.frame = bounds
         scroll.autoresizingMask = [.width, .height]
         addSubview(scroll)
+        showCaretSoon()
+    }
+
+    /// The page rewraps at its new width, so the caret could end up anywhere: scroll back to it.
+    private func showCaretSoon() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let text = self.textView, text.window != nil else { return }
+            self.scroll.layoutSubtreeIfNeeded()
+            text.scrollRangeToVisible(text.selectedRange())
+        }
     }
 }
 
@@ -247,8 +268,15 @@ final class MacPageTextView: NSTextView {
                 wantsFocus = false
                 DispatchQueue.main.async { [weak self] in self?.focusWhenReady() }
             }
+            if !isLocked { runPendingSoon() }
         }
     }
+    /// Text from SwiftUI that waits for the page: an uploaded image's Markdown can arrive while
+    /// the page is composing or locked, and mustn't be lost.
+    private var pending: [EditorCommand] = []
+    /// Composing was committed while SwiftUI was updating the page, so the text it wrote is still
+    /// to be sent back. See `MacTextEditor.updateNSView`.
+    var hasUnreportedCommit = false
     private var headerController: NSHostingController<AnyView>?
     private var headerHeight: CGFloat = 0
     private var laidOutWidth: CGFloat = -1
@@ -412,8 +440,13 @@ final class MacPageTextView: NSTextView {
         didChangeText()
     }
 
-    /// Formatting and inserted images, applied here so Undo names them.
+    /// Formatting and inserted images, applied here so Undo names them. An insert waits while
+    /// the page is composing or locked; formatting is only ever asked for at the keyboard, so it doesn't.
     func run(_ command: EditorCommand) {
+        if case .insert = command.action, isLocked || hasMarkedText() {
+            pending.append(command)
+            return
+        }
         guard isEditable, !hasMarkedText() else { return }
         let old = string
         let current = Range(selectedRange(), in: old).map { TextSelection(range: $0) }
@@ -431,6 +464,22 @@ final class MacPageTextView: NSTextView {
         focusWhenReady()
     }
 
+    /// What waited, once the page is free. Later, so it isn't applied during a SwiftUI update.
+    func runPendingSoon() {
+        guard !pending.isEmpty else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.isLocked, !self.hasMarkedText(), !self.pending.isEmpty else { return }
+            let waiting = self.pending
+            self.pending = []
+            for command in waiting { self.run(command) }
+        }
+    }
+
+    override func unmarkText() {
+        super.unmarkText()
+        runPendingSoon()
+    }
+
     // MARK: Focus
 
     override var acceptsFirstResponder: Bool { !isLocked && super.acceptsFirstResponder }
@@ -442,6 +491,14 @@ final class MacPageTextView: NSTextView {
     }
 
     override func resignFirstResponder() -> Bool {
+        // Whatever is being composed is kept as typed, so it reaches SwiftUI like any other text
+        // instead of being written over by the next update.
+        if hasMarkedText() {
+            unmarkText()
+            inputContext?.discardMarkedText()
+            hasUnreportedCommit = true
+            didChangeText()
+        }
         let resigned = super.resignFirstResponder()
         if resigned { report(focus: false) }
         return resigned

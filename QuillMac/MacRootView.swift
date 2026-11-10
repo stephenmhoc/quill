@@ -118,6 +118,7 @@ struct MacRootView: View {
             MacDetailColumn()
         }
         .sheet(isPresented: $navigation.showingAddSite) { MacAddSiteSheet() }
+        .modifier(SiteEditing())
         .fileImporter(isPresented: $window.showingImporter, allowedContentTypes: MarkdownFile.openableTypes,
                       allowsMultipleSelection: true) { result in
             guard let urls = try? result.get() else { return }
@@ -328,7 +329,8 @@ private struct WindowBridge: NSViewRepresentable {
                 // title with it. The title bar stays, for the traffic lights and the toggle.
                 window.titleVisibility = isFocused ? .hidden : .visible
                 window.titlebarAppearsTransparent = isFocused
-                window.toolbar?.isVisible = !isFocused
+                // Locking leaves Focus Mode, and the lock keeps the toolbar hidden.
+                window.toolbar?.isVisible = !isFocused && !isLocked
                 if isFocused {
                     watch(window)
                 } else {
@@ -346,12 +348,15 @@ private struct WindowBridge: NSViewRepresentable {
             if isLocked != wasLocked {
                 wasLocked = isLocked
                 if isLocked {
+                    window.toolbar?.isVisible = false
+                    endAppKitSheets(on: window)
                     // A field's editor stands in for the field, so keep the field.
                     let current = window.firstResponder
                     responder = (current as? NSTextView).flatMap { $0.isFieldEditor ? $0.delegate as? NSResponder : nil } ?? current
                     lockResponder?.isHolding = true
                     if window.makeFirstResponder(lockResponder) == false { window.makeFirstResponder(nil) }
                 } else {
+                    if !isFocused { window.toolbar?.isVisible = true }
                     lockResponder?.isHolding = false
                     if let view = responder as? NSView, view.window === window {
                         window.makeFirstResponder(view)
@@ -376,6 +381,21 @@ private struct WindowBridge: NSViewRepresentable {
                     }
                 }
             }
+        }
+
+        /// Nothing stays open over the lock. SwiftUI's own sheets and dialogs close by their state
+        /// (see `MacRootView`); AppKit's (the print panel, Export's save panel) are ended here.
+        /// A sheet SwiftUI hosts is left to SwiftUI, so the two never close the same one.
+        private func endAppKitSheets(on window: NSWindow) {
+            for sheet in window.sheets.reversed() where !Self.isSwiftUISheet(sheet) {
+                window.endSheet(sheet, returnCode: .cancel)
+            }
+        }
+
+        private static func isSwiftUISheet(_ sheet: NSWindow) -> Bool {
+            let hosting = [sheet.contentViewController.map { NSStringFromClass(type(of: $0)) },
+                           sheet.contentView.map { NSStringFromClass(type(of: $0)) }]
+            return hosting.contains { $0?.contains("Hosting") == true }
         }
 
         /// Focus Mode's one source of pointer moves and its Esc, for the whole window, title bar
@@ -526,7 +546,7 @@ private struct FocusSurface: NSViewRepresentable {
     /// Read so a new page (⌘N while focused) is adopted.
     let generation: Int
 
-    func makeNSView(context: Context) -> FocusSurfaceView { FocusSurfaceView() }
+    func makeNSView(context: Context) -> FocusSurfaceView { FocusSurfaceView(stage: stage) }
     func updateNSView(_ view: FocusSurfaceView, context: Context) {
         let page = stage.page
         DispatchQueue.main.async { view.adopt(page) }
@@ -535,9 +555,17 @@ private struct FocusSurface: NSViewRepresentable {
 }
 
 final class FocusSurfaceView: NSView {
+    private weak var stage: FocusStage?
     private weak var page: MacPageHost?
     /// Once leaving has given the page back, a late update mustn't borrow it again.
     private var isReleased = false
+
+    init(stage: FocusStage) {
+        self.stage = stage
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
 
     func adopt(_ new: MacPageHost?) {
         guard !isReleased, new !== page else { return }
@@ -553,7 +581,9 @@ final class FocusSurfaceView: NSView {
     func giveBack() {
         isReleased = true
         guard let page else { return }
-        let hadKeyboard = page.textView.map { window?.firstResponder === $0 } ?? false
+        // Leaving recorded it (see `MacWindowState.exitFocus`): this view is out of the window by now.
+        let hadKeyboard = stage?.returnsKeyboard == true || page.textView.map { window?.firstResponder === $0 } == true
+        stage?.returnsKeyboard = false
         page.reclaim()
         self.page = nil
         if hadKeyboard { page.textView?.focusWhenReady() }

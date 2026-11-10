@@ -31,6 +31,12 @@ struct MicroblogSiteForm: View {
         (!isNew || !token.isEmpty) && !checking && (blogs.count < 2 || chosenBlog != nil)
     }
 
+    /// Room on a Mac for the Blog picker, shown once an account turns out to have several blogs:
+    /// a radio button a line, and the section's own margins.
+    private var blogPickerHeight: CGFloat {
+        blogs.count > 1 ? CGFloat(blogs.count) * 22 + 36 : 0
+    }
+
     var body: some View {
         Form {
             Section {
@@ -75,13 +81,15 @@ struct MicroblogSiteForm: View {
             #if os(iOS)
             SiteColorSection(color: $color)
             #endif
+            #if os(iOS)
             if let error { FormErrorRow(message: error) }
+            #endif
             if !isNew { RemoveSiteSection(note: SiteKind.microblog.removalNote, isConfirming: $confirmingDelete) }
         }
-        .siteFormStyle(isCentered: isCentered)
+        .siteFormStyle(isCentered: isCentered, extraHeight: blogPickerHeight)
         .formTitle(isNew ? "Micro.blog" : "Edit Site")
         .compactTitle()
-        .siteFormButtons(isNew: isNew, canSave: canSave, isWorking: checking, removeNote: isNew ? nil : SiteKind.microblog.removalNote,
+        .siteFormButtons(isNew: isNew, canSave: canSave, isWorking: checking, error: error, removeNote: isNew ? nil : SiteKind.microblog.removalNote,
                          isConfirmingRemove: $confirmingDelete) { Task { await save() } }
         .confirmationDialog("Remove \(siteName ?? "site")?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Remove", role: .destructive, action: remove)
@@ -124,6 +132,8 @@ struct MicroblogSiteForm: View {
                     return
                 }
                 if let site {
+                    // Removed while the token was checked: there's nothing left to save to.
+                    guard site.isLive else { onDone(); return }
                     try lock.saveKey(token, for: site.id)
                 } else {
                     let blog = found.first { $0.uid == chosenBlog } ?? found[0]
@@ -136,6 +146,7 @@ struct MicroblogSiteForm: View {
                 }
             }
             if let site {
+                guard site.isLive else { onDone(); return }
                 site.name = title.isEmpty ? site.name : title
                 site.color = color
             }

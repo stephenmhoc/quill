@@ -109,6 +109,8 @@ extension Publisher {
         for site in sites where lock.canWork && !Task.isCancelled {
             guard site.modelContext != nil, !site.isDeleted else { continue }
             _ = try? await loadPosts(of: site)
+            // Removed while its posts loaded.
+            guard site.modelContext != nil, !site.isDeleted else { continue }
             await refreshTags(of: site)
         }
         for site in sites where lock.canWork && !Task.isCancelled {

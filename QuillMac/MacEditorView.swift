@@ -134,23 +134,28 @@ struct MacEditorView: View {
                       isLocked: !lock.isUnlocked, textSize: textSize, command: command, onImages: receive,
                       onFocus: { bodyHasFocus = $0 },
                       onLeaveTop: showsTitle && isEditable ? { titleFocusRequest += 1 } : nil,
-                      onEscape: {
-                          guard window.isFocused else { return false }
-                          window.exitFocus()
-                          return true
-                      },
+                      onEscape: leaveFocus,
                       onSave: save, stage: window.focusStage) {
             // Hosted inside AppKit, so the environment has to be passed along.
             EditorHeader(entry: entry, site: site, isEditable: isEditable, showsTitle: showsTitle,
                          focusesTitle: focusTitle, onTags: { showingTags = true }, onSubmit: { focusRequest += 1 },
-                         titleFocusRequest: titleFocusRequest)
+                         titleFocusRequest: titleFocusRequest, onEscape: leaveFocus)
                 .environment(navigation)
                 .environment(publisher)
+                // Behind the lock, the title and the banner's buttons take nothing either.
+                .disabled(!lock.isUnlocked)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !window.isFocused || saveFailed { statusBar }
         }
         .background(Color.paper)
+    }
+
+    /// Esc on the page or in the title. True if it was used.
+    private func leaveFocus() -> Bool {
+        guard window.isFocused else { return false }
+        window.exitFocus()
+        return true
     }
 
     private var statusBar: some View {
@@ -251,6 +256,7 @@ struct MacEditorView: View {
                 Button(action: send) {
                     // The label keeps its width under the spinner, so nothing beside it moves.
                     Text(sendLabel)
+                        .padding(.horizontal, 6)
                         .opacity(isSending ? 0 : 1)
                         .overlay { if isSending { ProgressView().controlSize(.small) } }
                 }
@@ -264,7 +270,7 @@ struct MacEditorView: View {
 
     private var actions: EditorActions {
         EditorActions(canPublish: canSend && lock.isUnlocked, canPreview: !entry.isBlank,
-                      canShowPreview: !entry.isBlank && fitsPreview, canEdit: isEditable,
+                      canShowPreview: !entry.isBlank && fitsPreview && !window.isFocused, canEdit: isEditable,
                       canFormat: isEditable && bodyHasFocus, hasTitle: showsTitle, isPreviewing: isPreviewing,
                       publishLabel: sendLabel, publish: send, format: apply, togglePreview: { showsPreview.toggle() },
                       print: { EntryPrinter.print(title: entry.title, markdown: entry.body, site: site) },
@@ -322,23 +328,9 @@ struct MacEditorView: View {
 
     /// Back to the published version. Undo brings the edit back, and Redo reverts it again.
     private func revert() {
-        guard entry.modelContext != nil, !entry.isDeleted, entry.state == .editing, entry.remotePostID != nil else { return }
-        let edited = (title: entry.title, body: entry.body, tags: entry.tags, hidden: entry.hiddenTitle,
-                      published: (entry.publishedTitle, entry.publishedBody, entry.publishedTags))
-        // The page drops its own typing steps when the text changes under it; see `MacTextEditor`.
-        entry.cancelEdit()
-        showsTitle = !entry.title.isEmpty
-        UndoAction.register(undoManager, name: "Revert to Published") { [entry] in
-            guard entry.modelContext != nil, !entry.isDeleted, entry.state == .sent else { return }
-            (entry.publishedTitle, entry.publishedBody, entry.publishedTags) = edited.published
-            entry.title = edited.title
-            entry.body = edited.body
-            entry.tags = edited.tags
-            entry.hiddenTitle = edited.hidden
-            entry.state = .editing
-            try? entry.modelContext?.save()
+        EditDiscard.discard([entry], name: "Revert to Published", undoManager: undoManager) { [entry] in
+            guard entry.modelContext != nil, !entry.isDeleted else { return }
             showsTitle = !entry.title.isEmpty
-            UndoAction.register(undoManager, name: "Revert to Published") { revert() }
         }
     }
 
@@ -413,14 +405,16 @@ struct MacEditorView: View {
         defer { uploading = false }
         do {
             for image in images {
+                // The site can be removed while an earlier picture uploads.
+                guard site.isLive else { return }
                 guard let jpeg = ImagePrep.jpeg(from: image) else {
                     uploadError = "Couldn't read that image."
                     return
                 }
                 let url = try await publisher.backend(for: site)
                     .uploadImage(jpeg, filename: "quill-\(UUID().uuidString).jpg")
-                // Leaving an edit cancels it, and the picture goes with it.
-                guard entry.modelContext != nil, !entry.isDeleted, entry.state == .editing else { return }
+                // Leaving an edit cancels it, or removing the site, and the picture goes with it.
+                guard entry.modelContext != nil, !entry.isDeleted, entry.state == .editing, site.isLive else { return }
                 entry.uploadedToSiteID = site.id
                 command = EditorCommand(id: (command?.id ?? 0) + 1, action: .insert("\n![](\(url.absoluteString))\n", name: "Insert Image"))
             }

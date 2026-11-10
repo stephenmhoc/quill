@@ -47,6 +47,9 @@ final class MacWindowState {
 
     func exitFocus() {
         guard isFocused else { return }
+        // Now, while the page is still in the window: by the time Focus Mode gives it back, it's out.
+        let page = focusStage.page?.textView
+        focusStage.returnsKeyboard = page.map { $0.window?.firstResponder === $0 } ?? false
         chromeTask?.cancel()
         focusChromeShown = false
         isFocused = false
@@ -100,6 +103,8 @@ final class MacWindowState {
     }
     /// Bumped for each new page, so Focus Mode moves on to it (⌘N while focused).
     private(set) var generation = 0
+    /// Whether the page had the keyboard as Focus Mode ended, so it gets it back in the column.
+    @ObservationIgnored var returnsKeyboard = false
 }
 
 /// Undo for things that aren't text, through the window's undo manager.
@@ -131,6 +136,43 @@ enum EntryDeletion {
             onRestore(restored)
             UndoAction.register(undoManager, name: name) {
                 delete(restored, in: context, navigation: navigation, undoManager: undoManager, onRestore: onRestore)
+            }
+        }
+    }
+}
+
+/// Edits of published posts, put back to the published version. Undo brings the edits back, and
+/// Redo discards them again. The entry itself stays: for a local site it's the only copy of the post.
+enum EditDiscard {
+    static func discard(_ entries: [Entry], name: String = "Discard Changes", undoManager: UndoManager?,
+                        onChange: @escaping @MainActor () -> Void = {}) {
+        let edits = entries.filter { $0.modelContext != nil && !$0.isDeleted && $0.state == .editing && $0.remotePostID != nil }
+        guard !edits.isEmpty else { return }
+        let saved = edits.map { entry in
+            (entry: entry, title: entry.title, body: entry.body, tags: entry.tags, hidden: entry.hiddenTitle,
+             published: (entry.publishedTitle, entry.publishedBody, entry.publishedTags))
+        }
+        // The page drops its own typing steps when the text changes under it; see `MacTextEditor`.
+        for entry in edits { entry.cancelEdit() }
+        onChange()
+        UndoAction.register(undoManager, name: name) {
+            var restored: [Entry] = []
+            for edit in saved {
+                let entry = edit.entry
+                guard entry.modelContext != nil, !entry.isDeleted, entry.state == .sent else { continue }
+                (entry.publishedTitle, entry.publishedBody, entry.publishedTags) = edit.published
+                entry.title = edit.title
+                entry.body = edit.body
+                entry.tags = edit.tags
+                entry.hiddenTitle = edit.hidden
+                entry.state = .editing
+                restored.append(entry)
+            }
+            guard let context = restored.first?.modelContext else { return }
+            try? context.save()
+            onChange()
+            UndoAction.register(undoManager, name: name) {
+                discard(restored, name: name, undoManager: undoManager, onChange: onChange)
             }
         }
     }

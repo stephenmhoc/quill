@@ -335,7 +335,8 @@ struct MacCommands: Commands {
             Button(window.isFocused ? "Exit Focus Mode" : "Enter Focus Mode") { window.toggleFocus() }
                 // Not ⌘\, which 1Password takes system-wide.
                 .keyboardShortcut("f", modifiers: [.command, .shift])
-                .disabled(!canWrite)
+                // Focus Mode is the open entry's page, so there has to be one.
+                .disabled(!canWrite || (!window.isFocused && editor == nil))
             Divider()
             Button("Zoom In") { zoom(by: 1) }
                 .keyboardShortcut("+")

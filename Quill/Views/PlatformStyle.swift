@@ -137,13 +137,17 @@ extension View {
 
     /// A site form's Save, plus Remove and Cancel on a Mac. iOS puts Save in the bar; a Mac
     /// puts them all along the bottom, where a Mac sheet's buttons go, Return and Esc included.
-    func siteFormButtons(isNew: Bool, canSave: Bool, isWorking: Bool = false, removeNote: String? = nil,
+    /// A Mac shows the form's error above the buttons, outside the fixed-height form, where it can't be clipped.
+    func siteFormButtons(isNew: Bool, canSave: Bool, isWorking: Bool = false, error: String? = nil, removeNote: String? = nil,
                          isConfirmingRemove: Binding<Bool> = .constant(false), save: @escaping () -> Void) -> some View {
-        modifier(SiteFormButtons(isNew: isNew, canSave: canSave, isWorking: isWorking, removeNote: removeNote,
+        modifier(SiteFormButtons(isNew: isNew, canSave: canSave, isWorking: isWorking, error: error, removeNote: removeNote,
                                  isConfirmingRemove: isConfirmingRemove, save: save))
     }
 
-    func siteFormStyle(isCentered: Bool) -> some View { modifier(SiteFormStyle(isCentered: isCentered)) }
+    /// `extraHeight` makes room on a Mac for a section that comes and goes, like Micro.blog's Blog picker.
+    func siteFormStyle(isCentered: Bool, extraHeight: CGFloat = 0) -> some View {
+        modifier(SiteFormStyle(isCentered: isCentered, extraHeight: extraHeight))
+    }
 }
 
 /// A card on iPhone. In iPad's columns a block of rows looks boxy against the page, so they sit
@@ -173,11 +177,16 @@ private struct CardRow: ViewModifier {
 
 private struct SiteFormStyle: ViewModifier {
     let isCentered: Bool
+    let extraHeight: CGFloat
     @Environment(\.siteFormHeight) private var height
     #if os(iOS)
     /// First run fills the window, where a form any wider than this is hard to read.
     private static let readableWidth: CGFloat = 600
     @State private var width: CGFloat = 0
+    #endif
+
+    #if os(macOS)
+    private static let maxHeight: CGFloat = 560
     #endif
 
     func body(content: Content) -> some View {
@@ -187,8 +196,13 @@ private struct SiteFormStyle: ViewModifier {
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         #else
         // System Settings' grouped rows, at the height their kind of site needs (see
-        // `SiteKind.formHeight`), which Add Site animates between. The heights fit, so they don't scroll.
-        content.formStyle(.grouped).scrollDisabled(true).frame(height: height)
+        // `SiteKind.formHeight`), which Add Site animates between. The heights fit, so they don't
+        // scroll, until a section that comes and goes needs more room than a sheet should take.
+        let wanted = height + extraHeight
+        content.formStyle(.grouped)
+            .scrollDisabled(wanted <= Self.maxHeight)
+            .frame(height: min(wanted, Self.maxHeight))
+            .animation(.smooth(duration: 0.25), value: extraHeight)
         #endif
     }
 }
@@ -197,6 +211,7 @@ private struct SiteFormButtons: ViewModifier {
     let isNew: Bool
     let canSave: Bool
     let isWorking: Bool
+    let error: String?
     let removeNote: String?
     @Binding var isConfirmingRemove: Bool
     let save: () -> Void
@@ -218,6 +233,13 @@ private struct SiteFormButtons: ViewModifier {
         VStack(spacing: 0) {
             content
             Divider()
+            if let error {
+                FormErrorRow(message: error)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .accessibilityIdentifier("siteFormError")
+            }
             HStack(spacing: 8) {
                 if let removeNote {
                     Button("Remove Site…", role: .destructive) { isConfirmingRemove = true }
@@ -241,21 +263,22 @@ private struct SiteFormButtons: ViewModifier {
     }
 }
 
-/// A form's error, where it happened instead of in an alert.
+/// A form's error, where it happened instead of in an alert: the form's last section on iOS, and
+/// above the buttons on a Mac (see `siteFormButtons`), whose fixed-height form would clip it.
 struct FormErrorRow: View {
     let message: String
 
     var body: some View {
+        #if os(macOS)
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(.callout)
+            .foregroundStyle(.red)
+            .fixedSize(horizontal: false, vertical: true)
+        #else
         Section {
-            #if os(macOS)
-            Label(message, systemImage: "exclamationmark.triangle.fill")
-                .font(.callout)
-                .foregroundStyle(.red)
-                .fixedSize(horizontal: false, vertical: true)
-            #else
             Text(message).font(.footnote).foregroundStyle(.red)
-            #endif
         }
+        #endif
     }
 }
 

@@ -10,11 +10,14 @@ struct MacTagEditor: View {
     @Environment(Publisher.self) private var publisher
     @State private var suggestions: [String] = []
 
-    /// Tags starting with "#" are the site's own internal ones, kept but not shown.
+    /// Tags starting with "#" are the site's own internal ones, kept but not shown. The popover
+    /// can outlive its entry for a moment, as the entry is deleted.
     private var tags: Binding<[String]> {
         Binding {
-            entry.tags.filter { !$0.hasPrefix("#") }
+            guard entry.modelContext != nil, !entry.isDeleted else { return [] }
+            return entry.tags.filter { !$0.hasPrefix("#") }
         } set: { visible in
+            guard entry.modelContext != nil, !entry.isDeleted else { return }
             entry.tags = EntryBuilder.normalizedTags(entry.tags.filter { $0.hasPrefix("#") } + visible)
         }
     }

@@ -65,6 +65,8 @@ struct EditorHeader: View {
     let onSubmit: () -> Void
     /// Bump to move the cursor to the title, as ↑ on the first line does on a Mac.
     var titleFocusRequest = 0
+    /// Mac: Esc in the title, which leaves Focus Mode. True if it was used.
+    var onEscape: () -> Bool = { false }
     @FocusState private var titleFocused: Bool
 
     var body: some View {
@@ -98,6 +100,7 @@ struct EditorHeader: View {
                     // While an input method is composing, its candidate list has them first.
                     .onKeyPress(.downArrow) { moveOn() }
                     .onKeyPress(.tab) { moveOn() }
+                    .onKeyPress(.escape) { isComposing || !onEscape() ? .ignored : .handled }
                     #endif
             }
             if !entry.tags.isEmpty {
@@ -110,8 +113,10 @@ struct EditorHeader: View {
     }
 
     #if os(macOS)
+    private var isComposing: Bool { (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true }
+
     private func moveOn() -> KeyPress.Result {
-        if (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true { return .ignored }
+        if isComposing { return .ignored }
         onSubmit()
         return .handled
     }

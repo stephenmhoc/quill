@@ -83,7 +83,7 @@ struct EntryListView: View {
             }
         }
         .contextMenu(forSelectionType: UUID.self) { ids in contextMenu(for: entries(ids)) }
-        .onDeleteCommand { delete(entries(selection)) }
+        .onDeleteCommand { removeChosen(entries(selection)) }
         // One row is the one that's open; several are only chosen, for deleting or exporting.
         .onChange(of: selection) { _, ids in
             if ids.count == 1, let entry = entries(ids).first, entry != navigation.selectedEntry { navigation.show(entry) }
@@ -174,7 +174,7 @@ struct EntryListView: View {
     private func entries(_ ids: Set<UUID>) -> [Entry] { visible.filter { ids.contains($0.id) } }
 
     @ViewBuilder private func contextMenu(for chosen: [Entry]) -> some View {
-        let deletable = chosen.filter { $0.modelContext != nil && !$0.isDeleted && $0.state != .sending }
+        let (discardable, deletable) = split(chosen)
         if !chosen.isEmpty {
             Button(chosen.count == 1 ? "Export as Markdown…" : "Export \(chosen.count) Entries as Markdown…") {
                 MarkdownFile.export(chosen)
@@ -194,14 +194,41 @@ struct EntryListView: View {
                 }
                 Button("Retry All") { Task { await publisher.retryAll() } }
             }
+            if !discardable.isEmpty || !deletable.isEmpty { Divider() }
+            // An edit of a published post goes back to the post: for a local site, the entry is
+            // the only copy of it. Anything else (an unsent draft, a send in the Outbox) is deleted.
+            if !discardable.isEmpty {
+                Button(discardable.count == 1 ? "Discard Changes" : "Discard Changes to \(discardable.count) Entries",
+                       role: .destructive) { discard(discardable) }
+            }
             if !deletable.isEmpty {
-                Divider()
                 Button(deletable.count == 1 ? "Delete" : "Delete \(deletable.count) Entries", role: .destructive) { delete(deletable) }
             }
         }
     }
 
+    /// Edits of published posts, which can only be discarded, and unsent writing, which can be deleted.
+    private func split(_ chosen: [Entry]) -> (discardable: [Entry], deletable: [Entry]) {
+        let live = chosen.filter { $0.modelContext != nil && !$0.isDeleted && $0.state != .sending }
+        let isEdit = { (entry: Entry) in entry.state == .editing && entry.remotePostID != nil }
+        return (live.filter(isEdit), live.filter { !isEdit($0) })
+    }
+
+    /// ⌫ does what the menu would: discards edits, and deletes the rest.
+    private func removeChosen(_ chosen: [Entry]) {
+        let (discardable, deletable) = split(chosen)
+        discard(discardable)
+        delete(deletable)
+    }
+
+    private func discard(_ chosen: [Entry]) {
+        guard !chosen.isEmpty else { return }
+        EditDiscard.discard(chosen, undoManager: undoManager)
+        selection = []
+    }
+
     private func delete(_ chosen: [Entry]) {
+        guard !chosen.isEmpty else { return }
         EntryDeletion.delete(chosen, in: context, navigation: navigation, undoManager: undoManager)
         selection = []
     }

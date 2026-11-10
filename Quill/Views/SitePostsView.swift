@@ -405,9 +405,11 @@ struct SitePostsView: View {
             page = 1
             hasMore = first.count == SitePost.pageSize
             error = nil
-            guard tag == nil else { return }
+            // The site can be removed while its posts load, or while its tags do.
+            guard tag == nil, site.isLive else { return }
             Task(priority: .utility) {
                 await publisher.refreshTags(of: site)
+                guard site.isLive else { return }
                 await publisher.refreshStats(of: site)
             }
         } catch {

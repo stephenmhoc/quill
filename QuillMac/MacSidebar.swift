@@ -7,14 +7,12 @@ struct MacSidebar: View {
     @Environment(Navigation.self) private var navigation
     @Environment(MacWindowState.self) private var window
     @Environment(Publisher.self) private var publisher
-    @Environment(AppLock.self) private var lock
     @Environment(\.modelContext) private var context
     @Environment(\.openURL) private var openURL
     @Query(sort: Site.order) private var sites: [Site]
     @Query private var entries: [Entry]
     /// Ticks so a slow send shows up without anything else changing.
     @State private var now = Date.now
-    @State private var removeError: String?
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -91,33 +89,11 @@ struct MacSidebar: View {
             if let first = made.first { navigation.sidebar = .drafts; navigation.show(first) }
             return !made.isEmpty
         }
-        .sheet(item: $window.editingSite) { EditSiteView(site: $0) }
-        .onChange(of: lock.isUnlocked) { _, isUnlocked in if !isUnlocked { removeError = nil } }
-        .confirmationDialog("Remove \(window.removingSite.flatMap { $0.isLive ? $0.name : nil } ?? "site")?",
-                            isPresented: Binding(get: { window.removingSite != nil }, set: { if !$0 { window.removingSite = nil } }),
-                            titleVisibility: .visible, presenting: window.removingSite) { site in
-            Button("Remove", role: .destructive) { remove(site) }
-        } message: { site in
-            Text(site.isLive ? site.kind.removalNote : "")
-        }
-        .alert("Couldn't remove the site", isPresented: Binding(get: { removeError != nil }, set: { if !$0 { removeError = nil } })) {
-            Button("OK") {}
-        } message: { Text(removeError ?? "") }
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(10))
                 now = .now
             }
-        }
-    }
-
-    private func remove(_ site: Site) {
-        guard site.isLive else { return }
-        navigation.leaveSite(site.id)
-        do {
-            try publisher.removeSite(site)
-        } catch {
-            removeError = error.localizedDescription
         }
     }
 
@@ -132,5 +108,42 @@ struct MacSidebar: View {
             $0.state == .failed || $0.lastError != nil || now.timeIntervalSince($0.updatedAt) > 30
         }
         return needsAttention ? waiting.count : nil
+    }
+}
+
+/// Site > Edit Site… and Remove Site…, from the menu bar or a sidebar row. On the split view
+/// rather than the sidebar, so they still open while the sidebar is hidden.
+struct SiteEditing: ViewModifier {
+    @Environment(Navigation.self) private var navigation
+    @Environment(MacWindowState.self) private var window
+    @Environment(Publisher.self) private var publisher
+    @Environment(AppLock.self) private var lock
+    @State private var removeError: String?
+
+    func body(content: Content) -> some View {
+        @Bindable var window = window
+        content
+            .sheet(item: $window.editingSite) { EditSiteView(site: $0) }
+            .onChange(of: lock.isUnlocked) { _, isUnlocked in if !isUnlocked { removeError = nil } }
+            .confirmationDialog("Remove \(window.removingSite.flatMap { $0.isLive ? $0.name : nil } ?? "site")?",
+                                isPresented: Binding(get: { window.removingSite != nil }, set: { if !$0 { window.removingSite = nil } }),
+                                titleVisibility: .visible, presenting: window.removingSite) { site in
+                Button("Remove", role: .destructive) { remove(site) }
+            } message: { site in
+                Text(site.isLive ? site.kind.removalNote : "")
+            }
+            .alert("Couldn't remove the site", isPresented: Binding(get: { removeError != nil }, set: { if !$0 { removeError = nil } })) {
+                Button("OK") {}
+            } message: { Text(removeError ?? "") }
+    }
+
+    private func remove(_ site: Site) {
+        guard site.isLive else { return }
+        navigation.leaveSite(site.id)
+        do {
+            try publisher.removeSite(site)
+        } catch {
+            removeError = error.localizedDescription
+        }
     }
 }
