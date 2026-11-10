@@ -88,6 +88,7 @@ struct EditorView: View {
         .statusBarHidden(isFocused)
         .persistentSystemOverlays(isFocused ? .hidden : .automatic)
         .toolbar { toolbar }
+        .focusedSceneValue(\.editorActions, actions)
         .sheet(isPresented: $showingTags) { TagEditor(entry: entry, site: site) }
         .modifier(PreviewPresentation(isPresented: $showingPreview, asInspector: usesColumns, entry: entry, site: site))
         .photosPicker(isPresented: $choosingPhoto, selection: $photoItem, matching: .images)
@@ -248,6 +249,18 @@ struct EditorView: View {
         }
         .hoverEffect()
         .accessibilityLabel("Leave Focus Mode")
+    }
+
+    /// For the menu bar and the shortcuts a keyboard shows.
+    private var actions: EditorActions {
+        EditorActions(canPublish: canSend, publishLabel: sendLabel, publish: send,
+                      canBeginEditing: entry.state == .sent, beginEditing: beginEditing,
+                      canDiscard: entry.hasUnpublishedChanges, discardChanges: discardChanges,
+                      viewURL: viewURL, viewOnSite: { if let viewURL { openURL(viewURL) } },
+                      canFormat: isEditable, format: apply,
+                      hasTitle: showsTitle, toggleTitle: toggleTitle,
+                      canInsertImage: isEditable && site != nil && !uploading, insertImage: { choosingPhoto = true },
+                      canPreview: !entry.isBlank, isPreviewing: showingPreview, togglePreview: { showingPreview.toggle() })
     }
 
     private var formatting: PageFormatting {

@@ -82,6 +82,19 @@ final class Navigation {
 
     static let defaultSiteKey = "defaultSiteID"
 
+    private struct Window { weak var navigation: Navigation? }
+    /// Every window's navigation, so two windows don't both take the same blank page.
+    private static var windows: [Window] = []
+
+    init() {
+        Self.windows.removeAll { $0.navigation == nil }
+        Self.windows.append(Window(navigation: self))
+    }
+
+    private func isOpenElsewhere(_ entry: Entry) -> Bool {
+        Self.windows.contains { $0.navigation !== self && $0.navigation?.selectedEntry == entry }
+    }
+
     /// The site new entries go to: the chosen default, else the last-used private site.
     func defaultSiteID(in context: ModelContext) -> UUID? {
         let sites = (try? context.fetch(FetchDescriptor<Site>(sortBy: Site.order))) ?? []
@@ -94,15 +107,16 @@ final class Navigation {
     }
 
     /// Reuse an empty draft if there is one, so the app opens to a blank page without piling up blanks.
-    /// Given a site, the entry goes there and back returns to that site's list.
-    func openBlankEntry(in context: ModelContext, focus: Bool = true, site: UUID? = nil) {
+    /// Given a site, the entry goes there and back returns to that site's list. Given text, the
+    /// page starts with it.
+    func openBlankEntry(in context: ModelContext, focus: Bool = true, site: UUID? = nil, text: String? = nil) {
         let editing = Entry.State.editing.rawValue
         let drafts = (try? context.fetch(FetchDescriptor<Entry>(
             predicate: #Predicate { $0.stateRaw == editing && $0.remotePostID == nil },
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]))) ?? []
         let siteID = site ?? defaultSiteID(in: context)
         let entry: Entry
-        if let blank = drafts.first(where: \.isBlank) {
+        if let blank = drafts.first(where: { $0.isBlank && !isOpenElsewhere($0) }) {
             entry = blank
             entry.createdAt = .now
             entry.siteID = siteID
@@ -111,6 +125,7 @@ final class Navigation {
             entry = Entry(siteID: siteID)
             context.insert(entry)
         }
+        if let text, !text.isEmpty { entry.body = text }
         try? context.save()
         focusNextEntry = focus
         selectedEntry = entry

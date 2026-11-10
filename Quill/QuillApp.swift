@@ -3,9 +3,11 @@ import SwiftUI
 
 @main
 struct QuillApp: App {
+    static let windowID = "main"
+
+    @UIApplicationDelegateAdaptor private var delegate: QuillAppDelegate
     private let container: ModelContainer
-    @State private var lock = AppLock()
-    @State private var navigation = Navigation()
+    @State private var lock: AppLock
     @State private var publisher: Publisher
     @AppStorage(Appearance.key) private var appearance = Appearance.auto
 
@@ -23,40 +25,70 @@ struct QuillApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
-            RootView()
+        WindowGroup(id: Self.windowID) {
+            SceneRoot()
                 .environment(lock)
-                .environment(navigation)
                 .environment(publisher)
                 .preferredColorScheme(appearance.colorScheme)
         }
         .modelContainer(container)
-        .commands { QuillCommands(navigation: navigation, lock: lock) }
+        .commands { QuillCommands(lock: lock, context: container.mainContext) }
     }
 }
 
-/// Menu-bar / ⌘-key shortcuts on iPad with a keyboard.
-struct QuillCommands: Commands {
-    let navigation: Navigation
-    let lock: AppLock
+/// One window. Each has its own navigation, so two iPad windows can show different pages.
+private struct SceneRoot: View {
+    @State private var navigation = Navigation()
 
-    var body: some Commands {
-        CommandGroup(replacing: .newItem) {
-            Button("New Entry") {
-                NotificationCenter.default.post(name: .quillNewEntry, object: nil)
-            }
-            .keyboardShortcut("n")
-            .disabled(!lock.isUnlocked)
-        }
-        CommandGroup(after: .sidebar) {
-            Button(navigation.isFocused ? "Leave Focus Mode" : "Focus Mode") { navigation.toggleFocus() }
-                // Not ⌘\, which 1Password takes system-wide.
-                .keyboardShortcut("f", modifiers: [.command, .shift])
-                .disabled(!lock.isUnlocked || navigation.selectedEntry == nil)
-        }
+    var body: some View {
+        RootView()
+            .environment(navigation)
+            .focusedSceneValue(\.sceneNavigation, navigation)
     }
 }
 
-extension Notification.Name {
-    static let quillNewEntry = Notification.Name("quillNewEntry")
+/// Requests from outside a window, like a Home Screen quick action or a shortcut, waiting for a
+/// window that can take them: unlocked, in front, and with a site to write on.
+@Observable
+final class AppRequests {
+    static let shared = AppRequests()
+
+    struct NewEntry: Equatable {
+        let id = UUID()
+        var text: String?
+        /// The window a quick action opened, or nil for whichever is in front.
+        var sceneID: String?
+    }
+
+    var newEntry: NewEntry?
+}
+
+/// Only here to hand each window the scene delegate below.
+final class QuillAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, configurationForConnecting session: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        if let item = options.shortcutItem { QuickAction.perform(item, in: session) }
+        let configuration = UISceneConfiguration(name: nil, sessionRole: session.role)
+        configuration.delegateClass = QuillSceneDelegate.self
+        return configuration
+    }
+}
+
+/// Home Screen quick actions, listed in `project.yml`.
+final class QuillSceneDelegate: NSObject, UIWindowSceneDelegate {
+    func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem,
+                     completionHandler: @escaping (Bool) -> Void) {
+        completionHandler(QuickAction.perform(shortcutItem, in: windowScene.session))
+    }
+}
+
+enum QuickAction {
+    static let newEntry = "com.merimerimeri.Quill.newEntry"
+
+    @discardableResult
+    static func perform(_ item: UIApplicationShortcutItem, in session: UISceneSession) -> Bool {
+        guard item.type == newEntry else { return false }
+        AppRequests.shared.newEntry = .init(sceneID: session.persistentIdentifier)
+        return true
+    }
 }

@@ -197,12 +197,16 @@ struct SidebarView: View {
         return needsAttention ? waiting.count : nil
     }
 
-    /// In the iPad sidebar a row selects; on iPhone it pushes onto the stack.
+    /// In the iPad sidebar a row selects, so the arrow keys move through it too; on iPhone it
+    /// pushes onto the stack.
     @ViewBuilder private func link(_ item: SidebarItem, @ViewBuilder label: () -> some View) -> some View {
         if usesColumns {
-            // The gesture takes over from the List's selection, and also sees the selected row
-            // being tapped again, which has to close the floating sidebar too.
-            NavigationLink(value: item, label: label)
+            // The gesture also sees the selected row being tapped again, which has to close the
+            // floating sidebar. The arrow keys leave it open.
+            label()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .tag(item)
                 .simultaneousGesture(TapGesture().onEnded {
                     navigation.sidebar = item
                     navigation.closeSidebarOverlay()

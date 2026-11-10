@@ -29,11 +29,14 @@ struct RootView: View {
         .onChange(of: lock.isUnlocked, initial: true) { _, unlocked in
             if unlocked { hasUnlocked = true }
             cover.setLocked(hasUnlocked && !unlocked, lock: lock)
+            takeRequest()
         }
         // Setting up the first site goes straight to writing on it.
         .onChange(of: sites.isEmpty) { _, isEmpty in
             if !isEmpty { navigation.openBlankEntry(in: context, focus: sizeClass != .regular) }
+            takeRequest()
         }
+        .onChange(of: AppRequests.shared.newEntry) { takeRequest() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
             // The whole app, not this scene: another of its windows can still be on screen.
             lock.didEnterBackground()
@@ -48,6 +51,7 @@ struct RootView: View {
                 // Before the privacy cover lifts, so a lapsed grace period never shows the page.
                 lock.didBecomeActive()
                 cover.setLocked(hasUnlocked && !lock.isUnlocked, lock: lock)
+                takeRequest()
             default:
                 break
             }
@@ -94,9 +98,6 @@ struct RootView: View {
                              set: { navigation.editingSite = $0?.id })) { EditSiteView(site: $0) }
         .task(id: lock.isUnlocked) { await runOutbox() }
         .task(id: lock.isUnlocked, priority: .utility) { await publisher.preloadPosts() }
-        .onReceive(NotificationCenter.default.publisher(for: .quillNewEntry)) { _ in
-            navigation.openBlankEntry(in: context)
-        }
         .onChange(of: sizeClass) { _, size in
             if size != .regular { navigation.rebuildPath() }
         }
@@ -113,6 +114,14 @@ struct RootView: View {
                 navigation.openBlankEntry(in: context, focus: false)
             }
         }
+    }
+
+    /// A quick action or shortcut's new entry, once this window can show it.
+    private func takeRequest() {
+        guard let request = AppRequests.shared.newEntry, lock.isUnlocked, !sites.isEmpty, scenePhase == .active else { return }
+        if let scene = request.sceneID, scene != cover.window?.windowScene?.session.persistentIdentifier { return }
+        AppRequests.shared.newEntry = nil
+        navigation.openBlankEntry(in: context, text: request.text)
     }
 
     private func repairSidebar() {
@@ -157,8 +166,22 @@ private struct SectionList: View {
 private struct DetailColumn: View {
     @Environment(Navigation.self) private var navigation
     @Environment(\.modelContext) private var context
+    @Environment(\.usesColumns) private var usesColumns
 
     var body: some View {
+        page.toolbar {
+            // The sidebar's button is out of sight while the sidebar is.
+            if usesColumns, navigation.columnVisibility != .all, !navigation.isFocused {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { navigation.openBlankEntry(in: context) } label: {
+                        Label("New Entry", systemImage: "square.and.pencil")
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var page: some View {
         if let entry = navigation.selectedEntry, entry.modelContext != nil, !entry.isDeleted {
             EditorView(entry: entry)
                 .id(entry.id)
