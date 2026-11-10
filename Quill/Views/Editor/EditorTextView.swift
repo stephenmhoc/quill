@@ -189,8 +189,9 @@ enum ListContinuation {
         guard caret >= markerEnd else { return nil }
         let marker = (content as NSString).substring(with: match.range)
         if lineEnd == markerEnd {
-            // An empty item: take away its marker and stop the list.
-            return (NSRange(location: lineStart, length: match.range.length), "")
+            // An empty item stops the list, with a blank line in place of its marker. Without one
+            // the next paragraph would join the last item.
+            return (NSRange(location: lineStart, length: match.range.length), "\n")
         }
         let content_ = content as NSString
         func group(_ index: Int) -> String? {
