@@ -194,7 +194,16 @@ final class Navigation {
             if isFocused {
                 isFocused = false
                 // The window may have narrowed meanwhile, and a narrow one floats its sidebar.
-                columnVisibility = sidebarOverlays && columnsBeforeFocus == .all ? .doubleColumn : columnsBeforeFocus
+                let restored = sidebarOverlays && columnsBeforeFocus == .all ? .doubleColumn : columnsBeforeFocus
+                columnVisibility = restored
+                // Coming back from one column, the split view sets itself to two straight after,
+                // so the sidebar stays hidden. Ask again once it has.
+                guard restored == .all else { return }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !isFocused, !sidebarOverlays, columnVisibility == .doubleColumn else { return }
+                    withAnimation { columnVisibility = .all }
+                }
             } else {
                 columnsBeforeFocus = columnVisibility == .detailOnly ? .all : columnVisibility
                 columnVisibility = .detailOnly
