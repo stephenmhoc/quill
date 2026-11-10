@@ -67,8 +67,9 @@ The test scripts create a fresh Ghost on `docker-server` and delete it afterward
 
 - There's no draft step. Writing saves itself, and going back from a new entry keeps it in
   Drafts. Never add a Save Draft action.
-- Going back from an edit of a published post cancels the edit on iOS. A Mac has no back button, so
-  real changes stay in Drafts until they're published or discarded.
+- Leaving an edit of a published post never loses it, on any platform: real changes stay in Drafts
+  until they're published or discarded, and an untouched edit just ends. A back swipe is too easy
+  to make by accident to mean "cancel".
 - Focus mode hides everything but the page. On a Mac it's ⇧⌘F, not ⌘\, which 1Password takes.
 - Sent and the Outbox stay out of the way: the Outbox only appears on an error or a slow send.
 - Titles are optional. A site must exist before any writing is possible.
