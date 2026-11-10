@@ -74,7 +74,7 @@ struct GhostSiteForm: View {
             #endif
             ToolbarItem(placement: .confirmationAction) {
                 if checking { ProgressView() } else {
-                    Button { Task { await save() } } label: { Text("Save").sheetButtonLabel() }
+                    Button { Task { await save() } } label: { Text(isNew ? "Add" : "Save").sheetButtonLabel() }
                         .accessibilityIdentifier("saveSite")
                         .disabled(!canSave)
                 }
@@ -84,6 +84,13 @@ struct GhostSiteForm: View {
             Button("Remove", role: .destructive, action: remove)
         }
         .onAppear(perform: load)
+        // A swipe would lose what's been typed, the key above all.
+        .interactiveDismissDisabled(checking || hasChanges)
+    }
+
+    private var hasChanges: Bool {
+        guard let site else { return !urlText.isEmpty || !key.isEmpty || !name.isEmpty }
+        return !key.isEmpty || name != site.name || isPublic != site.isPublic || color != site.color
     }
 
     private func load() {

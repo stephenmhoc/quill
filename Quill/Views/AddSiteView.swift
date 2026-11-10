@@ -117,20 +117,32 @@ struct EditSiteView: View {
 struct SiteColorSection: View {
     @Binding var color: SiteColor
 
+    #if os(iOS)
+    private static let spacing: CGFloat = 4
+    #else
+    private static let spacing: CGFloat = 14
+    #endif
+
     var body: some View {
         Section("Colour") {
-            HStack(spacing: 14) {
+            // On iOS each swatch is a full-size target, though the circle is drawn smaller.
+            HStack(spacing: Self.spacing) {
                 ForEach(SiteColor.allCases) { option in
                     Button { color = option } label: {
-                        Circle().fill(option.color).frame(width: 30, height: 30)
+                        Circle().fill(option.color).frame(width: 32, height: 32)
                             .overlay {
                                 if option == color {
                                     Image(systemName: "checkmark").font(.caption.bold()).foregroundStyle(.white)
                                 }
                             }
+                            #if os(iOS)
+                            .frame(width: 44, height: 44)
+                            #endif
+                            .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(option.label)
+                    .accessibilityAddTraits(option == color ? .isSelected : [])
                 }
             }
         }

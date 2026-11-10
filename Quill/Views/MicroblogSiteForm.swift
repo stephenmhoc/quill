@@ -69,7 +69,7 @@ struct MicroblogSiteForm: View {
             #endif
             ToolbarItem(placement: .confirmationAction) {
                 if checking { ProgressView() } else {
-                    Button { Task { await save() } } label: { Text("Save").sheetButtonLabel() }
+                    Button { Task { await save() } } label: { Text(isNew ? "Add" : "Save").sheetButtonLabel() }
                         .accessibilityIdentifier("saveSite")
                         .disabled(!canSave)
                 }
@@ -83,6 +83,13 @@ struct MicroblogSiteForm: View {
             name = site.name
             color = site.color
         }
+        // A swipe would lose what's been typed, the token above all.
+        .interactiveDismissDisabled(checking || hasChanges)
+    }
+
+    private var hasChanges: Bool {
+        guard let site else { return !token.isEmpty || !name.isEmpty }
+        return !token.isEmpty || name != site.name || color != site.color
     }
 
     private func save() async {

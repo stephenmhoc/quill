@@ -40,7 +40,7 @@ struct LocalSiteForm: View {
             if site != nil { RemoveSiteToolbarItem(note: "Permanently deletes this site and every entry on it.", isConfirming: $confirmingDelete) }
             #endif
             ToolbarItem(placement: .confirmationAction) {
-                Button(action: save) { Text("Save").sheetButtonLabel() }
+                Button(action: save) { Text(site == nil ? "Add" : "Save").sheetButtonLabel() }
                     .accessibilityIdentifier("saveSite")
                     .disabled(trimmedName.isEmpty)
             }
@@ -55,6 +55,12 @@ struct LocalSiteForm: View {
             name = site.name
             color = site.color
         }
+        .interactiveDismissDisabled(hasChanges)
+    }
+
+    private var hasChanges: Bool {
+        guard let site else { return !trimmedName.isEmpty }
+        return name != site.name || color != site.color
     }
 
     private func save() {

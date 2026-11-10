@@ -106,12 +106,16 @@ private struct CardRow: ViewModifier {
 private struct SiteFormStyle: ViewModifier {
     let isCentered: Bool
     #if os(iOS)
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    /// First run fills the window, where a form any wider than this is hard to read.
+    private static let readableWidth: CGFloat = 600
+    @State private var width: CGFloat = 0
     #endif
 
     func body(content: Content) -> some View {
         #if os(iOS)
-        content.safeAreaPadding(.horizontal, isCentered && sizeClass == .regular ? 180 : 0)
+        content
+            .safeAreaPadding(.horizontal, isCentered ? max(0, (width - Self.readableWidth) / 2) : 0)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         #else
         content.formStyle(.grouped)
         #endif
