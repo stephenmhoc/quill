@@ -595,14 +595,22 @@ final class MacPageTextView: NSTextView {
     /// Esc closes the find bar, then leaves Focus Mode, and otherwise does what it always does.
     /// While composing, the input method has it first.
     override func cancelOperation(_ sender: Any?) {
-        if hasMarkedText() { return super.cancelOperation(sender) }
+        if hasMarkedText() { return passOnCancel(sender) }
         if let scroll = enclosingScrollView, scroll.isFindBarVisible {
             let hide = NSMenuItem()
             hide.tag = NSTextFinder.Action.hideFindInterface.rawValue
             performTextFinderAction(hide)
             return
         }
-        if !onEscape() { super.cancelOperation(sender) }
+        if !onEscape() { passOnCancel(sender) }
+    }
+
+    /// NSTextView doesn't implement cancelOperation(_:), so calling super throws an unrecognized
+    /// selector. Hand it up the responder chain the way an unhandled command would go.
+    private func passOnCancel(_ sender: Any?) {
+        if nextResponder?.tryToPerform(#selector(NSResponder.cancelOperation(_:)), with: sender) != true {
+            NSSound.beep()
+        }
     }
 
     /// ⌘S: there's no Save Draft, because writing saves itself. A local site's Save does run,

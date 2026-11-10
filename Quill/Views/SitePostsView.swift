@@ -92,7 +92,8 @@ struct SitePostsView: View {
             #if os(macOS)
             // Nothing stays open over the lock screen.
             .onChange(of: isCovered) { _, covered in
-                guard covered else { return }
+                // Loading while locked fails without the key, so try again once there is one.
+                guard covered else { Task { await load() }; return }
                 editing = false
                 pendingDelete = nil
                 unsupported = nil
@@ -412,6 +413,8 @@ struct SitePostsView: View {
                 guard site.isLive else { return }
                 await publisher.refreshStats(of: site)
             }
+        } catch VaultError.locked {
+            // The page stays alive under the lock and loads again on unlock, so this isn't news.
         } catch {
             self.error = error.localizedDescription
         }
