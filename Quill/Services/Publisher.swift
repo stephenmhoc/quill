@@ -3,6 +3,9 @@ import GhostKit
 import Network
 import Observation
 import SwiftData
+#if os(iOS)
+import UIKit
+#endif
 
 /// Sends entries to Ghost and runs the outbox. Transient failures (offline, Tailscale off,
 /// 5xx) leave the entry queued for a later retry; anything that needs the user marks it failed.
@@ -142,11 +145,17 @@ final class Publisher {
         sending.insert(entry.id)
         entry.state = .sending
         let timing = Telemetry.Timing("publish", siteKind: site.kind.rawValue)
+        #if os(iOS)
+        let background = BackgroundTime("Publish")
+        #endif
         var succeeded = false
         defer {
             timing.finish(succeeded: succeeded)
             sending.remove(entry.id)
             save()
+            #if os(iOS)
+            background.end()
+            #endif
         }
         do {
             let post = try await backend(for: site).send(entry)
@@ -202,3 +211,21 @@ final class Publisher {
 extension Entry {
     var isConflict: Bool { state == .failed && failureReason == "conflict" }
 }
+
+#if os(iOS)
+/// Time from iOS to finish a send that's under way when Quill leaves the screen, so the post lands
+/// and the result is saved, instead of the request being cut off with its outcome unknown.
+private final class BackgroundTime {
+    private var id = UIBackgroundTaskIdentifier.invalid
+
+    init(_ name: String) {
+        id = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in self?.end() }
+    }
+
+    func end() {
+        guard id != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(id)
+        id = .invalid
+    }
+}
+#endif
