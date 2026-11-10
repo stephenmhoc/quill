@@ -104,28 +104,37 @@ struct EntryListView: View {
 
     #if os(iOS)
     private func rowActions(_ row: some View, _ entry: Entry) -> some View {
-        row
+        // An edit of a published post goes back to the post, which is still on the site.
+        let isEdit = entry.state == .editing && entry.remotePostID != nil
+        return row
         // Not a destructive role, which would take the row away before the question is answered.
         .swipeActions(edge: .trailing) {
             if entry.state != .sending {
-                Button { pendingDelete = entry } label: { Label("Delete", systemImage: "trash") }
-                    .tint(.red)
+                Button { pendingDelete = entry } label: {
+                    Label(isEdit ? "Discard" : "Delete", systemImage: isEdit ? "arrow.uturn.backward" : "trash")
+                }
+                .tint(.red)
             }
         }
         .contextMenu {
             Button("Open", systemImage: "doc.text") { navigation.show(entry) }
             if entry.state != .sending {
                 Divider()
-                Button("Delete…", systemImage: "trash", role: .destructive) { pendingDelete = entry }
+                Button(isEdit ? "Discard Changes…" : "Delete…", systemImage: isEdit ? "arrow.uturn.backward" : "trash",
+                       role: .destructive) { pendingDelete = entry }
             }
         }
         // On the row, so on iPad it points at what it would delete.
-        .confirmationDialog("Delete “\(entry.displayTitle)”?",
+        .confirmationDialog(isEdit ? "Discard changes to “\(entry.displayTitle)”?" : "Delete “\(entry.displayTitle)”?",
                             isPresented: Binding(get: { pendingDelete == entry }, set: { if !$0 { pendingDelete = nil } }),
                             titleVisibility: .visible) {
-            Button("Delete", role: .destructive) { delete(entry) }
+            if isEdit {
+                Button("Discard Changes", role: .destructive) { entry.cancelEdit() }
+            } else {
+                Button("Delete", role: .destructive) { delete(entry) }
+            }
         } message: {
-            Text("Nothing else keeps a copy of it, so this can't be undone.")
+            Text(isEdit ? "The post goes back to what's on the site." : "Nothing else keeps a copy of it, so this can't be undone.")
         }
     }
     #endif
@@ -141,7 +150,7 @@ struct EntryListView: View {
     }
 
     private func delete(_ entry: Entry) {
-        if navigation.selectedEntry == entry { navigation.selectedEntry = nil }
+        navigation.forget(entry)
         context.delete(entry)
         try? context.save()
     }
@@ -183,6 +192,9 @@ struct EntryRow: View {
         #else
         .padding(.vertical, 4)
         #endif
+        // The whole row, gaps and all, or a plain button only answers on its words.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 
     private var rowSpacing: CGFloat {

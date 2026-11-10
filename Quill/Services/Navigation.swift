@@ -133,11 +133,23 @@ final class Navigation {
         closeSidebarOverlay()
     }
 
-    /// Call before a site's data is deleted, while the selected entry can still be read.
+    /// Call before a site's data is deleted, while the selected entry can still be read. Every
+    /// window lets go of it, not only this one.
     func leaveSite(_ id: UUID) {
-        if selectedEntry?.siteID == id { selectedEntry = nil }
-        if sidebar == .site(id) { sidebar = nil }
-        path = []
+        for window in Self.windows.compactMap(\.navigation) {
+            let wasShowing = window.selectedEntry?.siteID == id || window.sidebar == .site(id)
+                || window.path.contains(.list(.site(id)))
+            if window.selectedEntry?.siteID == id { window.selectedEntry = nil }
+            if window.sidebar == .site(id) { window.sidebar = nil }
+            if window === self || wasShowing { window.path = [] }
+        }
+    }
+
+    /// Call before an entry is deleted, so no window is left showing it.
+    func forget(_ entry: Entry) {
+        for window in Self.windows.compactMap(\.navigation) where window.selectedEntry == entry {
+            window.selectedEntry = nil
+        }
     }
 
     func show(_ entry: Entry) {
@@ -180,8 +192,21 @@ final class Navigation {
         }
     }
 
-    /// The stack that matches the columns, for when an iPad window narrows.
+    /// The stack as it was when columns took over, while nothing has been chosen since.
+    private var stackBeforeColumns: (path: [Route], sidebar: SidebarItem?, entry: Entry?)?
+
+    func enterColumns() {
+        stackBeforeColumns = (path, sidebar, selectedEntry)
+    }
+
+    /// The stack that matches the columns, for when an iPad window narrows. A big iPhone turned
+    /// sideways and back without choosing anything comes back to the screen it left, even home.
     func rebuildPath() {
+        defer { stackBeforeColumns = nil }
+        if let saved = stackBeforeColumns, saved.sidebar == sidebar, saved.entry == selectedEntry {
+            path = saved.path
+            return
+        }
         path = (sidebar.map { [.list($0)] } ?? []) + (selectedEntry == nil ? [] : [.editor])
     }
 
@@ -198,12 +223,14 @@ final class Navigation {
                 columnVisibility = restored
                 // Coming back from one column, the split view sets itself to two straight after,
                 // so the sidebar stays hidden. Ask again once it has.
+                #if os(iOS)
                 guard restored == .all else { return }
                 Task {
                     try? await Task.sleep(for: .milliseconds(300))
                     guard !isFocused, !sidebarOverlays, columnVisibility == .doubleColumn else { return }
                     withAnimation { columnVisibility = .all }
                 }
+                #endif
             } else {
                 columnsBeforeFocus = columnVisibility == .detailOnly ? .all : columnVisibility
                 columnVisibility = .detailOnly
