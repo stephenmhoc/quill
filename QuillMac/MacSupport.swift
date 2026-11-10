@@ -120,7 +120,8 @@ enum EntryDeletion {
         let doomed = entries.filter { $0.modelContext != nil && !$0.isDeleted && $0.state != .sending }
         guard !doomed.isEmpty else { return }
         let snapshots = doomed.map(Entry.Snapshot.init)
-        if let open = navigation.selectedEntry, doomed.contains(open) { navigation.selectedEntry = nil }
+        // Every window lets go of them, not only this one.
+        for entry in doomed { navigation.forget(entry) }
         for entry in doomed { context.delete(entry) }
         try? context.save()
         let name = doomed.count == 1 ? "Delete Entry" : "Delete Entries"

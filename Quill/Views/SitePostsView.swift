@@ -19,11 +19,7 @@ struct SitePostsView: View {
     @State private var editing = false
     @State private var page = 1
     @State private var hasMore = false
-    @State private var opening: String?
-    /// Which open is the latest, because a Mac can select another row while one is loading.
-    @State private var openRequest = 0
     @State private var pendingDelete: SitePost?
-    @State private var unsupported: SitePost?
     @State private var filter: SiteTag?
     /// Each tag's posts from this visit, so going back to one doesn't wait for the site.
     @State private var tagged: [SiteTag: [SitePost]] = [:]
@@ -32,6 +28,12 @@ struct SitePostsView: View {
     @Environment(\.listQuery) private var query
     @Environment(\.isCovered) private var isCovered
     @Environment(\.hidesTitle) private var hidesTitle
+    @State private var opening: String?
+    /// Which open is the latest, because a Mac can select another row while one is loading.
+    @State private var openRequest = 0
+    @State private var unsupported: SitePost?
+    #else
+    @Environment(AppLock.self) private var lock
     #endif
 
     private var site: Site? { sites.first { $0.id == siteID } }
@@ -95,7 +97,6 @@ struct SitePostsView: View {
                 pendingDelete = nil
                 unsupported = nil
             }
-            #endif
             .confirmationDialog(deleteQuestion, isPresented: isConfirmingDelete,
                                 titleVisibility: .visible, presenting: pendingDelete) { post in
                 Button("Delete from \(site?.name ?? "site")", role: .destructive) { Task { await delete(post) } }
@@ -109,6 +110,10 @@ struct SitePostsView: View {
             } message: { _ in
                 Text("It has layouts Markdown can't hold, like galleries or embeds, and saving it here would remove them.")
             }
+            #else
+            // Loading while locked fails without the key, so try again once there is one.
+            .onChange(of: lock.isUnlocked) { _, unlocked in if unlocked { Task { await load() } } }
+            #endif
             // Unstructured: SwiftUI cancels view tasks during column transitions and list refreshes.
             .refreshable { await Task { await load() }.value }
             .onAppear { if posts.isEmpty, let site { posts = site.cachedPostList } }
@@ -134,7 +139,14 @@ struct SitePostsView: View {
                 }
             }
         #else
-        List { rows }
+        // Selection lets a keyboard and pointer move through the posts. On iPhone a row pushes.
+        if usesColumns {
+            List(selection: Binding(get: { selectedPostID }, set: { id in
+                if let post = posts.first(where: { $0.id == id }) { openNow(post) }
+            })) { rows }
+        } else {
+            List { rows }
+        }
         #endif
     }
 
@@ -162,7 +174,13 @@ struct SitePostsView: View {
                 ForEach(shown) { post in
                     postRow(post)
                         .swipeActions(edge: .trailing) {
+                            #if os(iOS)
+                            // Not a destructive role, which takes the row away before the question is answered.
+                            Button("Delete", systemImage: "trash") { pendingDelete = post }
+                                .tint(.red)
+                            #else
                             Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
+                            #endif
                         }
                         .contextMenu {
                             #if os(macOS)
@@ -177,9 +195,25 @@ struct SitePostsView: View {
                             Divider()
                             Button("Delete…", systemImage: "trash", role: .destructive) { pendingDelete = post }
                             #else
+                            if let url = post.url {
+                                Button("Open in Browser", systemImage: "safari") { openURL(url) }
+                                ShareLink(item: url)
+                                Button("Copy Link", systemImage: "link") { UIPasteboard.general.url = url }
+                            }
+                            Divider()
                             Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
                             #endif
                         }
+                        #if os(iOS)
+                        // On the row, so on iPad it points at what it would delete.
+                        .confirmationDialog("Delete “\(post.title)”?",
+                                            isPresented: Binding(get: { pendingDelete?.id == post.id }, set: { if !$0 { pendingDelete = nil } }),
+                                            titleVisibility: .visible) {
+                            Button("Delete from \(site?.name ?? "site")", role: .destructive) { Task { await delete(post) } }
+                        } message: {
+                            Text("This permanently deletes the post. It can't be undone.")
+                        }
+                        #endif
                 }
             } header: {
                 #if os(iOS)
@@ -234,10 +268,15 @@ struct SitePostsView: View {
             row(post).tag(post.id)
         }
         #else
-        Button { Task { await open(post) } } label: { row(post) }
-            .buttonStyle(.plain)
-            .cardRow(isSelected: usesColumns && localEntry(for: post).map { $0 == navigation.selectedEntry } == true)
-            .disabled(opening != nil)
+        Group {
+            if usesColumns {
+                row(post).tag(post.id)
+            } else {
+                Button { openNow(post) } label: { row(post) }
+                    .buttonStyle(.plain)
+            }
+        }
+        .cardRow(isSelected: usesColumns && selectedPostID == post.id)
         #endif
     }
 
@@ -252,7 +291,7 @@ struct SitePostsView: View {
                 Text((post.date ?? .now).formatted(date: .abbreviated, time: .omitted).uppercased())
                 Spacer()
                 if let badge = post.badge { Text(badge) }
-                if opening == post.id { ProgressView().controlSize(.mini) }
+                if isOpening(post) { ProgressView().controlSize(.mini) }
                 else if localEntry(for: post)?.state == .editing { Image(systemName: "pencil.circle") }
             }
             .font(.system(.caption2, design: .monospaced))
@@ -266,10 +305,34 @@ struct SitePostsView: View {
         .contentShape(Rectangle())
     }
 
+    private func isOpening(_ post: SitePost) -> Bool {
+        #if os(macOS)
+        opening == post.id
+        #else
+        navigation.openingPost.map { $0.post.id == post.id && $0.siteID == siteID && $0.failure == nil && !$0.isUnsupported } == true
+        #endif
+    }
+
+    #if os(iOS)
+    /// The post that's open beside the list, or on its way.
+    private var selectedPostID: String? {
+        if let opening = navigation.openingPost, opening.siteID == siteID { return opening.post.id }
+        guard let entry = navigation.selectedEntry, entry.siteID == siteID else { return nil }
+        return entry.remotePostID
+    }
+
+    /// The page opens at once and fills in when the post arrives.
+    private func openNow(_ post: SitePost) {
+        guard let site else { return }
+        navigation.open(post, on: site, publisher: publisher)
+    }
+    #endif
+
     private func localEntry(for post: SitePost) -> Entry? {
         entries.first { $0.remotePostID == post.id && $0.siteID == siteID }
     }
 
+    #if os(macOS)
     private func open(_ post: SitePost, edit: Bool = false) async {
         guard let site else { return }
         openRequest += 1
@@ -291,11 +354,12 @@ struct SitePostsView: View {
             self.error = error.localizedDescription
         }
     }
+    #endif
 
     private func delete(_ post: SitePost) async {
         guard let site else { return }
         localEntry(for: post)?.cancelEdit()
-        if let entry = localEntry(for: post), navigation.selectedEntry == entry { navigation.selectedEntry = nil }
+        if let entry = localEntry(for: post) { navigation.forget(entry) }
         do {
             try await publisher.deletePost(id: post.id, site: site)
             posts.removeAll { $0.id == post.id }

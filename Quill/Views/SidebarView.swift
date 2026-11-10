@@ -6,6 +6,7 @@ struct SidebarView: View {
     @Environment(\.usesColumns) private var usesColumns
     @Environment(Publisher.self) private var publisher
     @Environment(\.modelContext) private var context
+    @Environment(\.openURL) private var openURL
     @Query(sort: Site.order) private var sites: [Site]
     @Query private var entries: [Entry]
     /// Ticks so a slow send shows up without anything else changing.
@@ -25,6 +26,8 @@ struct SidebarView: View {
             } else {
                 List { rows.listRowBackground(Color.card) }
                     .listSectionSpacing(12)
+                    // Unstructured, so a list refresh can't cancel it.
+                    .refreshable { await Task { await refreshPosts() }.value }
             }
         }
         // iPad keeps the system's sidebar surface, so it stands apart from the list beside it.
@@ -80,6 +83,7 @@ struct SidebarView: View {
                             Circle().fill(site.color.color).frame(width: 10, height: 10)
                         }
                     }
+                    .contextMenu { siteMenu(site) }
                 }
                 // Press and drag, with no edit mode.
                 .onMove { Site.move(sites, from: $0, to: $1) }
@@ -91,6 +95,7 @@ struct SidebarView: View {
             Section {
                 ForEach(sites) { site in
                     link(.site(site.id)) { SiteCard(site: site) }
+                        .contextMenu { siteMenu(site) }
                         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { siteFrames[site.id] = $0 }
                         .listRowSeparator(.hidden)
                         .listRowBackground(cardBackground(site)
@@ -133,6 +138,18 @@ struct SidebarView: View {
                     .font(.system(.subheadline, design: .monospaced))
                     .textCase(nil)
             }
+        }
+    }
+
+    @ViewBuilder private func siteMenu(_ site: Site) -> some View {
+        Button("New Entry Here", systemImage: "square.and.pencil") {
+            navigation.openBlankEntry(in: context, site: site.id)
+        }
+        Button("Edit Site", systemImage: "slider.horizontal.3") { navigation.editingSite = site.id }
+        if let url = site.url {
+            Divider()
+            Button("Open in Browser", systemImage: "safari") { openURL(url) }
+            ShareLink(item: url)
         }
     }
 
@@ -180,12 +197,16 @@ struct SidebarView: View {
         return needsAttention ? waiting.count : nil
     }
 
-    /// In the iPad sidebar a row selects; on iPhone it pushes onto the stack.
+    /// In the iPad sidebar a row selects, so the arrow keys move through it too; on iPhone it
+    /// pushes onto the stack.
     @ViewBuilder private func link(_ item: SidebarItem, @ViewBuilder label: () -> some View) -> some View {
         if usesColumns {
-            // The gesture takes over from the List's selection, and also sees the selected row
-            // being tapped again, which has to close the floating sidebar too.
-            NavigationLink(value: item, label: label)
+            // The gesture also sees the selected row being tapped again, which has to close the
+            // floating sidebar. The arrow keys leave it open.
+            label()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .tag(item)
                 .simultaneousGesture(TapGesture().onEnded {
                     navigation.sidebar = item
                     navigation.closeSidebarOverlay()
@@ -270,6 +291,13 @@ private struct RecentPostRow: View {
             Button { Task { await open() } } label: { label }
                 .buttonStyle(.plain)
                 .disabled(opening)
+                .contextMenu {
+                    if let url = post.url {
+                        Button("Open in Browser", systemImage: "safari") { openURL(url) }
+                        ShareLink(item: url)
+                        Button("Copy Link", systemImage: "link") { UIPasteboard.general.url = url }
+                    }
+                }
                 .alert("Quill can't edit this post", isPresented: $unsupported) {
                     if let url = post.url { Button("Open in Browser") { openURL(url) } }
                     Button("OK", role: .cancel) {}

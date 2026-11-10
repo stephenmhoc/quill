@@ -112,7 +112,7 @@ final class PublishFlowUITests: XCTestCase {
         waitForBlankPage(editor)
         showSidebar(app)
         app.cells.containing(.staticText, identifier: name).firstMatch.tap()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch.waitForExistence(timeout: 10),
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch.waitForExistence(timeout: 10),
                       "saved entry not listed")
 
         showSidebar(app)
@@ -128,7 +128,7 @@ final class PublishFlowUITests: XCTestCase {
         waitForUnlock(editor, app)
         showSidebar(app)
         app.staticTexts["Drafts"].tap()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", kept)).firstMatch.waitForExistence(timeout: 10),
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", kept)).firstMatch.waitForExistence(timeout: 10),
                       "draft not listed after relaunch")
     }
 
@@ -161,7 +161,7 @@ final class PublishFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 20), "site wasn't added")
         showSidebar(app)
         app.cells.containing(.staticText, identifier: name).firstMatch.tap()
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS 'Muse'")).firstMatch.waitForExistence(timeout: 15),
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Muse'")).firstMatch.waitForExistence(timeout: 15),
                       "real posts didn't load")
 
         let edit = app.buttons["Edit Site"]

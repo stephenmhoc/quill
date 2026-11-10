@@ -19,6 +19,9 @@ struct EntryListView: View {
     @Environment(\.isCovered) private var isCovered
     @Environment(\.hidesTitle) private var hidesTitle
     #endif
+    #if os(iOS)
+    @State private var pendingDelete: Entry?
+    #endif
 
     private var visible: [Entry] {
         #if os(macOS)
@@ -93,24 +96,69 @@ struct EntryListView: View {
             }
         }
         #else
-        List {
-            ForEach(visible) { entry in
-                Button { navigation.show(entry) } label: {
-                    EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID })
+        // Selection lets a keyboard and pointer move through the list. On iPhone a row pushes.
+        if usesColumns {
+            List(selection: Binding(get: { navigation.selectedEntry }, set: { if let entry = $0 { navigation.show(entry) } })) {
+                ForEach(visible) { entry in
+                    rowActions(EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID }).tag(entry), entry)
+                        .cardRow(isSelected: entry == navigation.selectedEntry)
                 }
-                .buttonStyle(.plain)
-                .cardRow(isSelected: entry == navigation.selectedEntry && usesColumns)
-                .swipeActions(edge: .trailing) {
-                    if entry.state != .sending {
-                        Button(role: .destructive) { delete(entry) } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
+            }
+        } else {
+            List {
+                ForEach(visible) { entry in
+                    rowActions(Button { navigation.show(entry) } label: {
+                        EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID })
+                    }.buttonStyle(.plain), entry)
+                    .cardRow()
                 }
             }
         }
         #endif
     }
+
+    #if os(iOS)
+    private func rowActions(_ row: some View, _ entry: Entry) -> some View {
+        // An edit of a published post goes back to the post, which is still on the site.
+        let isEdit = entry.state == .editing && entry.remotePostID != nil
+        return row
+        // Not a destructive role, which would take the row away before the question is answered.
+        .swipeActions(edge: .trailing) {
+            if entry.state != .sending {
+                Button { pendingDelete = entry } label: {
+                    Label(isEdit ? "Discard" : "Delete", systemImage: isEdit ? "arrow.uturn.backward" : "trash")
+                }
+                .tint(.red)
+            }
+        }
+        .contextMenu {
+            Button("Open", systemImage: "doc.text") { navigation.show(entry) }
+            if entry.state != .sending {
+                Divider()
+                Button(isEdit ? "Discard Changes…" : "Delete…", systemImage: isEdit ? "arrow.uturn.backward" : "trash",
+                       role: .destructive) { pendingDelete = entry }
+            }
+        }
+        // On the row, so on iPad it points at what it would delete.
+        .confirmationDialog(isEdit ? "Discard changes to “\(entry.displayTitle)”?" : "Delete “\(entry.displayTitle)”?",
+                            isPresented: Binding(get: { pendingDelete == entry }, set: { if !$0 { pendingDelete = nil } }),
+                            titleVisibility: .visible) {
+            if isEdit {
+                Button("Discard Changes", role: .destructive) { entry.cancelEdit() }
+            } else {
+                Button("Delete", role: .destructive) { delete(entry) }
+            }
+        } message: {
+            Text(isEdit ? "The post goes back to what's on the site." : "Nothing else keeps a copy of it, so this can't be undone.")
+        }
+    }
+
+    private func delete(_ entry: Entry) {
+        navigation.forget(entry)
+        context.delete(entry)
+        try? context.save()
+    }
+    #endif
 
     @ViewBuilder private var emptyState: some View {
         switch section {
@@ -120,12 +168,6 @@ struct EntryListView: View {
                                              description: Text("Entries that couldn't be sent wait here and retry automatically."))
         case .site: EmptyView()
         }
-    }
-
-    private func delete(_ entry: Entry) {
-        if navigation.selectedEntry == entry { navigation.selectedEntry = nil }
-        context.delete(entry)
-        try? context.save()
     }
 
     #if os(macOS)
@@ -202,6 +244,9 @@ struct EntryRow: View {
         #else
         .padding(.vertical, 4)
         #endif
+        // The whole row, gaps and all, or a plain button only answers on its words.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 
     private var rowSpacing: CGFloat {

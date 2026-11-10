@@ -61,6 +61,14 @@ struct LocalSiteForm: View {
             name = site.name
             color = site.color
         }
+        .interactiveDismissDisabled(hasChanges)
+    }
+
+    private var hasChanges: Bool {
+        guard let site else { return !name.isEmpty }
+        // Removed, and the form is on its way out.
+        guard site.isLive else { return false }
+        return name != site.name || color != site.color
     }
 
     private func save() {

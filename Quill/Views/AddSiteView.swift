@@ -140,18 +140,22 @@ struct SiteColorSection: View {
         }
         #else
         Section("Color") {
-            HStack(spacing: 14) {
+            // Each swatch is a full-size target, though the circle is drawn smaller.
+            HStack(spacing: 4) {
                 ForEach(SiteColor.allCases) { option in
                     Button { color = option } label: {
-                        Circle().fill(option.color).frame(width: 30, height: 30)
+                        Circle().fill(option.color).frame(width: 32, height: 32)
                             .overlay {
                                 if option == color {
                                     Image(systemName: "checkmark").font(.caption.bold()).foregroundStyle(.white)
                                 }
                             }
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(option.label)
+                    .accessibilityAddTraits(option == color ? .isSelected : [])
                 }
             }
         }

@@ -44,8 +44,20 @@ targets:
         CFBundleDisplayName: Quill
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        UILaunchScreen: {}
-        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Color.paper, so launching doesn't flash white before the page.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # Several windows on iPad, each with its own page.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: com.merimerimeri.Quill.newEntry
+            UIApplicationShortcutItemTitle: New Entry
+            UIApplicationShortcutItemIconSymbolName: square.and.pencil
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationPortraitUpsideDown

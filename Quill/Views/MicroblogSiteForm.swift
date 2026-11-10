@@ -95,6 +95,15 @@ struct MicroblogSiteForm: View {
             name = site.name
             color = site.color
         }
+        // A swipe would lose what's been typed, the token above all.
+        .interactiveDismissDisabled(checking || hasChanges)
+    }
+
+    private var hasChanges: Bool {
+        guard let site else { return !token.isEmpty || !name.isEmpty }
+        // Removed, and the form is on its way out.
+        guard site.isLive else { return false }
+        return !token.isEmpty || name != site.name || color != site.color
     }
 
     private func save() async {

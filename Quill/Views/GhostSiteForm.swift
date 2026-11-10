@@ -104,6 +104,15 @@ struct GhostSiteForm: View {
             #endif
         }
         .onAppear(perform: load)
+        // A swipe would lose what's been typed, the key above all.
+        .interactiveDismissDisabled(checking || hasChanges)
+    }
+
+    private var hasChanges: Bool {
+        guard let site else { return !urlText.isEmpty || !key.isEmpty || !name.isEmpty }
+        // Removed, and the form is on its way out.
+        guard site.isLive else { return false }
+        return !key.isEmpty || name != site.name || isPublic != site.isPublic || color != site.color
     }
 
     private func load() {

@@ -13,11 +13,10 @@ struct SitePicker: View {
 
     var body: some View {
         Menu {
-            ForEach(sites) { s in
-                Button {
-                    entry.siteID = s.id
-                } label: {
-                    Label(s.name, systemImage: s.accessIcon)
+            // A picker, so the menu ticks the site the entry is on.
+            Picker("Site", selection: $entry.siteID) {
+                ForEach(sites) { s in
+                    Label(s.name, systemImage: s.accessIcon).tag(Optional(s.id))
                 }
             }
         } label: {
@@ -49,6 +48,9 @@ struct SitePickerLabel: View {
         #endif
         .background((site?.color.color ?? .gray).opacity(0.15), in: Capsule())
         .foregroundStyle(site?.color.color ?? .secondary)
+        #if os(iOS)
+        .hoverEffect(.highlight)
+        #endif
     }
 }
 
@@ -142,11 +144,10 @@ struct StatusBanner: View {
             VStack(alignment: .leading, spacing: 8) {
                 StatusNote(text: entry.lastError ?? "Waiting to send to \(site?.name ?? "the site").", icon: "clock", color: .orange)
                 HStack {
-                    Button(Self.label("Retry now", mac: "Retry Now")) { Task { await publisher.publish(entry) } }
+                    Button("Retry Now") { Task { await publisher.publish(entry) } }
                     // A post that may already be on the site has to be found again before it can change.
                     if entry.createAttemptedAt == nil {
-                        Button(entry.remotePostID == nil ? Self.label("Back to drafts", mac: "Back to Drafts")
-                                                         : Self.label("Keep editing", mac: "Keep Editing")) { entry.state = .editing }
+                        Button(entry.remotePostID == nil ? "Back to Drafts" : "Keep Editing") { entry.state = .editing }
                     }
                 }
                 .buttonStyle(.bordered)
@@ -157,10 +158,10 @@ struct StatusBanner: View {
                 StatusNote(text: entry.lastError ?? "Couldn't send.", icon: "exclamationmark.triangle", color: .red)
                 HStack {
                     if entry.isConflict {
-                        Button(Self.label("Overwrite \(site?.kind.title ?? "the site")'s version", mac: "Overwrite \(site?.kind.title ?? "the Site")'s Version")) {
+                        Button("Overwrite \(site?.kind.title ?? "the Site")'s Version") {
                             Task { await publisher.overwrite(entry) }
                         }
-                        Button(Self.label("Use \(site?.kind.title ?? "the site")'s version", mac: "Use \(site?.kind.title ?? "the Site")'s Version")) {
+                        Button("Use \(site?.kind.title ?? "the Site")'s Version") {
                             Task { await publisher.takeSiteVersion(entry) }
                         }
                     } else {
@@ -177,15 +178,6 @@ struct StatusBanner: View {
         default:
             EmptyView()
         }
-    }
-
-    /// A Mac's buttons are in Title Case; iOS keeps its own wording.
-    private static func label(_ iOS: String, mac: String) -> String {
-        #if os(macOS)
-        mac
-        #else
-        iOS
-        #endif
     }
 }
 

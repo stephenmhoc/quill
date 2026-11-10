@@ -117,7 +117,7 @@ final class Entry {
         state = .editing
     }
 
-    /// Leaving a published entry mid-edit cancels the edit.
+    /// Drops an edit of a published entry, back to what's on the site.
     func cancelEdit() {
         guard state == .editing, remotePostID != nil else { return }
         title = publishedTitle ?? title
@@ -128,12 +128,16 @@ final class Entry {
         try? modelContext?.save()
     }
 
-    /// Moving on from an entry. A Mac has no back button to mean "cancel", and any row is a click
-    /// away, so real changes wait in Drafts until they're published or discarded.
+    /// Whether an edit of a published entry has changed anything yet.
+    var hasUnpublishedChanges: Bool {
+        guard state == .editing, remotePostID != nil else { return false }
+        return title != publishedTitle ?? title || body != publishedBody ?? body || tags != publishedTags ?? tags
+    }
+
+    /// Moving on from an entry. A back swipe is too easy to make by accident to mean "cancel", so
+    /// real changes wait in Drafts until they're published or discarded. An untouched edit ends.
     func leaveEdit() {
-        #if os(macOS)
-        if title != publishedTitle ?? title || body != publishedBody ?? body || tags != publishedTags ?? tags { return }
-        #endif
+        if hasUnpublishedChanges { return }
         cancelEdit()
     }
 
