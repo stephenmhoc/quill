@@ -90,6 +90,8 @@ struct GhostSiteForm: View {
 
     private var hasChanges: Bool {
         guard let site else { return !urlText.isEmpty || !key.isEmpty || !name.isEmpty }
+        // Removed, and the form is on its way out.
+        guard site.modelContext != nil, !site.isDeleted else { return false }
         return !key.isEmpty || name != site.name || isPublic != site.isPublic || color != site.color
     }
 

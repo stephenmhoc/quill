@@ -59,7 +59,9 @@ struct LocalSiteForm: View {
     }
 
     private var hasChanges: Bool {
-        guard let site else { return !trimmedName.isEmpty }
+        guard let site else { return !name.isEmpty }
+        // Removed, and the form is on its way out.
+        guard site.modelContext != nil, !site.isDeleted else { return false }
         return name != site.name || color != site.color
     }
 

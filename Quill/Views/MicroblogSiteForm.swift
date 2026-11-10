@@ -89,6 +89,8 @@ struct MicroblogSiteForm: View {
 
     private var hasChanges: Bool {
         guard let site else { return !token.isEmpty || !name.isEmpty }
+        // Removed, and the form is on its way out.
+        guard site.modelContext != nil, !site.isDeleted else { return false }
         return !token.isEmpty || name != site.name || color != site.color
     }
 
