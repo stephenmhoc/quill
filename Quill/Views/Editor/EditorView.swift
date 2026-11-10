@@ -372,15 +372,19 @@ struct EditorView: View {
         uploading = true
         defer { uploading = false }
         for load in images {
+            // The site can be removed while an earlier picture uploads.
+            guard site.modelContext != nil, !site.isDeleted else { return }
             do {
                 guard let data = try await load(), let jpeg = ImagePrep.jpeg(from: data) else {
                     uploadError = "Couldn't read that image."
                     continue
                 }
+                guard site.modelContext != nil, !site.isDeleted else { return }
                 let url = try await publisher.backend(for: site)
                     .uploadImage(jpeg, filename: "quill-\(UUID().uuidString).jpg")
-                // Discarding the edit while this uploaded drops the picture with it.
-                guard entry.modelContext != nil, !entry.isDeleted, entry.state == .editing else { return }
+                // Discarding the edit, or removing the site, while this uploaded drops the picture.
+                guard entry.modelContext != nil, !entry.isDeleted, entry.state == .editing,
+                      site.modelContext != nil, !site.isDeleted else { return }
                 entry.uploadedToSiteID = site.id
                 let (text, newSelection) = MarkdownFormat.insert("\n![](\(url.absoluteString))\n", into: entry.body, at: selection)
                 entry.body = text
@@ -422,16 +426,24 @@ private struct LivePreview: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var html: String?
 
-    private var source: String {
-        EntryPage.html(title: title, markdown: markdown, isDark: colorScheme == .dark, imageHosts: EntryPage.imageHosts(of: site))
+    private struct Inputs: Equatable {
+        let title: String
+        let markdown: String
+        let isDark: Bool
+        let imageHosts: [String]
     }
 
     var body: some View {
-        PreviewPage(html: html ?? source)
+        let inputs = Inputs(title: title, markdown: markdown, isDark: colorScheme == .dark,
+                            imageHosts: EntryPage.imageHosts(of: site))
+        PreviewPage(html: html ?? "")
             .opensLinksInChosenBrowser()
-            .task(id: source) {
-                try? await Task.sleep(for: .seconds(0.25))
-                if !Task.isCancelled { html = source }
+            .task(id: inputs) {
+                // The first page comes at once. After that, typing waits for a pause.
+                if html != nil { try? await Task.sleep(for: .seconds(0.25)) }
+                guard !Task.isCancelled else { return }
+                html = EntryPage.html(title: inputs.title, markdown: inputs.markdown, isDark: inputs.isDark,
+                                      imageHosts: inputs.imageHosts)
             }
     }
 }

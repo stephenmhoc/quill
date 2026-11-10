@@ -173,6 +173,8 @@ final class EditorCoordinator: NSObject, UITextViewDelegate {
 /// Return in a list starts the next item, and Return on an empty item ends the list.
 enum ListContinuation {
     private static let item = try! NSRegularExpression(pattern: "^([ \\t]*)(?:([-*+])( \\[[ xX]\\])?|(\\d+)([.)])) ")
+    /// Three or more of one of `-`, `*` or `_`, spaced or not, and nothing else.
+    private static let rule = try! NSRegularExpression(pattern: "^[ \\t]*([-*_])(?:[ \\t]*\\1){2,}[ \\t]*$")
 
     /// The line to replace and what to put there, or nil for an ordinary Return.
     static func edit(for text: NSString, at caret: Int) -> (NSRange, String)? {
@@ -181,6 +183,9 @@ enum ListContinuation {
         var lineEnd = NSMaxRange(line)
         if lineEnd > lineStart, text.character(at: lineEnd - 1) == 0x0A { lineEnd -= 1 }
         let content = text.substring(with: NSRange(location: lineStart, length: lineEnd - lineStart))
+        let whole = NSRange(location: 0, length: (content as NSString).length)
+        // `* * *` and `- - -` are rules, not lists.
+        guard rule.firstMatch(in: content, range: whole) == nil else { return nil }
         guard let match = item.firstMatch(in: content, range: NSRange(location: 0, length: (content as NSString).length)) else {
             return nil
         }
