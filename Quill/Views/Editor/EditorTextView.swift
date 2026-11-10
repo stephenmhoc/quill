@@ -1,5 +1,13 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
+
+/// What the format bar and the edit menu can do to the page.
+struct PageFormatting {
+    let format: (MarkdownFormat) -> Void
+    let insertImage: () -> Void
+    let canInsertImage: Bool
+}
 
 /// The writing surface. UIKit because TextEditor can't scroll a title with the text, align
 /// exactly with it, or style Markdown as it's typed. The header scrolls as part of the page.
@@ -11,17 +19,33 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
     let focusRequest: Int
     let isEditable: Bool
     let margin: CGFloat
+    /// What the page belongs to, so the same text view comes back for it after a layout change.
+    let reuseID: UUID
+    let reuse: EditorReuse
+    /// Nil hides the format bar, as focus mode does.
+    let formatting: PageFormatting?
+    /// Pictures pasted or dropped on the page. Text goes in as usual.
+    let onImages: ([NSItemProvider]) -> Void
+    /// Esc, which leaves focus mode.
+    let onEscape: (() -> Void)?
     @ViewBuilder let header: () -> Header
 
     func makeCoordinator() -> EditorCoordinator { EditorCoordinator(text: $text, selection: $selection, isFocused: $isFocused) }
 
     func makeUIView(context: Context) -> PageTextView {
+        if let view = reuse.view(for: reuseID) {
+            view.delegate = context.coordinator
+            // The caret is where it was, and formatting needs to know.
+            DispatchQueue.main.async { context.coordinator.textViewDidChangeSelection(view) }
+            return view
+        }
         let view = PageTextView()
+        reuse.keep(view, for: reuseID)
         view.delegate = context.coordinator
         view.backgroundColor = .clear
         view.keyboardDismissMode = .interactive
         view.alwaysBounceVertical = true
-        view.adjustsFontForContentSizeCategory = true
+        view.isFindInteractionEnabled = true
         view.accessibilityIdentifier = "editor"
         view.typingAttributes = MarkdownStyler.base
         view.placeholder.text = "Write…"
@@ -38,6 +62,9 @@ struct EditorTextView<Header: View>: UIViewRepresentable {
 
         view.margin = margin
         view.isEditable = isEditable
+        view.onImages = onImages
+        view.onEscape = onEscape
+        view.setFormatting(isEditable ? formatting : nil)
         view.tintColor = UIColor(.cursor)
         view.setHeader(UIHostingConfiguration { header() }.margins(.all, 0))
         // While the keyboard is composing the view holds text SwiftUI hasn't seen, so writing back
@@ -73,6 +100,9 @@ final class EditorCoordinator: NSObject, UITextViewDelegate {
     var isUpdating = false
     var handledFocusRequest = 0
     var lastSelection: NSRange?
+    /// Where typing has changed the text since it was last styled.
+    private var edited: NSRange?
+    private var isContinuingList = false
 
     init(text: Binding<String>, selection: Binding<TextSelection?>, isFocused: Binding<Bool>) {
         self.text = text
@@ -80,11 +110,34 @@ final class EditorCoordinator: NSObject, UITextViewDelegate {
         self.isFocused = isFocused
     }
 
+    func textView(_ view: UITextView, shouldChangeTextIn range: NSRange, replacementText replacement: String) -> Bool {
+        guard !isContinuingList else { return true }
+        let changed = NSRange(location: range.location, length: (replacement as NSString).length)
+        edited = edited.map { NSUnionRange($0, changed) } ?? changed
+        guard replacement == "\n", range.length == 0, view.markedTextRange == nil,
+              let (lineRange, replacementText) = ListContinuation.edit(for: view.text as NSString, at: range.location) else {
+            return true
+        }
+        // Through UITextInput, so Undo takes it back in one step.
+        isContinuingList = true
+        defer { isContinuingList = false }
+        guard let start = view.position(from: view.beginningOfDocument, offset: lineRange.location),
+              let end = view.position(from: start, offset: lineRange.length),
+              let textRange = view.textRange(from: start, to: end) else { return true }
+        edited = NSUnionRange(edited ?? lineRange, NSRange(location: lineRange.location, length: (replacementText as NSString).length))
+        view.replace(textRange, withText: replacementText)
+        if view.text != text.wrappedValue { textViewDidChange(view) }
+        return false
+    }
+
     func textViewDidChange(_ view: UITextView) {
         guard !isUpdating else { return }
         text.wrappedValue = view.text
         (view as? PageTextView)?.placeholder.isHidden = !view.text.isEmpty
-        if view.markedTextRange == nil { view.applyMarkdownStyle() }
+        if view.markedTextRange == nil {
+            view.applyMarkdownStyle(around: edited)
+            edited = nil
+        }
     }
 
     func textViewDidChangeSelection(_ view: UITextView) {
@@ -96,6 +149,17 @@ final class EditorCoordinator: NSObject, UITextViewDelegate {
     func textViewDidBeginEditing(_ view: UITextView) { setFocused(true) }
     func textViewDidEndEditing(_ view: UITextView) { setFocused(false) }
 
+    /// Bold, Italic and Link beside Copy and Paste, for a selection.
+    func textView(_ view: UITextView, editMenuForTextIn range: NSRange, suggestedActions: [UIMenuElement]) -> UIMenu? {
+        guard range.length > 0, view.isEditable, let formatting = (view as? PageTextView)?.formatting else { return nil }
+        let format = UIMenu(title: "Format", image: UIImage(systemName: "bold.italic.underline"), children: [
+            UIAction(title: "Bold", image: UIImage(systemName: "bold")) { _ in formatting.format(.bold) },
+            UIAction(title: "Italic", image: UIImage(systemName: "italic")) { _ in formatting.format(.italic) },
+            UIAction(title: "Link", image: UIImage(systemName: "link")) { _ in formatting.format(.link) },
+        ])
+        return UIMenu(children: suggestedActions + [format])
+    }
+
     /// `updateUIView` can move the keyboard, and SwiftUI state can't change during an update.
     private func setFocused(_ focused: Bool) {
         guard isUpdating else {
@@ -106,21 +170,85 @@ final class EditorCoordinator: NSObject, UITextViewDelegate {
     }
 }
 
+/// Return in a list starts the next item, and Return on an empty item ends the list.
+enum ListContinuation {
+    private static let item = try! NSRegularExpression(pattern: "^([ \\t]*)(?:([-*+])( \\[[ xX]\\])?|(\\d+)([.)])) ")
+
+    /// The line to replace and what to put there, or nil for an ordinary Return.
+    static func edit(for text: NSString, at caret: Int) -> (NSRange, String)? {
+        let line = text.lineRange(for: NSRange(location: caret, length: 0))
+        let lineStart = line.location
+        var lineEnd = NSMaxRange(line)
+        if lineEnd > lineStart, text.character(at: lineEnd - 1) == 0x0A { lineEnd -= 1 }
+        let content = text.substring(with: NSRange(location: lineStart, length: lineEnd - lineStart))
+        guard let match = item.firstMatch(in: content, range: NSRange(location: 0, length: (content as NSString).length)) else {
+            return nil
+        }
+        let markerEnd = lineStart + match.range.length
+        // In the marker itself, Return just breaks the line.
+        guard caret >= markerEnd else { return nil }
+        let marker = (content as NSString).substring(with: match.range)
+        if lineEnd == markerEnd {
+            // An empty item: take away its marker and stop the list.
+            return (NSRange(location: lineStart, length: match.range.length), "")
+        }
+        let content_ = content as NSString
+        func group(_ index: Int) -> String? {
+            let range = match.range(at: index)
+            return range.location == NSNotFound ? nil : content_.substring(with: range)
+        }
+        let indent = group(1) ?? ""
+        let next: String
+        if let number = group(4).flatMap(Int.init), let delimiter = group(5) {
+            next = "\(indent)\(number + 1)\(delimiter) "
+        } else if let bullet = group(2) {
+            // A ticked task starts an unticked one.
+            next = "\(indent)\(bullet)\(group(3) == nil ? "" : " [ ]") "
+        } else {
+            next = marker
+        }
+        return (NSRange(location: caret, length: 0), "\n" + next)
+    }
+}
+
 private extension UITextView {
-    func applyMarkdownStyle() {
-        MarkdownStyler.style(textStorage)
+    func applyMarkdownStyle(around range: NSRange? = nil) {
+        MarkdownStyler.style(textStorage, around: range)
         typingAttributes = MarkdownStyler.base
     }
 }
 
-final class PageTextView: UITextView {
-    /// About 72 characters, the longest line that's still comfortable to write in.
-    static let maxWidth = ceil(("0" as NSString).size(withAttributes: [.font: MarkdownStyler.bodyFont]).width * 72)
+/// Holds one scene's text view between a split view and a stack. Only the open page's is kept.
+final class EditorReuse {
+    private var id: UUID?
+    private weak var view: PageTextView?
 
+    func view(for id: UUID) -> PageTextView? { self.id == id ? view : nil }
+
+    func keep(_ view: PageTextView, for id: UUID) {
+        self.id = id
+        self.view = view
+    }
+}
+
+final class PageTextView: UITextView {
     var margin: CGFloat = 20 { didSet { if margin != oldValue { setNeedsLayout() } } }
     let placeholder = UILabel()
     private var headerView: (any UIView & UIContentView)?
     private var wantsFocus = false
+    /// Set when the view leaves a window with the keyboard. Back in one straight away, as when
+    /// the layout changes, it takes the keyboard again.
+    private var leftWithKeyboardAt: Date?
+    var onImages: (([NSItemProvider]) -> Void)?
+    var onEscape: (() -> Void)?
+    private(set) var formatting: PageFormatting?
+    private lazy var imageDrop = ImageDrop(page: self)
+    private lazy var formatBar = makeFormatBar()
+
+    /// About 72 characters, the longest line that's still comfortable to write in.
+    private var maxWidth: CGFloat {
+        ceil(("0" as NSString).size(withAttributes: [.font: MarkdownStyler.bodyFont]).width * 72)
+    }
 
     init() {
         super.init(frame: .zero, textContainer: nil)
@@ -129,6 +257,13 @@ final class PageTextView: UITextView {
         placeholder.textColor = .tertiaryLabel
         placeholder.isAccessibilityElement = false
         addSubview(placeholder)
+        addInteraction(UIDropInteraction(delegate: imageDrop))
+        // The styles are set by hand, so a new text size has to restyle the page.
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (view: PageTextView, _) in
+            view.placeholder.font = MarkdownStyler.bodyFont
+            view.applyMarkdownStyle()
+            view.setNeedsLayout()
+        }
     }
 
     @available(*, unavailable)
@@ -144,6 +279,112 @@ final class PageTextView: UITextView {
         }
         setNeedsLayout()
     }
+
+    // MARK: Format bar
+
+    /// Above the keyboard on iPhone. On iPad it joins the shortcuts bar, which also shows with a
+    /// hardware keyboard, beside Undo and Paste.
+    func setFormatting(_ formatting: PageFormatting?) {
+        let wasShown = self.formatting != nil
+        self.formatting = formatting
+        imageItem.isEnabled = formatting?.canInsertImage ?? false
+        guard wasShown != (formatting != nil) else { return }
+        if traitCollection.userInterfaceIdiom == .pad {
+            inputAssistantItem.trailingBarButtonGroups = formatting == nil ? [] : [
+                UIBarButtonItemGroup(barButtonItems: formatItems, representativeItem: nil),
+            ]
+        } else {
+            inputAccessoryView = formatting == nil ? nil : formatBar
+        }
+        if isFirstResponder { reloadInputViews() }
+    }
+
+    private lazy var imageItem = item("Insert Image", "photo") { $0.insertImage() }
+
+    private lazy var formatItems: [UIBarButtonItem] = [
+        item("Bold", "bold") { $0.format(.bold) },
+        item("Italic", "italic") { $0.format(.italic) },
+        item("Heading", "number") { $0.format(.heading) },
+        item("List", "list.bullet") { $0.format(.bullet) },
+        item("Quote", "text.quote") { $0.format(.quote) },
+        item("Link", "link") { $0.format(.link) },
+        imageItem,
+    ]
+
+    private func item(_ title: String, _ symbol: String, _ action: @escaping (PageFormatting) -> Void) -> UIBarButtonItem {
+        let item = UIBarButtonItem(title: title, image: UIImage(systemName: symbol), primaryAction: UIAction { [weak self] _ in
+            if let formatting = self?.formatting { action(formatting) }
+        })
+        item.accessibilityLabel = title
+        return item
+    }
+
+    private func makeFormatBar() -> UIToolbar {
+        let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
+        let hide = UIBarButtonItem(title: "Hide Keyboard", image: UIImage(systemName: "keyboard.chevron.compact.down"),
+                                   primaryAction: UIAction { [weak self] _ in _ = self?.resignFirstResponder() })
+        bar.items = formatItems + [.flexibleSpace(), hide]
+        bar.sizeToFit()
+        return bar
+    }
+
+    override var keyCommands: [UIKeyCommand]? {
+        guard onEscape != nil else { return super.keyCommands }
+        let escape = UIKeyCommand(input: UIKeyCommand.inputEscape, modifierFlags: [], action: #selector(escapePressed))
+        escape.wantsPriorityOverSystemBehavior = true
+        return (super.keyCommands ?? []) + [escape]
+    }
+
+    @objc private func escapePressed() { onEscape?() }
+
+    // MARK: Pictures
+
+    /// A picture on its own. Anything with text, like a link with its preview, pastes as text.
+    private var pasteboardHasOnlyImages: Bool {
+        let board = UIPasteboard.general
+        return board.hasImages && !board.hasStrings && !board.hasURLs
+    }
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(paste(_:)), isEditable, onImages != nil, pasteboardHasOnlyImages { return true }
+        return super.canPerformAction(action, withSender: sender)
+    }
+
+    override func paste(_ sender: Any?) {
+        if isEditable, let onImages, pasteboardHasOnlyImages {
+            onImages(UIPasteboard.general.itemProviders.filter { $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) })
+        } else {
+            super.paste(sender)
+        }
+    }
+
+    /// Photos and Files drag pictures with no text, which a plain text view would refuse.
+    fileprivate final class ImageDrop: NSObject, UIDropInteractionDelegate {
+        weak var page: PageTextView?
+
+        init(page: PageTextView) { self.page = page }
+
+        func dropInteraction(_ interaction: UIDropInteraction, canHandle session: UIDropSession) -> Bool {
+            guard let page, page.isEditable, page.onImages != nil else { return false }
+            return session.hasItemsConforming(toTypeIdentifiers: [UTType.image.identifier])
+                && !session.hasItemsConforming(toTypeIdentifiers: [UTType.text.identifier, UTType.url.identifier])
+        }
+
+        func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: UIDropSession) -> UIDropProposal {
+            UIDropProposal(operation: .copy)
+        }
+
+        func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
+            guard let page else { return }
+            // In where it was dropped, not wherever the caret happened to be.
+            if let position = page.closestPosition(to: session.location(in: page)) {
+                page.selectedTextRange = page.textRange(from: position, to: position)
+            }
+            page.onImages?(session.items.map(\.itemProvider).filter { $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) })
+        }
+    }
+
+    // MARK: Editing
 
     /// Changes only what differs, through UITextInput, so Undo can take it back. Setting `text`
     /// would clear the undo stack.
@@ -168,9 +409,17 @@ final class PageTextView: UITextView {
         if window != nil { becomeFirstResponder() } else { wantsFocus = true }
     }
 
+    override func willMove(toWindow newWindow: UIWindow?) {
+        if newWindow == nil, isFirstResponder { leftWithKeyboardAt = .now }
+        super.willMove(toWindow: newWindow)
+    }
+
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        if window != nil, wantsFocus {
+        guard window != nil else { return }
+        let returning = leftWithKeyboardAt.map { Date.now.timeIntervalSince($0) < 1 } ?? false
+        leftWithKeyboardAt = nil
+        if wantsFocus || returning {
             wantsFocus = false
             DispatchQueue.main.async { self.becomeFirstResponder() }
         }
@@ -178,7 +427,7 @@ final class PageTextView: UITextView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        let side = max(margin, (bounds.width - Self.maxWidth) / 2)
+        let side = max(margin, (bounds.width - maxWidth) / 2)
         let width = bounds.width - side * 2
         guard width > 0 else { return }
         var top: CGFloat = 20

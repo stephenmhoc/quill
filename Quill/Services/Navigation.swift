@@ -20,18 +20,32 @@ extension EnvironmentValues {
     @Entry var usesColumns = false
 }
 
-/// Split-view state shared by the sidebar, list and editor.
+/// A listed post on its way into the editor, which shows it loading until it arrives.
+struct OpeningPost: Equatable {
+    let post: SitePost
+    let siteID: UUID
+    var failure: String?
+    /// It has content Markdown can't hold, so Quill won't edit it.
+    var isUnsupported = false
+}
+
+/// One window's state, shared by its sidebar, list and editor. Each iPad window has its own.
 @Observable
 final class Navigation {
     var sidebar: SidebarItem?
     var selectedEntry: Entry? {
-        didSet { if oldValue != selectedEntry { oldValue?.leaveEdit() } }
+        didSet {
+            if oldValue != selectedEntry { oldValue?.leaveEdit() }
+            if selectedEntry != nil { openingPost = nil }
+        }
     }
+    private(set) var openingPost: OpeningPost?
     var path: [Route] = [] {
         didSet {
             if !path.contains(.editor) {
                 selectedEntry?.leaveEdit()
                 isFocused = false
+                openingPost = nil
             }
             if case .list(let item)? = path.first { sidebar = item }
         }
@@ -54,10 +68,17 @@ final class Navigation {
     /// where the keyboard would take half the screen before anyone asked to write.
     var focusNextEntry = false
     var showingAddSite = false
+    /// A site whose settings are open from outside its own list, like a context menu.
+    var editingSite: UUID?
     /// Mac: ⌘R asks whichever site list is showing to fetch its posts again.
     var reloadRequest = 0
     var canReload: Bool { if case .site = sidebar { true } else { false } }
     var windowWidth: CGFloat = .infinity
+    #if os(iOS)
+    /// The open page's text view, kept across a change between columns and a stack so its
+    /// caret, scroll position, keyboard and undo survive.
+    @ObservationIgnored let editorReuse = EditorReuse()
+    #endif
 
     static let defaultSiteKey = "defaultSiteID"
 
@@ -109,6 +130,41 @@ final class Navigation {
         if path.last != .editor { path.append(.editor) }
     }
 
+    /// A listed post opens at once: Quill's copy if there is one, brought up to date behind it,
+    /// else a page that fills in when the post arrives.
+    func open(_ post: SitePost, on site: Site, publisher: Publisher) {
+        if let entry = try? Entry.copy(of: post.id, on: site.id, in: publisher.context) {
+            show(entry)
+            Task { await publisher.refresh(entry, site: site) }
+            return
+        }
+        let request = OpeningPost(post: post, siteID: site.id)
+        selectedEntry = nil
+        openingPost = request
+        if path.last != .editor { path.append(.editor) }
+        closeSidebarOverlay()
+        Task { await load(request, site: site, publisher: publisher) }
+    }
+
+    func retryOpening(publisher: Publisher, site: Site) {
+        guard var request = openingPost else { return }
+        request.failure = nil
+        openingPost = request
+        Task { await load(request, site: site, publisher: publisher) }
+    }
+
+    private func load(_ request: OpeningPost, site: Site, publisher: Publisher) async {
+        do {
+            let entry = try await publisher.importPost(id: request.post.id, site: site)
+            // Someone who moved on while this loaded stays where they went.
+            guard openingPost?.post.id == request.post.id, openingPost?.siteID == request.siteID else { return }
+            if let entry { selectedEntry = entry } else { openingPost?.isUnsupported = true }
+        } catch {
+            guard openingPost?.post.id == request.post.id, openingPost?.siteID == request.siteID else { return }
+            openingPost?.failure = error.localizedDescription
+        }
+    }
+
     /// The stack that matches the columns, for when an iPad window narrows.
     func rebuildPath() {
         path = (sidebar.map { [.list($0)] } ?? []) + (selectedEntry == nil ? [] : [.editor])
@@ -122,7 +178,8 @@ final class Navigation {
         withAnimation {
             if isFocused {
                 isFocused = false
-                columnVisibility = columnsBeforeFocus
+                // The window may have narrowed meanwhile, and a narrow one floats its sidebar.
+                columnVisibility = sidebarOverlays && columnsBeforeFocus == .all ? .doubleColumn : columnsBeforeFocus
             } else {
                 columnsBeforeFocus = columnVisibility == .detailOnly ? .all : columnVisibility
                 columnVisibility = .detailOnly

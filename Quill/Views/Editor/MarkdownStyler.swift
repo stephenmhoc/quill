@@ -28,11 +28,19 @@ enum MarkdownStyler {
     private static let boldFont = NSFontManager.shared.convert(bodyFont, toHaveTrait: .boldFontMask)
     private static let italicFont = NSFontManager.shared.convert(bodyFont, toHaveTrait: .italicFontMask)
     #else
-    /// Monospaced, because it reads as a draft in progress rather than finished type.
-    static let bodyFont: UIFont = {
+    /// Monospaced, because it reads as a draft in progress rather than finished type. It follows
+    /// the text size setting as it changes, without a relaunch.
+    static var bodyFont: UIFont {
+        let category = UIApplication.shared.preferredContentSizeCategory
+        if let scaled, scaled.category == category { return scaled.font }
         let size: CGFloat = UIDevice.current.userInterfaceIdiom == .pad ? 18 : 16
-        return UIFontMetrics(forTextStyle: .body).scaledFont(for: .monospacedSystemFont(ofSize: size, weight: .regular))
-    }()
+        let font = UIFontMetrics(forTextStyle: .body).scaledFont(
+            for: .monospacedSystemFont(ofSize: size, weight: .regular),
+            compatibleWith: UITraitCollection(preferredContentSizeCategory: category))
+        scaled = (category, font)
+        return font
+    }
+    private static var scaled: (category: UIContentSizeCategory, font: UIFont)?
     private static var lineHeight: CGFloat { bodyFont.lineHeight }
     private static let textColor = UIColor.label
     private static var boldFont: UIFont { font(.traitBold) }
@@ -58,8 +66,12 @@ enum MarkdownStyler {
     private static let marker = try! NSRegularExpression(pattern: "^(#{1,6} |> |[-+*] |\\d+\\. )", options: .anchorsMatchLines)
     private static let linkTarget = try! NSRegularExpression(pattern: "(?<=\\])\\([^)\\n]*\\)")
 
-    static func style(_ storage: NSTextStorage) {
-        let all = NSRange(location: 0, length: storage.length)
+    /// Every pattern stays within a line, so restyling only the paragraphs around `range` is enough.
+    static func style(_ storage: NSTextStorage, around range: NSRange? = nil) {
+        let whole = NSRange(location: 0, length: storage.length)
+        let all = range.flatMap { range in
+            NSMaxRange(range) <= whole.length ? (storage.string as NSString).paragraphRange(for: range) : nil
+        } ?? whole
         let quiet = PlatformColor.quietText
         func each(_ pattern: NSRegularExpression, _ body: (NSTextCheckingResult) -> Void) {
             pattern.enumerateMatches(in: storage.string, range: all) { match, _, _ in if let match { body(match) } }
