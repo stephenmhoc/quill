@@ -62,12 +62,14 @@ struct SitePostsView: View {
             .sheet(isPresented: $editing) {
                 if let site { EditSiteView(site: site) }
             }
+            #if os(macOS)
             .confirmationDialog(deleteQuestion, isPresented: isConfirmingDelete,
                                 titleVisibility: .visible, presenting: pendingDelete) { post in
                 Button("Delete from \(site?.name ?? "site")", role: .destructive) { Task { await delete(post) } }
             } message: { _ in
                 Text("This permanently deletes the post. It can't be undone.")
             }
+            #endif
             .alert("Quill can't edit this post", isPresented: Binding(get: { unsupported != nil }, set: { if !$0 { unsupported = nil } }),
                    presenting: unsupported) { post in
                 if let url = post.url { Button("Open in Browser") { openURL(url) } }
@@ -97,7 +99,14 @@ struct SitePostsView: View {
                 }
             }
         #else
-        List { rows }
+        // Selection lets a keyboard and pointer move through the posts. On iPhone a row pushes.
+        if usesColumns {
+            List(selection: Binding(get: { selectedPostID }, set: { id in
+                if let post = posts.first(where: { $0.id == id }) { openNow(post) }
+            })) { rows }
+        } else {
+            List { rows }
+        }
         #endif
     }
 
@@ -124,14 +133,35 @@ struct SitePostsView: View {
                 ForEach(posts) { post in
                     postRow(post)
                         .swipeActions(edge: .trailing) {
+                            #if os(iOS)
+                            // Not a destructive role, which takes the row away before the question is answered.
+                            Button("Delete", systemImage: "trash") { pendingDelete = post }
+                                .tint(.red)
+                            #else
                             Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
+                            #endif
                         }
                         .contextMenu {
-                            #if os(macOS)
                             if let url = post.url { Button("Open in Browser", systemImage: "safari") { openURL(url) } }
+                            #if os(iOS)
+                            if let url = post.url {
+                                ShareLink(item: url)
+                                Button("Copy Link", systemImage: "link") { UIPasteboard.general.url = url }
+                            }
+                            Divider()
                             #endif
                             Button("Delete", systemImage: "trash", role: .destructive) { pendingDelete = post }
                         }
+                        #if os(iOS)
+                        // On the row, so on iPad it points at what it would delete.
+                        .confirmationDialog("Delete “\(post.title)”?",
+                                            isPresented: Binding(get: { pendingDelete?.id == post.id }, set: { if !$0 { pendingDelete = nil } }),
+                                            titleVisibility: .visible) {
+                            Button("Delete from \(site?.name ?? "site")", role: .destructive) { Task { await delete(post) } }
+                        } message: {
+                            Text("This permanently deletes the post. It can't be undone.")
+                        }
+                        #endif
                 }
             } header: {
                 #if os(iOS)
@@ -175,10 +205,15 @@ struct SitePostsView: View {
         #if os(macOS)
         row(post).tag(post.id)
         #else
-        Button { Task { await open(post) } } label: { row(post) }
-            .buttonStyle(.plain)
-            .cardRow(isSelected: usesColumns && localEntry(for: post).map { $0 == navigation.selectedEntry } == true)
-            .disabled(opening != nil)
+        Group {
+            if usesColumns {
+                row(post).tag(post.id)
+            } else {
+                Button { openNow(post) } label: { row(post) }
+                    .buttonStyle(.plain)
+            }
+        }
+        .cardRow(isSelected: usesColumns && selectedPostID == post.id)
         #endif
     }
 
@@ -193,7 +228,7 @@ struct SitePostsView: View {
                 Text((post.date ?? .now).formatted(date: .abbreviated, time: .omitted).uppercased())
                 Spacer()
                 if let badge = post.badge { Text(badge) }
-                if opening == post.id { ProgressView().controlSize(.mini) }
+                if isOpening(post) { ProgressView().controlSize(.mini) }
                 else if localEntry(for: post)?.state == .editing { Image(systemName: "pencil.circle") }
             }
             .font(.system(.caption2, design: .monospaced))
@@ -206,6 +241,29 @@ struct SitePostsView: View {
         .padding(.vertical, 4)
         .contentShape(Rectangle())
     }
+
+    private func isOpening(_ post: SitePost) -> Bool {
+        #if os(macOS)
+        opening == post.id
+        #else
+        navigation.openingPost.map { $0.post.id == post.id && $0.siteID == siteID && $0.failure == nil && !$0.isUnsupported } == true
+        #endif
+    }
+
+    #if os(iOS)
+    /// The post that's open beside the list, or on its way.
+    private var selectedPostID: String? {
+        if let opening = navigation.openingPost, opening.siteID == siteID { return opening.post.id }
+        guard let entry = navigation.selectedEntry, entry.siteID == siteID else { return nil }
+        return entry.remotePostID
+    }
+
+    /// The page opens at once and fills in when the post arrives.
+    private func openNow(_ post: SitePost) {
+        guard let site else { return }
+        navigation.open(post, on: site, publisher: publisher)
+    }
+    #endif
 
     private func localEntry(for post: SitePost) -> Entry? {
         entries.first { $0.remotePostID == post.id && $0.siteID == siteID }

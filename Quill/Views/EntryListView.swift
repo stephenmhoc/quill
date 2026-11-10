@@ -11,9 +11,7 @@ struct EntryListView: View {
     @Environment(\.usesColumns) private var usesColumns
     @Query(sort: \Entry.updatedAt, order: .reverse) private var entries: [Entry]
     @Query private var sites: [Site]
-    #if os(macOS)
     @State private var pendingDelete: Entry?
-    #endif
 
     private var visible: [Entry] {
         switch section {
@@ -83,24 +81,54 @@ struct EntryListView: View {
             Text("This can't be undone.")
         }
         #else
-        List {
-            ForEach(visible) { entry in
-                Button { navigation.show(entry) } label: {
-                    EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID })
+        // Selection lets a keyboard and pointer move through the list. On iPhone a row pushes.
+        if usesColumns {
+            List(selection: Binding(get: { navigation.selectedEntry }, set: { if let entry = $0 { navigation.show(entry) } })) {
+                ForEach(visible) { entry in
+                    rowActions(EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID }).tag(entry), entry)
+                        .cardRow(isSelected: entry == navigation.selectedEntry)
                 }
-                .buttonStyle(.plain)
-                .cardRow(isSelected: entry == navigation.selectedEntry && usesColumns)
-                .swipeActions(edge: .trailing) {
-                    if entry.state != .sending {
-                        Button(role: .destructive) { delete(entry) } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
+            }
+        } else {
+            List {
+                ForEach(visible) { entry in
+                    rowActions(Button { navigation.show(entry) } label: {
+                        EntryRow(entry: entry, site: sites.first { $0.id == entry.siteID })
+                    }.buttonStyle(.plain), entry)
+                    .cardRow()
                 }
             }
         }
         #endif
     }
+
+    #if os(iOS)
+    private func rowActions(_ row: some View, _ entry: Entry) -> some View {
+        row
+        // Not a destructive role, which would take the row away before the question is answered.
+        .swipeActions(edge: .trailing) {
+            if entry.state != .sending {
+                Button { pendingDelete = entry } label: { Label("Delete", systemImage: "trash") }
+                    .tint(.red)
+            }
+        }
+        .contextMenu {
+            Button("Open", systemImage: "doc.text") { navigation.show(entry) }
+            if entry.state != .sending {
+                Divider()
+                Button("Delete…", systemImage: "trash", role: .destructive) { pendingDelete = entry }
+            }
+        }
+        // On the row, so on iPad it points at what it would delete.
+        .confirmationDialog("Delete “\(entry.displayTitle)”?",
+                            isPresented: Binding(get: { pendingDelete == entry }, set: { if !$0 { pendingDelete = nil } }),
+                            titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { delete(entry) }
+        } message: {
+            Text("Nothing else keeps a copy of it, so this can't be undone.")
+        }
+    }
+    #endif
 
     @ViewBuilder private var emptyState: some View {
         switch section {

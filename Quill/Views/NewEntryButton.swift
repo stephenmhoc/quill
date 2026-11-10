@@ -19,6 +19,7 @@ private struct NewEntryButton: ViewModifier {
     @Binding var dropSite: UUID?
     @Environment(Navigation.self) private var navigation
     @Environment(\.modelContext) private var context
+    @Query(sort: Site.order) private var sites: [Site]
     @State private var offset = CGSize.zero
     private static let reach: CGFloat = 16
     private static let tapSlop: CGFloat = 44
@@ -41,6 +42,10 @@ private struct NewEntryButton: ViewModifier {
                     .buttonStyle(.plain)
                     .accessibilityLabel("New Entry")
                     .accessibilityIdentifier("floatingNewEntry")
+                    .hoverEffect(.lift)
+                    // What dragging onto a site does, for anyone who can't or wouldn't think to drag.
+                    .contextMenu { if !dropTargets.isEmpty { siteChoices } }
+                    .accessibilityActions { if !dropTargets.isEmpty { siteChoices } }
                     .scaleEffect(offset == .zero ? 1 : 1.12)
                     .offset(offset)
                     .highPriorityGesture(dropTargets.isEmpty ? nil : drag)
@@ -48,6 +53,12 @@ private struct NewEntryButton: ViewModifier {
                     .padding(20 - Self.reach)
                 }
             }
+    }
+
+    private var siteChoices: some View {
+        ForEach(sites.filter { dropTargets[$0.id] != nil }) { site in
+            Button("New Entry in \(site.name)") { navigation.openBlankEntry(in: context, site: site.id) }
+        }
     }
 
     @ViewBuilder private func surface(_ icon: some View) -> some View {
