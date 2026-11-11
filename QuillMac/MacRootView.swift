@@ -73,7 +73,7 @@ struct MacRootView: View {
     /// The same as View > Show Sidebar and ⌃⌘S.
     private func toggleSidebar() { window.toggleSidebar(navigation) }
 
-    /// Focus Mode hides the toolbar itself, in `WindowBridge`: hiding it here takes the whole
+    /// Focus Mode empties the toolbar instead (see `WindowBridge`): hiding it here takes the whole
     /// title bar with it, traffic lights included, so they could never come back.
     private var showsToolbar: Bool { lock.isUnlocked }
 
@@ -106,12 +106,15 @@ struct MacRootView: View {
                 .navigationSplitViewColumnWidth(min: Self.listWidth.min, ideal: Self.listWidth.ideal, max: Self.listWidth.max)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { window.listWidth = $0 }
                 .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button { navigation.openBlankEntry(in: context) } label: {
-                            Label("New Entry", systemImage: "square.and.pencil")
+                    // Focus Mode empties the toolbar instead of hiding it; see `WindowBridge`.
+                    if !window.isFocused {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button { navigation.openBlankEntry(in: context) } label: {
+                                Label("New Entry", systemImage: "square.and.pencil")
+                            }
+                            .help("New Entry (⌘N)")
+                            .accessibilityIdentifier("newEntryButton")
                         }
-                        .help("New Entry (⌘N)")
-                        .accessibilityIdentifier("newEntryButton")
                     }
                 }
         } detail: {
@@ -325,18 +328,18 @@ private struct WindowBridge: NSViewRepresentable {
             repairNewSplitView(in: window)
             if isFocused != wasFocused {
                 wasFocused = isFocused
-                // The page covers the window, so the toolbar of the columns behind it goes, and the
-                // title with it. The title bar stays, for the traffic lights and the toggle.
+                // The page covers the window, so the title goes and the title bar shows the page,
+                // keeping the traffic lights and the toggle. The toolbar stays, emptied by the
+                // columns (see `MacEditorView`): hidden and shown again, SwiftUI grows the window by
+                // the toolbar's height on every layout, up to the height of the screen.
                 window.titleVisibility = isFocused ? .hidden : .visible
                 window.titlebarAppearsTransparent = isFocused
-                // Locking leaves Focus Mode, and the lock keeps the toolbar hidden.
-                window.toolbar?.isVisible = !isFocused && !isLocked
                 if isFocused {
                     watch(window)
                 } else {
                     stopWatching(window)
-                    // With the toolbar back, the title is laid out from scratch and lands under
-                    // the toggle. Putting the toggle back afterwards makes room for it again.
+                    // With the title back, it's laid out from scratch and lands under the toggle.
+                    // Putting the toggle back afterwards makes room for it again.
                     DispatchQueue.main.async { [weak self, weak window] in
                         guard let self, let window, !self.wasFocused, let accessory = self.accessory,
                               let index = window.titlebarAccessoryViewControllers.firstIndex(of: accessory) else { return }

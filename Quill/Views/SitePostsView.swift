@@ -48,6 +48,15 @@ struct SitePostsView: View {
         #endif
     }
 
+    /// Mac: Focus Mode takes the list's items out of the toolbar, which stays where it is.
+    private var showsToolbarItems: Bool {
+        #if os(macOS)
+        !hidesTitle
+        #else
+        true
+        #endif
+    }
+
     var body: some View {
         posted
             #if os(macOS)
@@ -75,15 +84,17 @@ struct SitePostsView: View {
             .largeTitle()
             .toolbar {
                 #if os(macOS)
-                if let tags = site?.cachedTagList, !tags.isEmpty {
+                if showsToolbarItems, let tags = site?.cachedTagList, !tags.isEmpty {
                     ToolbarItem(placement: .primaryAction) { TagFilterMenu(tags: tags, selection: $filter) }
                 }
                 #endif
-                ToolbarItem(placement: .primaryAction) {
-                    Button { editing = true } label: { Label("Edit Site", systemImage: "slider.horizontal.3") }
-                        #if os(macOS)
-                        .help("Edit Site")
-                        #endif
+                if showsToolbarItems {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button { editing = true } label: { Label("Edit Site", systemImage: "slider.horizontal.3") }
+                            #if os(macOS)
+                            .help("Edit Site")
+                            #endif
+                    }
                 }
             }
             .sheet(isPresented: $editing) {

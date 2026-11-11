@@ -31,7 +31,8 @@ extension EnvironmentValues {
     @Entry var listQuery = ""
     /// Mac: the lock screen covers the window, so its title mustn't name a site.
     @Entry var isCovered = false
-    /// Mac: Focus Mode's page covers the window, so the columns behind it give it no title.
+    /// Mac: Focus Mode's page covers the window, so the columns behind it give it no title and
+    /// take their items out of the toolbar, which stays in place so the window keeps its size.
     @Entry var hidesTitle = false
 }
 #endif

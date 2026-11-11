@@ -52,6 +52,15 @@ struct EntryListView: View {
         }
     }
 
+    /// Mac: Focus Mode takes the list's items out of the toolbar, which stays where it is.
+    private var showsToolbarItems: Bool {
+        #if os(macOS)
+        !hidesTitle
+        #else
+        true
+        #endif
+    }
+
     var body: some View {
         list
             .overlay {
@@ -65,7 +74,7 @@ struct EntryListView: View {
             #endif
             .largeTitle()
             .toolbar {
-                if section == .outbox, !visible.isEmpty {
+                if section == .outbox, !visible.isEmpty, showsToolbarItems {
                     ToolbarItem(placement: .automatic) {
                         Button("Retry All") { Task { await publisher.retryAll() } }
                     }
