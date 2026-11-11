@@ -44,7 +44,6 @@ struct MacRootView: View {
                          leaveFocus: { window.exitFocus() })
         }
         .background { AttentionWatcher() }
-        .toolbar(showsToolbar ? .automatic : .hidden, for: .windowToolbar)
         // Closing the window ends Focus Mode, so reopening it shows the window as it was.
         .onDisappear { window.exitFocus() }
         .onChange(of: lock.isUnlocked) { _, isUnlocked in
@@ -72,10 +71,6 @@ struct MacRootView: View {
 
     /// The same as View > Show Sidebar and ⌃⌘S.
     private func toggleSidebar() { window.toggleSidebar(navigation) }
-
-    /// Focus Mode empties the toolbar instead (see `WindowBridge`): hiding it here takes the whole
-    /// title bar with it, traffic lights included, so they could never come back.
-    private var showsToolbar: Bool { lock.isUnlocked }
 
     @ViewBuilder private var content: some View {
         if sites.isEmpty {
@@ -106,8 +101,8 @@ struct MacRootView: View {
                 .navigationSplitViewColumnWidth(min: Self.listWidth.min, ideal: Self.listWidth.ideal, max: Self.listWidth.max)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { window.listWidth = $0 }
                 .toolbar {
-                    // Focus Mode empties the toolbar instead of hiding it; see `WindowBridge`.
-                    if !window.isFocused {
+                    // Locked or in Focus Mode, the toolbar is emptied rather than hidden; see `WindowBridge`.
+                    if lock.isUnlocked && !window.isFocused {
                         ToolbarItem(placement: .primaryAction) {
                             Button { navigation.openBlankEntry(in: context) } label: {
                                 Label("New Entry", systemImage: "square.and.pencil")
@@ -331,7 +326,8 @@ private struct WindowBridge: NSViewRepresentable {
                 // The page covers the window, so the title goes and the title bar shows the page,
                 // keeping the traffic lights and the toggle. The toolbar stays, emptied by the
                 // columns (see `MacEditorView`): hidden and shown again, SwiftUI grows the window by
-                // the toolbar's height on every layout, up to the height of the screen.
+                // the toolbar's height on every layout, up to the height of the screen. The lock
+                // empties it the same way, so nothing there names a site or an entry.
                 window.titleVisibility = isFocused ? .hidden : .visible
                 window.titlebarAppearsTransparent = isFocused
                 if isFocused {
@@ -351,7 +347,6 @@ private struct WindowBridge: NSViewRepresentable {
             if isLocked != wasLocked {
                 wasLocked = isLocked
                 if isLocked {
-                    window.toolbar?.isVisible = false
                     endAppKitSheets(on: window)
                     // A field's editor stands in for the field, so keep the field.
                     let current = window.firstResponder
@@ -359,7 +354,6 @@ private struct WindowBridge: NSViewRepresentable {
                     lockResponder?.isHolding = true
                     if window.makeFirstResponder(lockResponder) == false { window.makeFirstResponder(nil) }
                 } else {
-                    if !isFocused { window.toolbar?.isVisible = true }
                     lockResponder?.isHolding = false
                     if let view = responder as? NSView, view.window === window {
                         window.makeFirstResponder(view)
@@ -456,7 +450,11 @@ private struct WindowBridge: NSViewRepresentable {
                 window.addTitlebarAccessoryViewController(controller)
                 accessory = controller
             }
-            accessory?.isHidden = !isShown || wasFaded
+            let hides = !isShown || wasFaded
+            accessory?.isHidden = hides
+            // With the toolbar left in place over the lock, the controller's flag alone leaves the
+            // button showing, so the view goes too.
+            accessory?.view.isHidden = hides
         }
 
         func removeToggle() {

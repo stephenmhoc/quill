@@ -58,6 +58,15 @@ final class AppLock {
         guard !isUnlocked, !isAuthenticating else { return }
         isAuthenticating = true
         defer { isAuthenticating = false }
+        #if DEBUG
+        // UI tests can't use Touch ID: this stands in for it, a moment late so that the test sees
+        // the window while it's locked. Debug builds only, like `-skipUnlock`.
+        if CommandLine.arguments.contains("-unlockForTesting") {
+            try? await Task.sleep(for: .seconds(1.5))
+            isUnlocked = true
+            return
+        }
+        #endif
         let ctx = LAContext()
         #if os(iOS)
         ctx.localizedFallbackTitle = "Use Passcode"

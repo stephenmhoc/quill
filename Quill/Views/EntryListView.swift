@@ -52,10 +52,10 @@ struct EntryListView: View {
         }
     }
 
-    /// Mac: Focus Mode takes the list's items out of the toolbar, which stays where it is.
+    /// Mac: Focus Mode and the lock take the list's items out of the toolbar, which stays where it is.
     private var showsToolbarItems: Bool {
         #if os(macOS)
-        !hidesTitle
+        !hidesTitle && !isCovered
         #else
         true
         #endif

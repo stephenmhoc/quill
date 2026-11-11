@@ -69,8 +69,8 @@ struct MacEditorView: View {
         // Focus Mode shows the page and nothing about it, title bar included.
         .navigationTitle(!lock.isUnlocked ? "Quill" : window.isFocused ? "" : entry.isBlank ? "New Entry" : entry.displayTitle)
         .navigationSubtitle(lock.isUnlocked && !window.isFocused ? site?.name ?? "" : "")
-        // Focus Mode empties the toolbar rather than hiding it, so the window keeps its size.
-        .toolbar { if !window.isFocused { toolbar } }
+        // Locked or in Focus Mode, the toolbar is emptied rather than hidden, so the window keeps its size.
+        .toolbar { if lock.isUnlocked && !window.isFocused { toolbar } }
         .focusedSceneValue(\.editorActions, actions)
         .onChange(of: lock.isUnlocked) { _, isUnlocked in
             guard !isUnlocked else { return }

@@ -96,6 +96,8 @@ Results land in `build/results.xcresult`. To see the screenshots the UI test cap
 `test-mac.sh` needs no Ghost. It builds the `com.merimerimeri.Quill.dev` identity, ad-hoc signed,
 and clears only that identity's data, so it can't touch the Quill in `/Applications`. Its log is
 `build/mac.log`. `-skipUnlock` stands in for Touch ID, so the Mac's unlock prompt isn't tested.
+To check something across a lock, `-unlockForTesting` makes Unlock succeed 1.5 seconds after it's
+asked, without Touch ID, both at launch and after ⇧⌘L. Like `-skipUnlock`, it's in Debug builds only.
 
 ## Managing the test Ghost
 

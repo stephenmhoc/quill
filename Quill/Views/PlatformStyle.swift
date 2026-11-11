@@ -29,7 +29,8 @@ extension EnvironmentValues {
 extension EnvironmentValues {
     /// Mac: what's typed in the sidebar's search field, which narrows the list beside it.
     @Entry var listQuery = ""
-    /// Mac: the lock screen covers the window, so its title mustn't name a site.
+    /// Mac: the lock screen covers the window, so its title mustn't name a site, and the columns
+    /// take their items out of the toolbar.
     @Entry var isCovered = false
     /// Mac: Focus Mode's page covers the window, so the columns behind it give it no title and
     /// take their items out of the toolbar, which stays in place so the window keeps its size.
